@@ -1,0 +1,31 @@
+# Workflow chan doan: kiem tra GitHub Actions co cap duoc runner cho repo nay khong.
+# Khong build gi, chi echo. Chay bang: Actions -> "Runner check" -> Run workflow.
+#
+# Cach doc ket qua:
+#   - Ca 2 job xanh            -> runner OK, loi truoc do la transient -> chay lai "iOS build"
+#   - linux xanh, macos do     -> pool macOS cua tai khoan co van de (khong phai code)
+#   - Ca 2 job deu "not acquired" -> van de o tang tai khoan/repo, khong phai workflow
+name: Runner check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Linux runner OK
+        run: |
+          echo "ubuntu-latest acquired"
+          uname -a
+
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: macOS runner OK
+        run: |
+          echo "macos-15 acquired"
+          sw_vers
+          xcodebuild -version
