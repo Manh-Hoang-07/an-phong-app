@@ -104,28 +104,23 @@ jobs:
         if: ${{ !inputs.sign }}
         run: |
           set -euo pipefail
-          # Xcode tu choi archive voi CODE_SIGNING_ALLOWED=NO (exit 65).
-          # Dung ad-hoc identity de archive, roi strip chu ky truoc khi zip.
-          xcodebuild archive -project build/ios/anphong.xcodeproj -scheme anphong \
+          # Dung xcodebuild build (da chay thanh cong tren CI) thay vi archive
+          # (archive bi Xcode tu choi, exit 65). derive .app tu derivedDataPath.
+          xcodebuild -project build/ios/anphong.xcodeproj -scheme anphong \
             -configuration Release -destination 'generic/platform=iOS' \
-            -archivePath build/anphong-unsigned.xcarchive \
-            CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Automatic \
-            -allowProvisioningUpdates | tail -n 40
+            -derivedDataPath build/derived \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO | tail -n 40
 
-          APP="$(find build/anphong-unsigned.xcarchive/Products/Applications -maxdepth 1 -name '*.app' -print -quit)"
+          APP="$(find build/derived/Build/Products -maxdepth 3 -name '*.app' -type d -print -quit)"
           if [ -z "$APP" ]; then
-            echo "::error title=Khong tim thay .app trong xcarchive"
+            echo "::error title=Khong tim thay .app trong derivedData"
             exit 1
           fi
+          echo "APP=$APP"
 
           rm -rf build/ipa-unsigned
           mkdir -p build/ipa-unsigned/Payload
           cp -R "$APP" build/ipa-unsigned/Payload/
-          BIN="$(find build/ipa-unsigned/Payload/*.app -maxdepth 1 -type f -perm -u+x -print -quit)"
-          if [ -n "$BIN" ]; then
-            codesign --remove-signature "$BIN" 2>/dev/null || true
-          fi
           rm -rf build/ipa-unsigned/Payload/*.app/_CodeSignature \
                  build/ipa-unsigned/Payload/*.app/embedded.mobileprovision
           (cd build/ipa-unsigned && zip -q -r -y ../anphong-unsigned.ipa Payload)
