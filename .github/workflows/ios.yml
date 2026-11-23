@@ -52,6 +52,32 @@ jobs:
             sed -i '' "s|application/bundle_identifier=\".*\"|application/bundle_identifier=\"${IOS_BUNDLE_ID}\"|" export_presets.cfg
           fi
 
+      # Godot 4.7+ refuses iOS export unless ETC2/ASTC import is enabled.
+      # has_valid_project_configuration() returns false with an EMPTY error
+      # string when this is off, so the failure log gives no clue. Enforce it
+      # here so CI does not depend on the setting being committed by hand.
+      - name: Bắt buộc bật ETC2/ASTC cho export iOS
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("project.godot")
+          text = path.read_text(encoding="utf-8")
+          key = "textures/vram_compression/import_etc2_astc"
+
+          if re.search(rf"(?m)^{re.escape(key)}=", text):
+              text = re.sub(rf"(?m)^{re.escape(key)}=.*$", key + "=true", text)
+          else:
+              marker = "[rendering]"
+              if marker not in text:
+                  raise SystemExit("Khong tim thay [rendering] trong project.godot")
+              text = text.replace(marker, marker + "\n" + key + "=true", 1)
+
+          path.write_text(text, encoding="utf-8")
+          print("ETC2/ASTC import: enabled")
+          PY
+
       - name: Import tài nguyên
         run: |
           "$GODOT_APP" --headless --path . --import || true
