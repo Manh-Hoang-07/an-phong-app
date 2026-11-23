@@ -19,16 +19,27 @@ var quest_hint := ""      ## tiến độ nhiệm vụ gần nhất từ sự ki
 func has_player() -> bool:
 	return not player.is_empty()
 
-func set_player(p: Dictionary) -> void:
-	player = p.duplicate(true)
-	form_active = bool(p.get("formActive", false))
+func set_player(p: Variant) -> void:
+	# Chặn payload sai kiểu tu /api/me: gan Dictionary khong dung kieu vao bien
+	# typed Dictionary gay EXC_BAD_ACCESS ngay khi goi .is_empty() tren iOS/arm64.
+	if typeof(p) != TYPE_DICTIONARY:
+		push_warning("set_player: payload khong phai Dictionary, bo qua")
+		return
+	var d: Dictionary = p
+	player = d.duplicate(true)
+	form_active = bool(d.get("formActive", false))
 	# Server gửi hp/mp trong player; client tự giữ giá trị tức thời giữa các lần lưu
-	if not p.has("hp"): hp = int(p.get("hp", 0))
-	else: hp = int(p["hp"])
-	if not p.has("mp"): mp = int(p.get("mp", 0))
-	else: mp = int(p["mp"])
+	if not d.has("hp"): hp = int(d.get("hp", 0))
+	else: hp = int(d["hp"])
+	if not d.has("mp"): mp = int(d.get("mp", 0))
+	else: mp = int(d["mp"])
 	recalc_stats()
 	player_changed.emit(false)
+
+## Ép an toàn sang Dictionary. Gán Variant sai kiểu vào biến typed Dictionary
+## rồi gọi .is_empty() la nguon EXC_BAD_ACCESS tren iOS release build.
+static func _as_dict(v: Variant) -> Dictionary:
+	return v if typeof(v) == TYPE_DICTIONARY else {}
 
 ## Web: App.stats = GameData.calcStats(player, {form}). Server KHÔNG gửi stats trong payload,
 ## nên client phải tự tính. Bản rút gọn: level curve của class + điểm潜力 + stats trang bị + crit.
@@ -36,14 +47,14 @@ func set_player(p: Dictionary) -> void:
 func recalc_stats() -> void:
 	if player.is_empty(): return
 	var lv := maxi(1, int(player.get("level", 1)))
-	var pts: Dictionary = player.get("points", {})
+	var pts: Dictionary = _as_dict(player.get("points", {}))
 	var school := str(player.get("school", ""))
-	var schools: Dictionary = Data.raw.get("SCHOOLS", {})
-	var sc: Dictionary = schools.get(school, {})
+	var schools: Dictionary = _as_dict(Data.raw.get("SCHOOLS", {}))
+	var sc: Dictionary = _as_dict(schools.get(school, {}))
 	if sc.is_empty():
 		var base := str(sc.get("base", ""))
-		sc = schools.get(base, {})
-	var curve: Dictionary = sc.get("curve", {})
+		sc = _as_dict(schools.get(base, {}))
+	var curve: Dictionary = _as_dict(sc.get("curve", {}))
 	if curve.is_empty():
 		curve = {"hp": [100, 40], "mp": [30, 8], "atk": [8, 4], "def": [3, 2]}
 	var evo_mul := 1.0
@@ -53,10 +64,10 @@ func recalc_stats() -> void:
 		return (float(a[0]) + float(a[1]) * float(lv - 1)) * evo_mul
 	# Cộng stats từ 10 ô trang bị (mỗi món có thể có stats và quality mul; dùng stats đã lưu).
 	var eq_add := {"hp": 0.0, "mp": 0.0, "atk": 0.0, "def": 0.0, "crit": 0.0, "speed": 0.0, "sta": 0.0}
-	var equip: Dictionary = player.get("equip", {})
+	var equip: Dictionary = _as_dict(player.get("equip", {}))
 	for slot in equip.keys():
-		var it: Dictionary = equip.get(slot, {})
-		var st: Dictionary = it.get("stats", {})
+		var it: Dictionary = _as_dict(equip.get(slot, {}))
+		var st: Dictionary = _as_dict(it.get("stats", {}))
 		for k in st.keys():
 			if eq_add.has(k): eq_add[k] += float(st[k])
 	var vit := int(pts.get("vit", 0))
@@ -71,8 +82,8 @@ func recalc_stats() -> void:
 	# Ấn thức tỉnh đang bật: nhân hệ số (máu, năng lượng, tấn công, phòng thủ; thể lực theo hệ số năng lượng)
 	var sta_mul := 1.0
 	if form_active:
-		var aw: Dictionary = Data.awaken(maxi(1, Data.awaken_tier_of(player.get("formChoice", ""))))
-		var m: Dictionary = aw.get("mul", {})
+		var aw: Dictionary = _as_dict(Data.awaken(maxi(1, Data.awaken_tier_of(player.get("formChoice", "")))))
+		var m: Dictionary = _as_dict(aw.get("mul", {}))
 		if not m.is_empty():
 			max_hp = int(roundf(float(max_hp) * float(m.get("hp", 1.0))))
 			max_mp = int(roundf(float(max_mp) * float(m.get("mp", 1.0))))
@@ -80,7 +91,8 @@ func recalc_stats() -> void:
 			def = int(roundf(float(def) * float(m.get("def", 1.0))))
 			sta_mul = float(m.get("mp", 1.0))
 	var S: Dictionary = Data.STAMINA
-	var max_sta := int(roundf((float(S.get("base", 100)) + float(S.get("perLevel", 2)) * float(lv - 1) + float(S.get("perAgi", 1)) * float(agi)) * sta_mul * float((sc.get("bonus", {}) as Dictionary).get("sta", 1.0)))) + int(eq_add["sta"])
+	var bonus: Dictionary = _as_dict(sc.get("bonus", {}))
+	var max_sta := int(roundf((float(S.get("base", 100)) + float(S.get("perLevel", 2)) * float(lv - 1) + float(S.get("perAgi", 1)) * float(agi)) * sta_mul * float(bonus.get("sta", 1.0)))) + int(eq_add["sta"])
 	stats = {
 		"maxSta": max_sta,
 		"maxHp": max_hp, "maxMp": max_mp, "atk": atk, "def": def,

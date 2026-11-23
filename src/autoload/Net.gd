@@ -15,6 +15,10 @@ var _rid_seq: int = 0
 var _offline: bool = false
 var _queue: Array[Dictionary] = []
 var _busy: bool = false
+# Giữ HTTPRequest lại sau khi await. Gọi queue_free() ngay trong coroutine đang
+# resume tu HTTPRequest::_request_done lam crash tren iOS/arm64 release build
+# (EXC_BAD_ACCESS trong GDScriptFunctionState::resume).
+var _spent: Array[HTTPRequest] = []
 
 func _ready() -> void:
 	_rid_base = str(Time.get_unix_time_from_system()).md5_text().substr(0, 6)
@@ -22,6 +26,17 @@ func _ready() -> void:
 func _next_rid() -> String:
 	_rid_seq += 1
 	return "%s-%d" % [_rid_base, _rid_seq]
+
+func _cleanup_spent() -> void:
+	# Chi giu 8 request gan nhat. Khong free request vua resume trong _request_done.
+	while _spent.size() > 8:
+		var r: HTTPRequest = _spent.pop_front()
+		if is_instance_valid(r): r.queue_free()
+
+func _exit_tree() -> void:
+	for r in _spent:
+		if is_instance_valid(r): r.queue_free()
+	_spent.clear()
 
 func _set_offline(v: bool) -> void:
 	if v == _offline: return
@@ -46,16 +61,21 @@ func request(path: String, body: Variant = null, method: String = "") -> Diction
 		payload = JSON.stringify(body)
 	var err := req.request(url, headers, verb, payload if body != null else "")
 	if err != OK:
-		req.queue_free()
+		_spent.append(req)
 		return {"ok": false, "error": "Không gửi được yêu cầu: %s" % err}
 	# await là cơ chế chính thức của Godot 4 cho HTTPRequest
 	var response: Array = await req.request_completed
-	req.queue_free()
-	var result: int = response[0]
-	var code: int = response[1]
-	var raw: PackedByteArray = response[3]
+	# KHÔNG queue_free() ở đây: coroutine đang resume trong HTTPRequest::_request_done.
+	# Giữ request trong _spent; dọn khi vượt ngưỡng (xem _cleanup_spent) hoac luc thoat.
+	_spent.append(req)
+	_cleanup_spent()
+	if response.size() < 4:
+		return {"ok": false, "error": "Phản hồi không hợp lệ"}
+	var result: int = int(response[0])
+	var code: int = int(response[1])
+	var raw: PackedByteArray = response[3] if typeof(response[3]) == TYPE_PACKED_BYTE_ARRAY else PackedByteArray()
 	# Server đặt phiên qua Set-Cookie; trích ap_session để dùng cho request sau và WebSocket.
-	var resp_headers: PackedStringArray = response[2]
+	var resp_headers: PackedStringArray = response[2] if typeof(response[2]) == TYPE_PACKED_STRING_ARRAY else PackedStringArray()
 	for h in resp_headers:
 		var low := h.to_lower()
 		if low.begins_with("set-cookie:") and low.contains("ap_session="):
