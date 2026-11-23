@@ -69,7 +69,7 @@ jobs:
           set -e
           tail -n 60 export.log
           if [ $code -ne 0 ]; then
-            echo "::error title=Godot export loi::$(grep -A10 -iE 'configuration errors' export.log | head -n 14 | tr '\n' '|')"
+            echo "::error title=Godot export loi::$(sed 's/\x1b\[[0-9;]*m//g' export.log | grep -v '^\[' | tail -n 30 | tr '\n' '|') -- templates: $(ls "$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable" | tr '\n' ' ')"
             exit $code
           fi
           ls build/ios
