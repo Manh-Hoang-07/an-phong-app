@@ -17,6 +17,10 @@ on:
 env:
   GODOT_VERSION: "4.7.2"
   GODOT_APP: /Applications/Godot.app/Contents/MacOS/Godot
+  # Template Godot 4.7.2 duoc build bang Xcode 26 / iOS 26 SDK (co cac symbol
+  # CADynamicRange*, MTLTensorDomain). Xcode 16.4 mac dinh tren runner khong co
+  # -> link that. Ep dung Xcode 26.3 co san tren macos-15.
+  DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
 
 jobs:
   ios:
