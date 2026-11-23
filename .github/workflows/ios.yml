@@ -100,12 +100,29 @@ jobs:
           fi
           ls build/ios
 
-      - name: Biên dịch thử (không ký)
+      - name: Đóng gói IPA unsigned để sideload (không cần tài khoản Apple)
         if: ${{ !inputs.sign }}
         run: |
-          xcodebuild -project build/ios/anphong.xcodeproj -scheme anphong \
+          set -euo pipefail
+          xcodebuild archive -project build/ios/anphong.xcodeproj -scheme anphong \
             -configuration Release -destination 'generic/platform=iOS' \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | tail -n 30
+            -archivePath build/anphong-unsigned.xcarchive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO | tail -n 30
+
+          APP="$(find build/anphong-unsigned.xcarchive/Products/Applications -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$APP" ]; then
+            echo "::error title=Khong tim thay .app trong xcarchive"
+            exit 1
+          fi
+
+          rm -rf build/ipa-unsigned
+          mkdir -p build/ipa-unsigned/Payload
+          cp -R "$APP" build/ipa-unsigned/Payload/
+          (cd build/ipa-unsigned && zip -q -r -y ../anphong-unsigned.ipa Payload)
+
+          mkdir -p build/ipa
+          cp build/anphong-unsigned.ipa build/ipa/anphong-unsigned.ipa
+          ls -lh build/anphong-unsigned.ipa
 
       - name: Nạp chứng chỉ + provisioning profile
         if: ${{ inputs.sign }}
@@ -171,6 +188,15 @@ jobs:
           mkdir -p "$HOME/.private_keys"
           echo "$KEY_P8" | base64 --decode > "$HOME/.private_keys/AuthKey_${KEY_ID}.p8"
           xcrun altool --upload-app --type ios -f build/ipa/*.ipa --apiKey "$KEY_ID" --apiIssuer "$ISSUER"
+
+      - name: Lưu IPA unsigned (dùng cho Sideloadly)
+        if: ${{ !inputs.sign }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: anphong-unsigned-ipa
+          path: build/anphong-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Lưu kết quả
         if: always()
