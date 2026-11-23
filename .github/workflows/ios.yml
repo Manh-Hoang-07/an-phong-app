@@ -45,9 +45,9 @@ jobs:
           IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
         run: |
           set -euo pipefail
-          if [ -n "${IOS_TEAM_ID:-}" ]; then
-            sed -i '' "s|application/app_store_team_id=\"\"|application/app_store_team_id=\"${IOS_TEAM_ID}\"|" export_presets.cfg
-          fi
+          # Godot bắt buộc có Team ID; bản không ký dùng giá trị tạm
+          TEAM="${IOS_TEAM_ID:-0000000000}"
+          sed -i '' "s|application/app_store_team_id=\"\"|application/app_store_team_id=\"${TEAM}\"|" export_presets.cfg
           if [ -n "${IOS_BUNDLE_ID:-}" ]; then
             sed -i '' "s|application/bundle_identifier=\".*\"|application/bundle_identifier=\"${IOS_BUNDLE_ID}\"|" export_presets.cfg
           fi
@@ -63,7 +63,15 @@ jobs:
       - name: Xuất dự án Xcode
         run: |
           mkdir -p build/ios
-          "$GODOT_APP" --headless --path . --export-release iOS build/ios/anphong.xcodeproj
+          set +e
+          "$GODOT_APP" --headless --path . --export-release iOS build/ios/anphong.xcodeproj > export.log 2>&1
+          code=$?
+          set -e
+          tail -n 60 export.log
+          if [ $code -ne 0 ]; then
+            echo "::error title=Godot export loi::$(grep -iE 'error|fail|not found|missing|invalid' export.log | head -n 12 | tr '\n' '|')"
+            exit $code
+          fi
           ls build/ios
 
       - name: Biên dịch thử (không ký)
