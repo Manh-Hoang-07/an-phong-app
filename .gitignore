@@ -1,0 +1,12 @@
+# .gitignore cho project Godot (app Thức Tỉnh)
+.godot/
+builds/
+*.log
+.DS_Store
+Thumbs.db
+
+# ảnh chụp thử giao diện
+.shots_*.png
+
+# công cụ cá nhân
+.perch/

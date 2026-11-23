@@ -1,0 +1,148 @@
+# Build iOS trên máy macOS của GitHub (không cần Mac cá nhân).
+#   Actions -> "iOS build" -> Run workflow
+#   - sign = false: chỉ xuất dự án Xcode + biên dịch thử (không cần tài khoản Apple)
+#   - sign = true : ký + xuất .ipa (cần secrets Apple, xem docs/IOS_CI.md), tùy chọn đẩy lên TestFlight
+name: iOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: "Ký và xuất .ipa (cần secrets Apple)"
+        type: boolean
+        default: false
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_APP: /Applications/Godot.app/Contents/MacOS/Godot
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cài Godot + export templates
+        run: |
+          set -euo pipefail
+          V="${GODOT_VERSION}-stable"
+          BASE="https://github.com/godotengine/godot/releases/download/${V}"
+          curl -fsSL -o godot.zip "${BASE}/Godot_v${V}_macos.universal.zip"
+          unzip -q godot.zip
+          sudo mv Godot.app /Applications/Godot.app
+          curl -fsSL -o templates.tpz "${BASE}/Godot_v${V}_export_templates.tpz"
+          unzip -q templates.tpz -d tpl
+          DEST="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$DEST"
+          mv tpl/templates/* "$DEST/"
+
+      - name: Điền Team ID / Bundle ID vào preset
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+        run: |
+          set -euo pipefail
+          if [ -n "${IOS_TEAM_ID:-}" ]; then
+            sed -i '' "s|application/app_store_team_id=\"\"|application/app_store_team_id=\"${IOS_TEAM_ID}\"|" export_presets.cfg
+          fi
+          if [ -n "${IOS_BUNDLE_ID:-}" ]; then
+            sed -i '' "s|application/bundle_identifier=\".*\"|application/bundle_identifier=\"${IOS_BUNDLE_ID}\"|" export_presets.cfg
+          fi
+
+      - name: Import tài nguyên
+        run: |
+          "$GODOT_APP" --headless --path . --import || true
+          "$GODOT_APP" --headless --path . --import
+
+      - name: Kiểm tra cú pháp script
+        run: '"$GODOT_APP" --headless --path . --script res://tools/check_scripts.gd'
+
+      - name: Xuất dự án Xcode
+        run: |
+          mkdir -p build/ios
+          "$GODOT_APP" --headless --path . --export-release iOS build/ios/anphong.xcodeproj
+          ls build/ios
+
+      - name: Biên dịch thử (không ký)
+        if: ${{ !inputs.sign }}
+        run: |
+          xcodebuild -project build/ios/anphong.xcodeproj -scheme anphong \
+            -configuration Release -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | tail -n 30
+
+      - name: Nạp chứng chỉ + provisioning profile
+        if: ${{ inputs.sign }}
+        env:
+          CERT_P12: ${{ secrets.IOS_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+          PROFILE: ${{ secrets.IOS_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          KC="$RUNNER_TEMP/build.keychain-db"
+          KCPASS="$(uuidgen)"
+          security create-keychain -p "$KCPASS" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPASS" "$KC"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KCPASS" "$KC"
+          security list-keychains -d user -s "$KC" login.keychain-db
+          echo "$PROFILE" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
+          NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          echo "PROFILE_NAME=$NAME" >> "$GITHUB_ENV"
+
+      - name: Archive + xuất .ipa
+        if: ${{ inputs.sign }}
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive -project build/ios/anphong.xcodeproj -scheme anphong \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath build/anphong.xcarchive \
+            CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" CODE_SIGN_IDENTITY="Apple Distribution" | tail -n 30
+          BUNDLE=$(grep -o 'application/bundle_identifier="[^"]*"' export_presets.cfg | head -1 | cut -d'"' -f2)
+          {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+            echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+            echo '<plist version="1.0"><dict>'
+            echo "<key>method</key><string>${IOS_EXPORT_METHOD:-app-store}</string>"
+            echo "<key>teamID</key><string>${IOS_TEAM_ID}</string>"
+            echo '<key>signingStyle</key><string>manual</string>'
+            echo "<key>provisioningProfiles</key><dict><key>${BUNDLE}</key><string>${PROFILE_NAME}</string></dict>"
+            echo '</dict></plist>'
+          } > build/ExportOptions.plist
+          xcodebuild -exportArchive -archivePath build/anphong.xcarchive \
+            -exportOptionsPlist build/ExportOptions.plist -exportPath build/ipa | tail -n 20
+          ls build/ipa
+
+      - name: Đẩy lên TestFlight (nếu có API key)
+        if: ${{ inputs.sign }}
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          KEY_P8: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEY_ID:-}" ]; then echo "Bỏ qua: chưa có ASC_KEY_ID"; exit 0; fi
+          mkdir -p "$HOME/.private_keys"
+          echo "$KEY_P8" | base64 --decode > "$HOME/.private_keys/AuthKey_${KEY_ID}.p8"
+          xcrun altool --upload-app --type ios -f build/ipa/*.ipa --apiKey "$KEY_ID" --apiIssuer "$ISSUER"
+
+      - name: Lưu kết quả
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: |
+            build/ipa/*.ipa
+            build/ios
+          if-no-files-found: ignore
+          retention-days: 14
