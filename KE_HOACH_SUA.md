@@ -228,3 +228,12 @@ Trước đây mọi layer đều vẽ bằng vài hình đơn giản (vòng tr�
 - Kiểm: 175 kỹ năng, 139 công thức khác nhau; 36 kỹ năng (33 nhóm) có công thức trùng hệt kỹ năng khác (thường khác class, cùng kiểu).
 - Thêm **biểu tượng đặc trưng** theo `sig` của từng kỹ năng (86 loại: vuốt, kiếm chéo, mũi giáo, vòng xoáy, bóng phân thân, đầu lâu, phượng hoàng, rồng, bông tuyết, sét, thiên thần, cánh, khiên, gai...). Vẽ ngay lúc tung chiêu, to hơn với tuyệt kỹ.
 - `tools/mark_variants.js` đánh dấu `variant` cho kỹ năng trùng công thức; app xoay tông màu + lật biến thể để mỗi kỹ năng nhìn khác nhau. Chạy lại script sau mỗi lần đồng bộ `data/skillfx` từ web.
+
+### 2026-11-24 — Đồng bộ chiến đấu với web
+Nguyên nhân máu thấp (3k thay vì 15k): `recalc_stats` cũ đọc `it.stats` do món đồ tự lưu (server không lưu) nên bỏ qua đồ/phẩm chất/cường hóa/bộ/nội tại/Kỳ Nguyên/Ấn. Bản mới đã port đủ và khớp web 2500/2500 ca ngẫu nhiên (`tools/calc_check.gd`).
+- **Sát thương lên quái** (`_calc_hit`): trừ giáp quái (`defReduce`), cộng `boss%`, buff tấn công/chí mạng, xuyên giáp Thần Kiếm, chí mạng x1.6 (Cung Thủ x1.8, Sát Thủ x2.5 sau lướt), trần chí mạng 90%, dao động 0.9–1.1, Kiếm Tâm hồi 0,5% máu.
+- **Quái đánh người** (`_hurt_player`): phẫn nộ x1.25 (cờ `fl & 4` từ server), giậm đất x1.5, chiêu trùm theo `style`; né Phiêu Diêu, Xuyên Không, Khiên Đá, Hộ Mệnh; Thành Đồng; thủ thế giảm sát thương; khiên năng lượng hút MP.
+- **Buff** (`_buffs`): guard / manashield / buff cộng dồn từng kỹ năng; tốc đánh, hồi máu liên tục. Kỹ năng hồi máu nay hồi thật (Trị Liệu Sư +20%).
+- **Hồi phục** (`_regen`): chỉ khi không giao chiến 2s, 0,5%/giây; đồ nhiễm chặn hồi máu; Dòng Chảy; Cấm Chú khóa MP.
+- Đợt 2 (cùng ngày): **dung hợp Tử Linh** (cộng chỉ số bóng ma vào `recalc_stats`, tự hết hạn + gửi `fusion_end`); **thú đồng hành** gánh 18% sát thương, gục 15s rồi hồi 50%, hồi máu khi yên, lưu `pets` kèm save/đổi map; **phản sát thương** thủ thế; **Ấn Sát** (Sát Kiếp); **Trấn Hồn** hồi khi hạ quái; **Đóng Băng** bộ Băng Long; **Cổ Ngữ** kỹ năng đầu miễn MP; **Băng Sương** làm chậm; hút máu; kháng đánh thường; buff exec/vsSlowed/chain; kỹ năng gửi kèm slow/freeze/stun/knock; tiêu MP theo `costMul`, hồi chiêu theo `cdr`.
+- Kiểm: `tools/calc_check.gd` (chỉ số, gồm dung hợp) và `tools/fx_check.gd` (hiệu ứng + nội tại) đều lệch 0 so với web. Chưa kiểm với server và cảm ứng thật.

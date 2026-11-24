@@ -184,11 +184,14 @@ func send_chat(text: String, ch: String = "map") -> bool:
 	return send({"t": "chat", "text": text, "ch": ch})
 
 ## Gửi đòn trúng quái. Server đọc: u=uid quái, d=sát thương, k=loại (0 thường/1 kỹ năng/2 tuyệt/3 siêu), id=mã kỹ năng.
-func send_hit(target_uid: int, dmg: int, skill_id: String = "", kind: int = -1, dir: int = 1, crit: bool = false) -> bool:
+## `extra`: hiệu ứng điều khiển kèm đòn — slow / freeze / stun (giây), knock (px), src ("pet" | "shadow" | "player").
+func send_hit(target_uid: int, dmg: int, skill_id: String = "", kind: int = -1, dir: int = 1, crit: bool = false, extra: Dictionary = {}) -> bool:
 	var k := kind
 	if k < 0: k = 1 if not skill_id.is_empty() else 0
 	# Khớp payload web (combat.js): c=0, dir=hướng đòn. Server đọc k để chọn trần sát thương.
-	var m := {"t": "hit", "u": target_uid, "d": dmg, "c": 1 if crit else 0, "k": k, "dir": dir}
+	var m := {"t": "hit", "u": target_uid, "d": dmg, "c": 1 if crit else 0, "k": k, "dir": dir, "knock": 90}
+	for key in ["slow", "freeze", "stun", "knock", "src"]:
+		if extra.has(key): m[key] = extra[key]
 	if not skill_id.is_empty(): m["id"] = skill_id
 	return send(m)
 

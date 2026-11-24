@@ -40,8 +40,11 @@ var _fade: ColorRect = null
 var _fxs: Node2D = null
 var _weather: CanvasLayer = null
 var _mob_script: Script = null
-var _pet: Node2D = null          # thú đồng hành đi theo player
-var _pet_id: String = ""
+const AssistScript := preload("res://src/world/Assist.gd")
+var _assist: Node = null         # thú đồng hành / linh thú / bóng ma tự đánh quái
+var _last_hit_uid := 0           # quái người chơi vừa đánh (bạn đồng hành nhắm theo)
+var _last_hit_at := 0
+var _shadow_power_until := 0
 
 var _players: Dictionary = {}   # id -> RemotePlayer
 var _mobs: Dictionary = {}      # uid -> MobSprite
@@ -65,6 +68,18 @@ var _next_attack := 0
 var _hurt_until := 0
 var _invuln_until := 0
 var _last_hurt := 0
+var _buffs: Dictionary = {}          # id kỹ năng -> {name, until, reduce, reflect, absorb, atk, crit, speed, regen}
+var _phase_cd := 0                   # bộ Vĩnh Hằng: lướt qua đòn
+var _stone_cd := 0                   # bộ Thạch Vương: khiên đá
+var _slow_until := 0                 # trùm Nước / Băng làm chậm người chơi
+var _last_ground_at := 0             # coyote time: còn nhảy được 110ms sau khi rời mép
+var _jump_buffered_at := -1000       # bộ đệm nhảy: bấm sớm 140ms vẫn nhảy khi chạm đất
+var _jumped_air := false
+var _laststand_cd := 0               # Bùa Hộ Mệnh (Kỳ Nguyên Bất Tử)
+var _laststand_until := 0
+var _nth_count: Dictionary = {}           # Ấn Sát: số đòn đã trúng theo uid quái
+var _free_cast_used := false         # bộ Lưu Trữ: kỹ năng đầu tiên mỗi trận miễn MP
+var _heal_tick := 0                  # Kiếm Tâm: chống hồi dồn trong 120ms
 var _dead := false
 var _changing := false
 var _reload_queued := false
@@ -113,6 +128,9 @@ var _other_fx_n := 0
 func _ready() -> void:
 	_char_script = load("res://src/world/CharSprite.gd")
 	_mob_script = load("res://src/world/MobSprite.gd")
+	_assist = AssistScript.new()
+	add_child(_assist)
+	_assist.setup(self)
 	var mv_script: Script = load("res://src/world/MapView.gd")
 	if mv_script:
 		_map_view = mv_script.new()
@@ -218,6 +236,8 @@ func _find_char(ch: String) -> Vector2i:
 
 func _load_player_map(arrive: String) -> void:
 	_clear_world()
+	_free_cast_used = false
+	_nth_count.clear()
 	_map_id = str(Game.player.get("map", "cong_do"))
 	if _map_id.is_empty() or not Data.has_map_text(_map_id):
 		_map_id = "cong_do"
@@ -309,6 +329,7 @@ func _load_player_map(arrive: String) -> void:
 	_hud_dirty = true
 
 func _clear_world() -> void:
+	if _assist != null: _assist.clear()
 	for u in _mobs.keys():
 		var n: Node = _mobs[u]
 		if is_instance_valid(n): n.queue_free()
@@ -369,42 +390,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_V: _cast(6)
 	elif event.is_action_pressed("attack"): _on_attack()
 
-## Đồng bộ thú đồng hành với dữ liệu server (mounts.summoned). Gọi mỗi khung + sau action.
+## Đồng bộ thú đồng hành / linh thú / bóng ma với dữ liệu server (xem src/world/Assist.gd).
 func _sync_pet() -> void:
-	var mounts: Variant = Game.player.get("mounts", {})
-	var summoned: Array = []
-	if typeof(mounts) == TYPE_DICTIONARY:
-		var sv: Variant = (mounts as Dictionary).get("summoned", [])
-		if typeof(sv) == TYPE_ARRAY: summoned = sv
-		elif typeof(sv) == TYPE_STRING and str(sv) != "": summoned = [sv]
-	var want := str(summoned[0]) if not summoned.is_empty() else ""
-	if want == _pet_id: return
-	if is_instance_valid(_pet): _pet.queue_free(); _pet = null
-	_pet_id = want
-	if want != "" and _mob_script != null:
-		# Dùng MobSprite (đã render quái ổn) làm thú đi theo.
-		var pet: Node2D = _mob_script.new()
-		var def: Dictionary = Data.monster(want)
-		pet.setup(900001, want, str(def.get("look", "")), str(def.get("sprite", "")))
-		pet.set_process(true)
-		pet.set_physics_process(false)
-		pet.z_index = 3
-		var pn: Variant = pet.get("_name")
-		if pn is Node: (pn as Node).visible = false
-		var pb: Variant = pet.get("_bar")
-		if pb is Node: (pb as Node).visible = false
-		# Đặt ngoài _mob_layer để vòng lặp quái của World không gọi show_name(true) lại.
-		var host_node: Node = _mob_layer.get_parent()
-		host_node.add_child(pet)
-		host_node.move_child(pet, _mob_layer.get_index())
-		pet.set_target(_player.position, true)
-		_pet = pet
+	if _assist != null: _assist.sync()
 
 func _process(delta: float) -> void:
 	if not Game.has_player(): return
-	_sync_pet()
-	if is_instance_valid(_pet) and _pet.has_method("set_target"):
-		_pet.set_target(_player.position + Vector2(-float(_facing) * 42.0, 6.0))
+	if _assist != null: _assist.tick(delta)
 	# Nền bám đúng tâm màn hình THẬT của camera (đã bị chặn ở biên map), không phải vị trí nhân vật
 	if _cam and _bg_node:
 		_bg_node.set_camera(_cam.get_screen_center_position())
@@ -418,6 +410,7 @@ func _process(delta: float) -> void:
 		_on_socket_connected()
 	_update_interact()
 	_regen(delta)
+	_update_projectiles(delta)
 	_stamina_tick(delta)
 	_form_tick(delta)
 
@@ -438,8 +431,16 @@ func _physics_process(delta: float) -> void:
 	var gy := _ground_y(_player.position.x, foot)
 	var on_ground := foot >= gy - 1.0 and _vy >= 0.0
 
-	if jump_pressed and on_ground and not drop_pressed:
+	var tnow := Time.get_ticks_msec()
+	if on_ground:
+		_last_ground_at = tnow
+		_jumped_air = false
+	if jump_pressed: _jump_buffered_at = tnow
+	var can_jump := on_ground or (tnow - _last_ground_at < 110 and not _jumped_air)
+	if tnow - _jump_buffered_at < 140 and can_jump and not drop_pressed and not _dead and not _changing:
+		_jump_buffered_at = -1000
 		_vy = -JUMP_V
+		_jumped_air = true
 		on_ground = false
 
 	if not on_ground:
@@ -455,7 +456,10 @@ func _physics_process(delta: float) -> void:
 		_player.position.y = gy - 30.0
 		_vy = 0.0
 
-	var vx := dir.x * SPEED
+	# Tốc độ theo chỉ số (nhanh nhẹn, đồ, class) x buff tốc độ; trùm làm chậm thì còn 60% (updatePlayer của web)
+	var spd := float(Game.stats.get("speed", SPEED)) * (1.0 + _buff_sum("speed") * 0.3)
+	if now < _slow_until: spd *= 0.6
+	var vx := dir.x * spd
 	if now < _knock_until: vx = _knock_vx
 	if absf(vx) > 1.0:
 		if now >= _knock_until and dir.x != 0.0:
@@ -540,41 +544,346 @@ func _atk_stat() -> int:
 	return int(st.get("atk", Game.player.get("atk", 30)))
 
 ## Quét hình chữ nhật trước mặt, gửi đòn cho MỌI quái trúng (khớp hitBox của web).
-func _strike(range_px: float, skill_id: String, power: float, kind: int, hits: int = 1, gap: float = 0.12) -> void:
-	for i in range(hits):
-		if i > 0: await get_tree().create_timer(gap).timeout
-		if _dead or not is_inside_tree(): return
-		_strike_once(range_px, skill_id, power, kind)
+## Tổng một chỉ số buff (atk / crit / speed) của mọi hiệu ứng còn hạn — cộng dồn như web (buffTotals).
+func _buff_sum(key: String) -> float:
+	var now := Time.get_ticks_msec()
+	var t := 0.0
+	for id in _buffs.keys():
+		var b: Dictionary = _buffs[id]
+		if now < int(b.get("until", 0)): t += float(b.get(key, 0.0))
+	return t
 
-func _strike_once(range_px: float, skill_id: String, power: float, kind: int) -> void:
+## Như trên nhưng chỉ tính buff cùng loại (guard: reduce/reflect, manashield: absorb).
+func _buff_sum_of(name: String, key: String) -> float:
+	var now := Time.get_ticks_msec()
+	var t := 0.0
+	for id in _buffs.keys():
+		var b: Dictionary = _buffs[id]
+		if now < int(b.get("until", 0)) and str(b.get("name", "")) == name: t += float(b.get(key, 0.0))
+	return t
+
+## Buff đang bật mang tên này ({} nếu không có) — buffOn của web.
+func _buff_on(name: String) -> Dictionary:
+	var now := Time.get_ticks_msec()
+	for id in _buffs.keys():
+		var b: Dictionary = _buffs[id]
+		if now < int(b.get("until", 0)) and str(b.get("name", "")) == name: return b
+	return {}
+
+func _add_buff(id: String, sk: Dictionary, stype: String) -> void:
+	var dur := float(sk.get("duration", 0.0))
+	if dur <= 0.0: return
+	_buffs[id] = {
+		"name": str(sk.get("buff", id)) if stype == "buff" else stype, "until": Time.get_ticks_msec() + int(dur * 1000.0),
+		"reduce": float(sk.get("reduce", 0.0)), "reflect": float(sk.get("reflect", 0.0)), "absorb": float(sk.get("absorb", 0.0)),
+		"atk": float(sk.get("atkBuff", 0.0)), "crit": float(sk.get("critBuff", 0.0)), "speed": float(sk.get("speedBuff", 0.0)),
+		"regen": float(sk.get("regen", 0.0)), "exec": sk.get("exec", null),
+	}
+
+## Hồi máu theo % máu tối đa; Trị Liệu Sư hồi thêm 20% (skillHeal của web).
+func _skill_heal(ratio: float) -> void:
+	var boost := 1.2 if Game.has_passive("tri_lieu_su") else 1.0
+	var mx := int(Game.stats.get("maxHp", 1))
+	var amount := int(roundf(float(mx) * ratio * boost))
+	Game.hp = mini(mx, Game.hp + amount)
+	FloatText.spawn(_fx, _player.position + Vector2(0, -30), "+%d" % amount, Color(0.41, 0.94, 0.68), 16)
+	_hud_dirty = true
+
+## Sát thương một đòn lên một con quái — cùng công thức calcDamage của web:
+## ATK x hệ số x (1+buff) x trùm x (1-giáp quái) x [0.9,1.1], chí mạng x1.6 (Cung Thủ x1.8), trần chí mạng 90%.
+func _calc_hit(mob: Node2D, mult: float, boss_bonus: float, pierce: Dictionary, basic: bool = false) -> Dictionary:
+	var pierced := false
+	if not pierce.is_empty():
+		pierced = mob.mob_level >= int(pierce.get("minLevel", 1)) and mob.mob_level <= int(pierce.get("maxLevel", 999))
+	var boss_mul := 1.0 + boss_bonus / 100.0 if mob.is_boss else 1.0
+	var armor := 1.0 if pierced else 1.0 - Formulas.def_reduce(float(mob.def_stat), mob.mob_level)
+	# Buff "exec": nhân thêm khi quái dưới ngưỡng máu
+	var now_ms := Time.get_ticks_msec()
+	for bid in _buffs.keys():
+		var bb: Dictionary = _buffs[bid]
+		var ex: Dictionary = Game._as_dict(bb.get("exec", {}))
+		if not ex.is_empty() and now_ms < int(bb.get("until", 0)) and float(mob.hp) <= float(mob.max_hp) * float(ex.get("below", 0.0)): mult *= float(ex.get("mult", 1.0))
+	var dmg := float(_atk_stat()) * mult * (1.0 + _buff_sum("atk")) * boss_mul * armor
+	dmg = maxf(1.0, dmg) * randf_range(0.9, 1.1)
+	if basic and mob.resist > 0.0: dmg = maxf(1.0, dmg * (1.0 - mob.resist))
+	var crit_p := minf(90.0, float(Game.stats.get("crit", 3.0)) + _buff_sum("crit"))
+	var crit := randf() * 100.0 < crit_p
+	if crit:
+		if _shadow_crit and Game.has_passive("sat_thu"):
+			dmg *= 2.5
+			_shadow_crit = false
+		else:
+			dmg *= 1.8 if Game.has_passive("cung_thu") else 1.6
+	return {"dmg": maxi(1, int(roundf(dmg))), "crit": crit}
+
+var _shadow_crit := false
+
+# ------------------------------------------------------------------ Chiến đấu: vùng trúng đòn (hitBox / hitCircle / shoot của web)
+const HIT_GAP := 0.13
+const ProjScript := preload("res://src/world/Proj.gd")
+
+func _weapon() -> Dictionary:
+	var wt: Dictionary = Game._as_dict(Data.calc.get("WEAPON_TYPES", {}))
+	var w: Variant = wt.get(str(Game.stats.get("wtype", "tay")), null)
+	if typeof(w) == TYPE_DICTIONARY: return w
+	return {"range": 74.0, "cooldown": 360.0, "mult": 1.0, "style": "melee"}
+
+## Bối cảnh một lượt đòn: hiệu ứng trang bị tính 1 lần cho mọi quái trúng.
+func _hit_ctx() -> Dictionary:
+	var fx: Dictionary = Game.special_fx()
+	return {"boss": float(Game.stats.get("boss", 0.0)), "lifesteal": float(Game.stats.get("lifesteal", 0.0)),
+		"pierce": Game._as_dict(fx.get("pierce", {})), "nth": Game._as_dict(fx.get("everyNth", {})),
+		"freeze": Game._as_dict(fx.get("setFreeze", {})), "aura": Game._as_dict(fx.get("slowAura", {}))}
+
+## Vùng trúng: {"kind":"rect","cx","cy","w","h"} hoặc {"kind":"circle","cx","cy","r"}.
+func _shape_hits(shape: Dictionary, r: Rect2) -> bool:
+	var cx := float(shape["cx"])
+	var cy := float(shape["cy"])
+	if str(shape.get("kind", "rect")) == "circle":
+		var rad := float(shape["r"])
+		var nx := clampf(cx, r.position.x, r.position.x + r.size.x)
+		var ny := clampf(cy, r.position.y, r.position.y + r.size.y)
+		return (nx - cx) * (nx - cx) + (ny - cy) * (ny - cy) <= rad * rad
+	var w := float(shape["w"])
+	var h := float(shape["h"])
+	return Rect2(cx - w * 0.5, cy - h * 0.5, w, h).intersects(r)
+
+## Một lượt đòn lên mọi quái nằm trong vùng. `power` chưa nhân skillMul (kỹ năng) — hàm tự nhân.
+func _strike_shape(shape: Dictionary, skill_id: String, power: float, kind: int, extra: Dictionary = {}) -> int:
 	var skill_mul := float(Game.stats.get("skillMul", 1.0)) if kind > 0 else 1.0
-	var dmg := maxi(1, int(roundf(float(_atk_stat()) * maxf(0.05, power) * skill_mul * randf_range(0.95, 1.05))))
-	var crit_p := float(Game.stats.get("crit", 3.0)) / 100.0
-	var crit := randf() < crit_p
-	if crit: dmg = int(roundf(float(dmg) * 1.5))
-	var cx := _player.position.x + float(_facing) * range_px * 0.5
-	var cy := _player.position.y
-	var half_w := range_px * 0.5 + 20.0
-	var hits := 0
+	var mult := maxf(0.05, power) * skill_mul
+	var ctx := _hit_ctx()
+	var n := 0
 	for u in _mobs.keys():
 		var mob: Node2D = _mobs[u]
 		if not is_instance_valid(mob) or not mob.alive: continue
-		if absf(mob.position.x - cx) <= half_w and absf((mob.position.y - 20.0) - cy) <= 70.0:
-			Socket.send_hit(int(u), dmg, skill_id, kind, _facing, crit)
-			hits += 1
-	if hits == 0 and kind == 0 and _hud_node:
-		pass
+		if _shape_hits(shape, mob.body_rect()):
+			_hit_mob(int(u), mob, mult, kind, skill_id, extra, ctx)
+			n += 1
+	return n
+
+## Nhiều nhát liên tiếp (cận chiến): nhát cuối dùng `finisher` nếu có. Hộp trước mặt rộng `range_px`.
+func _strike(range_px: float, skill_id: String, power: float, kind: int, hits: int = 1, gap: float = HIT_GAP, extra: Dictionary = {}, height: float = 70.0) -> void:
+	for i in range(hits):
+		if i > 0: await get_tree().create_timer(gap).timeout
+		if _dead or not is_inside_tree(): return
+		var pw := power
+		if extra.has("finisher") and i == hits - 1: pw = float(extra["finisher"])
+		var shape := {"kind": "rect", "cx": _player.position.x + float(_facing) * range_px * 0.5, "cy": _player.position.y, "w": range_px, "h": height}
+		_strike_shape(shape, skill_id, pw, kind, extra)
+
+func _after(sec: float, cb: Callable) -> void:
+	await get_tree().create_timer(sec).timeout
+	if not is_inside_tree(): return
+	cb.call()
+
+## Lõi một đòn lên một con quái: tính sát thương, hiệu ứng trang bị, gửi server, hút máu, dây chuyền.
+func _hit_mob(u: int, mob: Node2D, mult: float, kind: int, skill_id: String, extra: Dictionary, ctx: Dictionary) -> void:
+	var m2 := mult
+	# Kỹ năng gấp bội lên quái đang bị làm chậm / đóng băng
+	if extra.has("vsSlowed") and (int(mob.flags) & 3) != 0: m2 *= float(extra["vsSlowed"])
+	var r := _calc_hit(mob, m2, float(ctx["boss"]), ctx["pierce"], kind == 0)
+	var dmg := int(r["dmg"])
+	# Ấn Sát (Kỳ Nguyên Sát Kiếp): cứ n đòn trúng một mục tiêu thì đòn thứ n nặng hơn, đếm riêng từng quái
+	var nth: Dictionary = ctx["nth"]
+	if not nth.is_empty():
+		var cnt := int(_nth_count.get(u, 0)) + 1
+		if cnt >= int(nth.get("n", 5)):
+			cnt = 0
+			dmg = maxi(1, int(roundf(float(dmg) * float(nth.get("mult", 1.0)))))
+			FloatText.spawn(_fx, mob.position + Vector2(0, -70), "Ấn Sát", Color(1.0, 0.84, 0.33), 15)
+		_nth_count[u] = cnt
+	var hit_x: Dictionary = {"slow": float(extra.get("slow", 0.0)), "freeze": float(extra.get("freeze", 0.0)), "stun": float(extra.get("stun", 0.0))}
+	if extra.has("knock"): hit_x["knock"] = float(extra["knock"])
+	# Bộ Băng Long 10 món: đòn có cơ hội đóng băng quái
+	var freeze_fx: Dictionary = ctx["freeze"]
+	if not freeze_fx.is_empty() and not bool(mob.passive) and hit_x["freeze"] <= 0.0 and randf() < float(freeze_fx.get("chance", 0.0)):
+		hit_x["freeze"] = float(freeze_fx.get("dur", 2.0))
+		FloatText.spawn(_fx, mob.position + Vector2(0, -84), "Đóng Băng", Color(0.5, 0.85, 1.0), 14)
+	# Kiếm Thượng Băng Sương: quái trong tầm bị làm chậm
+	var aura: Dictionary = ctx["aura"]
+	if not aura.is_empty() and absf(mob.position.x - _player.position.x) < float(aura.get("range", 170.0)):
+		hit_x["slow"] = maxf(float(hit_x["slow"]), 0.5)
+	var dir := 1 if mob.position.x >= _player.position.x else -1
+	_last_hit_uid = u
+	_last_hit_at = Time.get_ticks_msec()
+	Socket.send_hit(u, dmg, skill_id, kind, dir, bool(r["crit"]), hit_x)
+	if not bool(mob.passive) and not _dead:
+		var mxh := int(Game.stats.get("maxHp", 1))
+		var ls := float(ctx["lifesteal"])
+		if ls > 0.0: Game.hp = mini(mxh, Game.hp + int(roundf(float(dmg) * ls / 100.0)))
+		# Nội tại Kiếm Tâm: đánh thường trúng quái hồi 0,5% máu tối đa
+		if kind == 0 and Game.has_passive("kiem_si") and Time.get_ticks_msec() > _heal_tick:
+			_heal_tick = Time.get_ticks_msec() + 120
+			Game.hp = mini(mxh, Game.hp + int(roundf(float(mxh) * 0.005)))
+	# Dây chuyền: lan sang quái gần mục tiêu (tối đa 6 con)
+	if extra.has("chain"):
+		var budget := 6
+		var rad := float(extra.get("chainRadius", 150.0))
+		for u2 in _mobs.keys():
+			if budget <= 0: break
+			var o: Node2D = _mobs[u2]
+			if int(u2) == u or not is_instance_valid(o) or not o.alive or bool(o.passive): continue
+			if o.position.distance_to(mob.position) <= rad:
+				budget -= 1
+				var rc := _calc_hit(o, m2 * float(extra["chain"]), float(ctx["boss"]), ctx["pierce"], false)
+				Socket.send_hit(int(u2), int(rc["dmg"]), skill_id, kind, dir, false)
+
+# ---- Đạn bay
+var _projs: Array = []
+
+## o: speed, range, mult (đã nhân skillMul), angle, dy, pierce, skill_id, kind, extra, color, basic, arrow
+func _shoot(o: Dictionary) -> void:
+	var node: Node2D = ProjScript.new()
+	node.position = _player.position + Vector2(float(_facing) * 16.0, -2.0 + float(o.get("dy", 0.0)))
+	var ang := float(o.get("angle", 0.0))
+	node.setup(o.get("color", Color(1.0, 0.6, 0.3)), ang, _facing, float(o.get("size", 1.0)), bool(o.get("arrow", false)))
+	_fx.add_child(node)
+	var spd := float(o.get("speed", 700.0))
+	_projs.append({"node": node, "v": Vector2(cos(ang) * spd * float(_facing), sin(ang) * spd), "dist": 0.0, "hit": {}, "o": o})
+
+func _free_proj(p: Dictionary) -> void:
+	var n: Variant = p.get("node", null)
+	if n != null and is_instance_valid(n): (n as Node).queue_free()
+	_projs.erase(p)
+
+func _update_projectiles(delta: float) -> void:
+	if _projs.is_empty(): return
+	var ctx := _hit_ctx()
+	for p in _projs.duplicate():
+		var node: Node2D = p["node"]
+		if not is_instance_valid(node): _projs.erase(p); continue
+		var o: Dictionary = p["o"]
+		var step: Vector2 = (p["v"] as Vector2) * delta
+		node.position += step
+		p["dist"] = float(p["dist"]) + step.length()
+		if float(p["dist"]) > float(o.get("range", 400.0)) or _cell(node.position.x, node.position.y) == "#":
+			_free_proj(p); continue
+		var box := Rect2(node.position - Vector2(12, 9), Vector2(24, 18))
+		for u in _mobs.keys():
+			var mob: Node2D = _mobs[u]
+			if not is_instance_valid(mob) or not mob.alive or (p["hit"] as Dictionary).has(u): continue
+			if absf(mob.position.x - node.position.x) > 350.0: continue
+			if box.intersects(mob.body_rect()):
+				(p["hit"] as Dictionary)[u] = true
+				_hit_mob(int(u), mob, float(o.get("mult", 1.0)), int(o.get("kind", 0)), str(o.get("skill_id", "")), o.get("extra", {}), ctx)
+				if not bool(o.get("pierce", false)):
+					_free_proj(p)
+					break
+
+func _skill_extra(sk: Dictionary) -> Dictionary:
+	var sx := {}
+	for key in ["slow", "freeze", "stun", "knock", "vsSlowed", "chain", "finisher"]:
+		if sk.has(key): sx[key] = sk[key]
+	return sx
+
+func _proj_color(sk: Dictionary) -> Color:
+	if str(sk.get("school", "")) == "phap_su": return Color(0.45, 0.78, 1.0)
+	return Color(1.0, 0.62, 0.28)
+
+## Gây sát thương của một kỹ năng theo đúng dạng của web (xem WorldSkills.castSkill).
+func _skill_damage(id: String, sk: Dictionary, stype: String, kind: int) -> void:
+	var power := float(sk.get("power", 0.0))
+	var sx := _skill_extra(sk)
+	var fa := float(_facing)
+	var px := _player.position.x
+	var py := _player.position.y
+	var smul := float(Game.stats.get("skillMul", 1.0))
+	match stype:
+		"melee":
+			_strike(float(sk.get("range", 90.0)), id, power, kind, maxi(1, int(sk.get("hits", 1))), HIT_GAP, sx)
+		"aoe":
+			_strike_shape({"kind": "circle", "cx": px, "cy": py, "r": float(sk.get("radius", 160.0))}, id, power, kind, sx)
+		"sword_fall":
+			var offs := [140.0, 270.0, 400.0]
+			for k in range(mini(int(sk.get("count", 1)), 3)):
+				var x := clampf(px + fa * float(offs[k]), 30.0, float(_cols) * TILE - 30.0)
+				var kx := sx.duplicate(); kx["knock"] = float(sk.get("knock", 300.0))
+				_after(float(k) * 0.22 + 0.3, func(): _strike_shape({"kind": "circle", "cx": x, "cy": py, "r": float(sk.get("radius", 120.0))}, id, power, kind, kx))
+		"meteor":
+			for k in range(int(sk.get("count", 1))):
+				var x2 := clampf(px + fa * (170.0 + float(k) * 110.0), 30.0, float(_cols) * TILE - 30.0)
+				var km := sx.duplicate(); km["knock"] = float(sk.get("knock", 260.0)); km["chainRadius"] = 170.0
+				_after(float(k) * 0.42 + 0.6, func(): _strike_shape({"kind": "circle", "cx": x2, "cy": py, "r": float(sk.get("radius", 120.0))}, id, power, kind, km))
+			if float(sk.get("heal", 0.0)) > 0.0: _skill_heal(float(sk["heal"]))
+		"arrow_rain":
+			var width := float(sk.get("width", 300.0))
+			var cx := clampf(px + fa * (width * 0.5 + 30.0), 30.0, float(_cols) * TILE - 30.0)
+			var n := maxi(1, int(sk.get("arrows", 1)))
+			for i in range(n):
+				var ax := cx + randf_range(-width * 0.5, width * 0.5)
+				_after(0.15 + float(i) * (1.2 / float(n)) + 0.26, func(): _strike_shape({"kind": "rect", "cx": ax, "cy": py, "w": 46.0, "h": 90.0}, id, power, kind, sx))
+		"projectile":
+			var water := str(sk.get("school", "")) == "phap_su"
+			var cnt := maxi(1, int(sk.get("count", 1)))
+			for k in range(cnt):
+				var ex := sx.duplicate()
+				if not ex.has("knock"): ex["knock"] = 140.0 if water else 60.0
+				_shoot({"speed": 520.0 if water else 820.0, "range": float(sk.get("range", 400.0)), "mult": power * smul, "kind": kind, "skill_id": id,
+					"pierce": bool(sk.get("pierce", false)), "extra": ex, "dy": (float(k) - float(cnt - 1) * 0.5) * 16.0, "color": _proj_color(sk)})
+		"spread":
+			var cs := maxi(1, int(sk.get("count", 1)))
+			for k in range(cs):
+				_shoot({"speed": 760.0, "range": float(sk.get("range", 400.0)), "mult": power * smul, "kind": kind, "skill_id": id,
+					"pierce": bool(sk.get("pierce", false)), "extra": sx, "angle": (float(k) - float(cs - 1) * 0.5) * 0.16, "color": _proj_color(sk)})
+		"backstep":
+			var now := Time.get_ticks_msec()
+			_invuln_until = maxi(_invuln_until, now + 450)
+			_knock_vx = -fa * 650.0
+			_knock_until = now + 260
+			_vy = -320.0
+			var cb := maxi(1, int(sk.get("count", 1)))
+			_after(0.12, func():
+				for k in range(cb):
+					_shoot({"speed": 780.0, "range": 420.0, "mult": power * smul, "kind": kind, "skill_id": id, "extra": sx,
+						"angle": (float(k) - float(cb - 1) * 0.5) * 0.12, "color": _proj_color(sk)}))
+		"shadow_command":
+			var target := _nearest_mob(500.0, 200.0)
+			var cx2 := px + fa * 100.0
+			var cy2 := py
+			if target != null:
+				cx2 = target.position.x; cy2 = target.position.y - 20.0
+				_shadow_focus = int(target.uid); _shadow_focus_until = Time.get_ticks_msec() + 6000
+			_strike_shape({"kind": "circle", "cx": cx2, "cy": cy2, "r": float(sk.get("radius", 200.0))}, id, power, kind, sx)
+
+var _shadow_focus := 0
+var _shadow_focus_until := 0
+
+func _nearest_mob(range_x: float, reach_y: float) -> Node2D:
+	var best: Node2D = null
+	var bd := 1e9
+	for u in _mobs.keys():
+		var m: Node2D = _mobs[u]
+		if not is_instance_valid(m) or not m.alive or bool(m.passive): continue
+		var dx := absf(m.position.x - _player.position.x)
+		if dx < range_x and absf(m.position.y - _player.position.y) < reach_y and dx < bd:
+			bd = dx; best = m
+	return best
 
 func _on_attack() -> void:
 	if _dead or _changing: return
 	var now := Time.get_ticks_msec()
 	if now < _next_attack: return
+	var w := _weapon()
 	if not _spend_sta(_attack_sta_cost()): return
-	_next_attack = now + ATTACK_GAP_MS
+	_next_attack = now + int(float(w.get("cooldown", 360.0)) / (1.0 + _buff_sum("speed")))
 	_attack_until = now + 280
-	Audio.play("hit", 1.2)
-	_fxs.slash(_player.position + Vector2(0, 6), _facing, Color(1.0, 0.95, 0.8), 1.0, int(now / 340) % 2 == 0)
-	_strike(110.0, "", 1.0, 0)
+	var style := str(w.get("style", "melee"))
+	var wmult := float(w.get("mult", 1.0))
+	var wrange := float(w.get("range", 74.0))
+	if style == "melee":
+		Audio.play("hit", 1.2)
+		_fxs.slash(_player.position + Vector2(0, 6), _facing, Color(1.0, 0.95, 0.8), 1.0, int(now / 340) % 2 == 0)
+		_strike_shape({"kind": "rect", "cx": _player.position.x + float(_facing) * wrange * 0.5, "cy": _player.position.y, "w": wrange, "h": 60.0}, "", wmult, 0)
+	elif style == "projectile":
+		Audio.play("cast", 1.3)
+		var orb := str(w.get("proj", "")) == "proj_orb"
+		_shoot({"speed": float(w.get("speed", 720.0)), "range": wrange, "mult": wmult, "kind": 0, "skill_id": "", "extra": {"knock": 90.0},
+			"color": Color(0.75, 0.6, 1.0) if orb else Color(0.9, 0.85, 0.7), "arrow": not orb})
+	else:
+		Audio.play("cast", 1.1)
+		_shoot({"speed": 460.0, "range": wrange, "mult": wmult, "kind": 0, "skill_id": "", "pierce": true, "extra": {"knock": 160.0},
+			"color": Color(0.6, 0.85, 1.0), "size": 1.3})
 
 func _cast(index: int) -> void:
 	if _dead or _changing or index >= 7: return
@@ -586,14 +895,20 @@ func _cast(index: int) -> void:
 	var now := Time.get_ticks_msec()
 	if now < int(_cd_until[index]):
 		return
-	var cost := int(sk.get("mp", 0))
+	var cost := int(roundf(float(sk.get("mp", 0)) * float(Game.stats.get("costMul", 1.0))))
+	# Bộ Lưu Trữ 10 món (Cổ Ngữ): kỹ năng đầu tiên mỗi trận không tốn năng lượng
+	var free_cast: bool = Game.special_fx().has("setFreeCast") and not _free_cast_used
+	if free_cast: cost = 0
 	if Game.mp < cost:
 		if _hud_node: _hud_node.toast("Không đủ MP", "warn")
 		return
 	var sta_cost: float = float(Data.STAMINA.get("ult", 50.0)) if bool(sk.get("ult", false)) else float(Data.STAMINA.get("skill", 14.0))
 	if not _spend_sta(sta_cost): return
 	Game.mp -= cost
-	var cd := float(sk.get("cd", 1.0))
+	if free_cast:
+		_free_cast_used = true
+		FloatText.spawn(_fx, _player.position + Vector2(0, -60), "Cổ Ngữ", Color(0.31, 0.76, 0.97), 14)
+	var cd := float(sk.get("cd", 1.0)) * (1.0 - float(Game.stats.get("cdr", 0.0)) / 100.0)
 	_cd_until[index] = now + int(cd * 1000.0)
 	if _hud_node: _hud_node.start_cooldown(index, cd)
 	var stype0 := str(sk.get("type", ""))
@@ -611,7 +926,7 @@ func _cast(index: int) -> void:
 	_attack_until = now + 320
 	if _skill_fx and _skill_fx.has_method("play"):
 		_skill_fx.play("cast", id, _player.position, _facing)
-	var kind := 1
+	var kind := 3 if bool(sk.get("superUlt", false)) else (2 if bool(sk.get("ult", false)) else 1)
 	var stype := str(sk.get("type", ""))
 	match stype:
 		"manaburst": Socket.send_manaburst()
@@ -624,17 +939,40 @@ func _cast(index: int) -> void:
 				shake(5.0, 0.25)
 				Game.hp = 0
 				_die()
-		"dash": _dash(float(sk.get("distance", 170.0)))
+		"dash":
+			var x0 := _player.position.x
+			_dash(float(sk.get("distance", 170.0)))
+			_invuln_until = maxi(_invuln_until, now + 400)
+			_shadow_crit = true   # Sát Thủ: chí mạng đầu tiên sau lướt gây 250%
+			# Đòn đánh xuyên suốt quãng đã lướt (và đòn nối `after` sau 180ms)
+			var da := minf(x0, _player.position.x)
+			var db := maxf(x0, _player.position.x)
+			var dshape := {"kind": "rect", "cx": (da + db) * 0.5, "cy": _player.position.y, "w": db - da + 50.0, "h": 64.0}
+			var dx := _skill_extra(sk)
+			if float(sk.get("power", 0.0)) > 0.0: _strike_shape(dshape, id, float(sk["power"]), kind, dx)
+			if float(sk.get("after", 0.0)) > 0.0: _after(0.18, func(): _strike_shape(dshape, id, float(sk["after"]), kind, dx))
 		"melee", "backstep": _fxs.slash(_player.position + Vector2(0, 6), _facing, Color(1.0, 0.85, 0.5), 1.5)
-		"guard", "manashield", "buff": _fxs.shield(_player.position + Vector2(0, 26), Color(0.45, 0.72, 1.0) if stype != "buff" else Color(1.0, 0.85, 0.4))
+		"guard", "manashield", "buff":
+			_add_buff(id, sk, stype)
+			_fxs.shield(_player.position + Vector2(0, 26), Color(0.45, 0.72, 1.0) if stype != "buff" else Color(1.0, 0.85, 0.4))
 		"heal":
+			_skill_heal(float(sk.get("heal", 0.0)))
+			if float(sk.get("mpHeal", 0.0)) > 0.0:
+				var mxm := int(Game.stats.get("maxMp", 1))
+				var gm := int(roundf(float(mxm) * float(sk["mpHeal"])))
+				Game.mp = mini(mxm, Game.mp + gm)
+				FloatText.spawn(_fx, _player.position + Vector2(0, -46), "+%d" % gm, Color(0.39, 0.71, 0.96), 14)
 			_fxs.heal(_player.position)
 			Audio.play("coin", 0.8)
-		"aoe", "meteor", "sword_fall", "arrow_rain": _fxs.ring(_player.position + Vector2(float(_facing) * 70.0, 28), Color(1.0, 0.6, 0.3), 120.0, 0.5, 5.0)
-		"summon", "shadow_toggle", "shadow_command": _fxs.ring(_player.position + Vector2(0, 28), Color(0.7, 0.5, 1.0), 80.0, 0.6, 4.0)
-	if sk.has("power") and float(sk.get("power", 0.0)) > 0.0:
-		var reach := float(sk.get("range", sk.get("distance", 130.0)))
-		_strike(maxf(90.0, reach), id, float(sk.get("power", 1.0)), kind, maxi(1, int(sk.get("hits", 1))))
+		"aoe", "meteor", "sword_fall", "arrow_rain":
+			if stype == "aoe" and float(sk.get("heal", 0.0)) > 0.0: _skill_heal(float(sk["heal"]))
+			_fxs.ring(_player.position + Vector2(float(_facing) * 70.0, 28), Color(1.0, 0.6, 0.3), 120.0, 0.5, 5.0)
+		"summon", "shadow_toggle", "shadow_command":
+			if stype == "summon": Net.action("summon_toggle", {}, {"silent": true})
+			elif stype == "shadow_toggle": Net.action("shadow_toggle", {}, {"silent": true})
+			_fxs.ring(_player.position + Vector2(0, 28), Color(0.7, 0.5, 1.0), 80.0, 0.6, 4.0)
+	if stype != "dash" and float(sk.get("power", 0.0)) > 0.0:
+		_skill_damage(id, sk, stype, kind)
 	_hud_dirty = true
 
 ## Mục tiêu gần nhất cho Tuyệt Phẩm "execute" (quái sống, trong tầm ngang/dọc).
@@ -659,14 +997,68 @@ func _dash(distance: float) -> void:
 	_fxs.dash_trail(from + Vector2(0, 8), _player.position + Vector2(0, 8))
 	_invuln_until = Time.get_ticks_msec() + 250
 
-func _hurt_player(m: Node2D) -> void:
+## Hệ số sát thương đòn đặc biệt của trùm theo web (boss.js): giậm đất x1.5, các chiêu theo kiểu `style`.
+const BOSS_STYLE_MUL := {"water": 0.8, "ice": 1.3, "void": 1.1, "moon": 0.9}
+
+## `mult`: hệ số của đòn (giậm đất 1.5, chiêu trùm theo style); `enrage_scale`: đòn lao thường nhân thêm 1.25 khi quái phẫn nộ.
+func _hurt_player(m: Node2D, mult: float = 1.0, enrage_scale: bool = true) -> void:
 	var now := Time.get_ticks_msec()
 	if now < _invuln_until or _dead: return
+	var fx: Dictionary = Game.special_fx()
+	# Cánh Phiêu Diêu: né hoàn toàn một đòn
+	var dodge: Dictionary = Game._as_dict(fx.get("dodge", {}))
+	if not dodge.is_empty() and randf() < float(dodge.get("chance", 0.0)):
+		FloatText.spawn(_fx, _player.position + Vector2(0, -34), "Né", Color(0.56, 0.94, 1.0), 17)
+		Audio.play("cast", 1.4)
+		_invuln_until = now + 300
+		return
+	# Bộ Vĩnh Hằng 10 món: lướt qua đòn mỗi `cd` giây
+	var phase: Dictionary = Game._as_dict(fx.get("setPhase", {}))
+	if not phase.is_empty() and now >= _phase_cd:
+		_phase_cd = now + int(float(phase.get("cd", 8.0)) * 1000.0)
+		FloatText.spawn(_fx, _player.position + Vector2(0, -34), "Xuyên Không", Color(0.70, 0.53, 1.0), 16)
+		_invuln_until = now + 300
+		return
+	# Bộ Thạch Vương 10 món: khiên đá đỡ trọn một đòn mỗi `cd` giây
+	var stone: Dictionary = Game._as_dict(fx.get("setStone", {}))
+	if not stone.is_empty() and now >= _stone_cd:
+		_stone_cd = now + int(float(stone.get("cd", 12.0)) * 1000.0)
+		FloatText.spawn(_fx, _player.position + Vector2(0, -46), "Khiên Đá", Color(0.63, 0.53, 0.50), 15)
+		_invuln_until = now + 400
+		return
 	var def_v := float(Game.stats.get("def", 0))
 	var lv := int(Game.player.get("level", 1))
-	var raw := float(m.atk) * randf_range(0.9, 1.1)
-	var dmg := Formulas.mitigate(raw, def_v, lv)
+	var atk_v := float(m.atk) * mult
+	if enrage_scale and m.enraged: atk_v *= 1.25
+	var dmg := Formulas.mitigate(atk_v * randf_range(0.9, 1.1), def_v, lv)
+	var mx_hp := int(Game.stats.get("maxHp", 100))
+	# Nội tại Tanker "Thành Đồng": máu dưới 50% giảm thêm 10%
+	if float(Game.hp) < float(mx_hp) * 0.5 and Game.has_passive("tanker"): dmg = maxi(1, int(roundf(float(dmg) * 0.9)))
+	# Thủ thế: giảm cộng dồn (đòn vẫn tối thiểu 1) + phản sát thương
+	var reduce := _buff_sum_of("guard", "reduce")
+	if reduce > 0.0:
+		dmg = maxi(1, int(roundf(float(dmg) * (1.0 - reduce))))
+		var refl := _buff_sum_of("guard", "reflect")
+		if refl > 0.0 and m.alive and m.uid != 900001:
+			var rdir := 1 if m.position.x >= _player.position.x else -1
+			Socket.send_hit(int(m.uid), maxi(1, int(roundf(float(m.atk) * refl))), "", 0, rdir, false)
+	# Khiên năng lượng: hấp thụ bằng MP, cộng dồn
+	var absorb := _buff_sum_of("manashield", "absorb")
+	if absorb > 0.0 and Game.mp > 0:
+		var take := mini(Game.mp, int(roundf(float(dmg) * absorb)))
+		Game.mp -= take
+		dmg -= take
+		if take > 0: FloatText.spawn(_fx, _player.position + Vector2(0, -46), "%d" % take, Color(0.56, 0.71, 1.0), 13)
+		if dmg <= 0:
+			_invuln_until = now + 500
+			_hud_dirty = true
+			return
+	# Hộ Mệnh đang chạy: mọi đòn không trừ máu
+	if _laststand_until > 0 and now < _laststand_until:
+		_invuln_until = now + 400
+		return
 	Game.hp = maxi(0, Game.hp - dmg)
+	_share_to_companions(dmg)
 	_last_hurt = now
 	_hurt_until = now + 260
 	_invuln_until = now + 700
@@ -681,31 +1073,168 @@ func _hurt_player(m: Node2D) -> void:
 	if _hud_node: _hud_node.flash(Color(1.0, 0.1, 0.1), 0.28)
 	if Settings.haptics: Input.vibrate_handheld(40)
 	_hud_dirty = true
-	if Game.hp > 0 and float(Game.hp) / float(maxi(1, int(Game.stats.get("maxHp", 100)))) < 0.3: _hud_node.hint_once("lowhp", "Máu thấp! Mở Túi và dùng bình máu.")
+	# Bùa Hộ Mệnh (Kỳ Nguyên Bất Tử): máu cạn thì giữ 1 máu trong `dur` giây, hồi lại sau `cd` giây
+	var undying: Dictionary = Game._as_dict(fx.get("undying", {}))
+	if Game.hp <= 0 and not undying.is_empty() and now >= _laststand_cd:
+		_laststand_cd = now + int(float(undying.get("cd", 60.0)) * 1000.0)
+		_laststand_until = now + int(float(undying.get("dur", 5.0)) * 1000.0)
+		Game.hp = 1
+		FloatText.spawn(_fx, _player.position + Vector2(0, -52), "Hộ Mệnh %ds" % int(undying.get("dur", 5)), Color(1.0, 0.88, 0.51), 16)
+	if Game.hp > 0 and float(Game.hp) / float(maxi(1, mx_hp)) < 0.3: _hud_node.hint_once("lowhp", "Máu thấp! Mở Túi và dùng bình máu.")
 	if Game.hp <= 0: _die()
+
+## Hết 5 giây Hộ Mệnh mà máu vẫn <= 0 thì gục (gọi mỗi giây từ _regen).
+func _laststand_tick(now: int) -> void:
+	if _laststand_until > 0 and now >= _laststand_until:
+		_laststand_until = 0
+		if Game.hp <= 0 and not _dead: _die()
 
 func _regen(delta: float) -> void:
 	if _dead or _changing: return
 	_regen_acc += delta
 	if _regen_acc < 1.0: return
 	_regen_acc = 0.0
+	var now := Time.get_ticks_msec()
+	_laststand_tick(now)
+	_pets_tick(now)
+	_fusion_expire_tick()
 	var mx_hp := int(Game.stats.get("maxHp", 0))
 	var mx_mp := int(Game.stats.get("maxMp", 0))
 	var changed := false
-	if Game.mp < mx_mp:
-		Game.mp = mini(mx_mp, Game.mp + maxi(1, int(roundf(float(mx_mp) * 0.015))))
+	# Buff hồi máu liên tục: `regen` là % máu tối đa mỗi 2 giây (cộng dồn)
+	var regen_pct := _buff_sum("regen")
+	if regen_pct > 0.0 and Game.hp < mx_hp:
+		Game.hp = mini(mx_hp, Game.hp + int(roundf(float(mx_hp) * regen_pct / 2.0)))
 		changed = true
-	if Game.hp < mx_hp and Time.get_ticks_msec() - _last_hurt > 5000:
-		Game.hp = mini(mx_hp, Game.hp + maxi(1, int(roundf(float(mx_hp) * 0.005))))
+	# Cấm Chú Giải Phóng: đang phong ấn năng lượng thì không hồi MP bằng đường nào
+	var mp_locked := float(Game.player.get("mpLock", 0)) > Time.get_unix_time_from_system() * 1000.0
+	# Nội tại Dòng Chảy (Pháp Sư): hồi 0,5% MP mỗi giây kể cả khi đang đánh
+	if Game.has_passive("phap_su") and not mp_locked and Game.mp < mx_mp:
+		Game.mp = mini(mx_mp, Game.mp + int(roundf(float(mx_mp) * 0.005)))
 		changed = true
+	# Chỉ hồi khi KHÔNG giao chiến (không đánh / không bị đánh trong calmMs gần nhất), như web
+	var calm_ms := int(Game._as_dict(Data.calc.get("REGEN", {})).get("calmMs", 2000))
+	var fighting := now - _sta_used_at < calm_ms or now - _last_hurt < calm_ms
+	if not fighting:
+		# Đồ nhiễm đỏ: không hồi máu ngoài giao chiến
+		if Game.hp < mx_hp and int(Game.stats.get("nhiem", 0)) == 0:
+			Game.hp = mini(mx_hp, Game.hp + maxi(1, int(roundf(float(mx_hp) * 0.005))))
+			changed = true
+		if Game.mp < mx_mp and not mp_locked:
+			Game.mp = mini(mx_mp, Game.mp + maxi(1, int(roundf(float(mx_mp) * 0.005))))
+			changed = true
 	if changed: _hud_dirty = true
 
 # ------------------------------------------------------------------ Chết / hồi sinh
+# ------------------------------------------------------------------ Thú đồng hành (chia sát thương, hồi sinh)
+var _pet_dead_until: Dictionary = {}
+
+func _companion_ids() -> Array:
+	var m: Dictionary = Game._as_dict(Game.player.get("mounts", {}))
+	var owned: Variant = m.get("owned", [])
+	var sm: Variant = m.get("summoned", null)
+	var ids: Array = []
+	if typeof(sm) == TYPE_ARRAY: ids = sm
+	elif m.get("active", null) != null: ids = [m["active"]]
+	var out: Array = []
+	for id in ids:
+		var s := str(id)
+		if typeof(owned) == TYPE_ARRAY and (owned as Array).has(s) and not Data.mount(s).is_empty() and not out.has(s): out.append(s)
+	return out
+
+## Chỉ số thú = chỉ số cố định theo loài + trang bị thú (port companionStats).
+func _companion_stats(id: String) -> Dictionary:
+	var mt: Dictionary = Data.mount(id)
+	var st := {"maxHp": float(mt.get("hp", 1000)), "maxMp": float(mt.get("mp", 60)), "maxSta": float(mt.get("sta", 100)), "atk": float(mt.get("atk", 100)), "def": float(mt.get("def", 100))}
+	var gear: Dictionary = Game._as_dict(Game._as_dict(Game.player.get("petGear", {})).get(id, {}))
+	var table: Dictionary = Game._as_dict(Data.calc.get("PET_GEAR", {}))
+	for slot in gear.keys():
+		var b: Dictionary = Game._as_dict(table.get(str(gear[slot]), {}))
+		if b.has("maxHp"): st["maxHp"] = roundf(float(st["maxHp"]) + float(b["maxHp"]))
+		if b.has("atk"): st["atk"] = float(st["atk"]) + float(b["atk"])
+		if b.has("def"): st["def"] = roundf(float(st["def"]) + float(b["def"]))
+	return st
+
+func _pet_state(id: String, ps: Dictionary) -> Dictionary:
+	if typeof(Game.player.get("pets", null)) != TYPE_DICTIONARY: Game.player["pets"] = {}
+	var pets: Dictionary = Game.player["pets"]
+	if typeof(pets.get(id, null)) != TYPE_DICTIONARY:
+		pets[id] = {"hp": ps["maxHp"], "mp": ps["maxMp"], "sta": ps["maxSta"]}
+	return pets[id]
+
+## Thú đồng hành gánh 18% sát thương người chơi nhận (chia đều), giảm theo giáp thú; gục thì 15 giây sau hồi 50%.
+func _share_to_companions(dmg: int) -> void:
+	var ids := _companion_ids()
+	if ids.is_empty(): return
+	var now := Time.get_ticks_msec()
+	var share := float(dmg) * 0.18 / float(ids.size())
+	var lv := int(Game.player.get("level", 1))
+	for id in ids:
+		var ps := _companion_stats(id)
+		var state := _pet_state(id, ps)
+		if float(state.get("hp", 0)) <= 0.0: continue
+		var pd := maxi(1, int(roundf(share * (1.0 - Formulas.def_reduce(float(ps["def"]), lv)))))
+		state["hp"] = maxf(0.0, float(state.get("hp", 0)) - float(pd))
+		FloatText.spawn(_fx, _player.position + Vector2(-35, -36), "-%d" % pd, Color(1.0, 0.61, 0.61), 12)
+		if float(state["hp"]) <= 0.0:
+			_pet_dead_until[id] = now + 15000
+			if _hud_node: _hud_node.log("%s đã gục, sẽ hồi sinh sau 15 giây." % Data.mount_name(id), Color(1.0, 0.72, 0.30))
+
+func _pets_tick(now: int) -> void:
+	for id in _companion_ids():
+		var ps := _companion_stats(id)
+		var state := _pet_state(id, ps)
+		if float(state.get("hp", 0)) <= 0.0:
+			if now >= int(_pet_dead_until.get(id, 0)):
+				_pet_dead_until.erase(id)
+				state["hp"] = maxf(1.0, roundf(float(ps["maxHp"]) * 0.5)); state["mp"] = ps["maxMp"]; state["sta"] = ps["maxSta"]
+			continue
+		if now - _last_hurt >= 3000:
+			state["hp"] = minf(float(ps["maxHp"]), float(state.get("hp", 0)) + float(ps["maxHp"]) * 0.018)
+			state["mp"] = minf(float(ps["maxMp"]), float(state.get("mp", 0)) + 5.0)
+			state["sta"] = minf(float(ps["maxSta"]), float(state.get("sta", 0)) + 14.0)
+
+## Trạng thái thú gửi kèm lúc lưu (server kẹp theo chỉ số tối đa).
+func _pets_payload() -> Dictionary:
+	var out := {}
+	for id in _companion_ids():
+		var st: Dictionary = _pet_state(id, _companion_stats(id))
+		out[id] = {"hp": roundi(float(st.get("hp", 0))), "mp": roundi(float(st.get("mp", 0))), "sta": roundi(float(st.get("sta", 0)))}
+	return out
+
+## Tử Linh Dung Hợp hết hạn: bỏ cộng thêm, tính lại chỉ số, báo server dọn `player.fusion`.
+func _fusion_expire_tick() -> void:
+	var fu: Dictionary = Game._as_dict(Game.player.get("fusion", null))
+	if fu.is_empty() or Game.fusion_active(): return
+	Game.player["fusion"] = null
+	Game.recalc_stats()
+	_hud_dirty = true
+	if _hud_node: _hud_node.log("Dung hợp tan: bóng ma đã tiêu biến, chỉ số trở lại bình thường.", Color(0.61, 0.55, 0.75))
+	Socket.send_fusion_end()
+
+## Hồi chút khi hạ quái (Chuông Trấn Hồn): % máu / năng lượng tối đa.
+func _on_my_kill() -> void:
+	var fx: Dictionary = Game._as_dict(Game.special_fx().get("onKill", {}))
+	if fx.is_empty() or _dead: return
+	var mxh := int(Game.stats.get("maxHp", 1))
+	var mxm := int(Game.stats.get("maxMp", 1))
+	var hp_gain := int(roundf(float(mxh) * float(fx.get("hp", 0.0))))
+	var mp_gain := int(roundf(float(mxm) * float(fx.get("mp", 0.0))))
+	if hp_gain > 0 and Game.hp < mxh:
+		Game.hp = mini(mxh, Game.hp + hp_gain)
+		FloatText.spawn(_fx, _player.position + Vector2(0, -34), "+%d" % hp_gain, Color(0.41, 0.94, 0.68), 13)
+	if mp_gain > 0 and Game.mp < mxm: Game.mp = mini(mxm, Game.mp + mp_gain)
+	_hud_dirty = true
+
 func _die() -> void:
 	if _dead: return
 	_end_form("")
 	_dead = true
 	Game.hp = 0
+	_free_cast_used = false
+	_laststand_until = 0
+	_buffs.clear()   # chết thì mọi buff tan (web: resetCombatFlags)
+	_slow_until = 0
 	_move_dir = Vector2.ZERO
 	_flush_kills()
 	Audio.play("death")
@@ -722,7 +1251,7 @@ func _on_death_choice(where: String) -> void:
 func _save_state() -> void:
 	if _map_id.is_empty() or _changing: return
 	Net.action("save", {"map": _map_id, "x": roundi(_player.position.x), "y": roundi(_player.position.y),
-		"hp": Game.hp, "mp": Game.mp}, {"silent": true})
+		"hp": Game.hp, "mp": Game.mp, "pets": _pets_payload()}, {"silent": true})
 
 func _queue_kill(kid: String) -> void:
 	_pending_kills.append({"kid": kid})
@@ -802,14 +1331,14 @@ func _use_portal(key: String) -> void:
 	Audio.play("portal")
 	_fxs.ring(_player.position + Vector2(0, 28), Color(0.7, 0.6, 1.0), 90.0, 0.5, 5.0)
 	create_tween().tween_property(_fade, "modulate:a", 1.0, 0.25)
-	Net.action("change_map", {"portal": key, "hp": Game.hp, "mp": Game.mp})
+	Net.action("change_map", {"portal": key, "hp": Game.hp, "mp": Game.mp, "pets": _pets_payload()})
 
 func use_teleport(to: String) -> void:
 	if _changing: return
 	_changing = true
 	_flush_kills()
 	create_tween().tween_property(_fade, "modulate:a", 1.0, 0.25)
-	Net.action("teleport", {"to": to, "hp": Game.hp, "mp": Game.mp})
+	Net.action("teleport", {"to": to, "hp": Game.hp, "mp": Game.mp, "pets": _pets_payload()})
 
 # ------------------------------------------------------------------ Kết quả action / sự kiện
 func _on_action_done(data: Dictionary, type: String) -> void:
@@ -1049,6 +1578,8 @@ func _apply_mob_full(node: Node2D, info: Dictionary) -> void:
 	node.set_facing(int(info.get("f", 1)))
 	node.set_hp(int(info.get("hp", 0)), int(info.get("mh", 1)))
 	node.set_state(int(info.get("st", 0)))
+	node.flags = int(info.get("fl", 0))
+	node.enraged = (node.flags & 4) != 0
 	if int(info.get("al", 1)) == 1:
 		if not node.alive: node.revive()
 		node.visible = true
@@ -1067,6 +1598,9 @@ func _on_mob_packet(msg: Dictionary) -> void:
 				n.set_target(Vector2(float(e[1]), float(e[2])))
 				n.set_facing(int(e[3]))
 				n.set_state(int(e[4]))
+				if (e as Array).size() > 5:
+					n.flags = int(e[5])
+					n.enraged = (int(e[5]) & 4) != 0
 		"mspawn":
 			if typeof(msg.get("m", null)) == TYPE_DICTIONARY: _spawn_mob(msg["m"], true)
 		"mresp":
@@ -1108,6 +1642,7 @@ func _on_mob_packet(msg: Dictionary) -> void:
 			var me := Socket.my_id
 			if not kid.is_empty() and me != 0 and (int(msg.get("by", -1)) == me or (msg.get("as", []) as Array).has(me)):
 				_queue_kill(kid)
+			if int(msg.get("by", -1)) == me and me != 0: _on_my_kill()
 		"mact":
 			var bm: Node2D = _mobs.get(int(msg.get("u", 0)), null)
 			if bm == null or not bm.alive: return
@@ -1116,11 +1651,15 @@ func _on_mob_packet(msg: Dictionary) -> void:
 				"slam":
 					shake(8.0, 0.35)
 					FloatText.spawn(_fx, bm.position + Vector2(0, -90), "Giậm đất!", Color(1.0, 0.6, 0.3), 18)
-					if dxm < 230.0 and absf(bm.position.y - _player.position.y) < 120.0: _hurt_player(bm)
+					if dxm < 230.0 and absf(bm.position.y - _player.position.y) < 120.0: _hurt_player(bm, 1.5, false)
 				"special":
 					shake(5.0, 0.4)
 					FloatText.spawn(_fx, bm.position + Vector2(0, -90), "Tuyệt chiêu!", Color(1.0, 0.4, 0.8), 18)
-					if dxm < 300.0 and absf(bm.position.y - _player.position.y) < 160.0: _hurt_player(bm)
+					if dxm < 300.0 and absf(bm.position.y - _player.position.y) < 160.0:
+						_hurt_player(bm, float(BOSS_STYLE_MUL.get(bm.mob_style, 1.0)), false)
+						# Trùm Nước / Băng: đòn trúng thì làm chậm người chơi (60% tốc độ)
+						if bm.mob_style == "water": _slow_until = Time.get_ticks_msec() + 2600
+						elif bm.mob_style == "ice": _slow_until = Time.get_ticks_msec() + 3000
 				"enrage":
 					FloatText.spawn(_fx, bm.position + Vector2(0, -90), "Phẫn nộ!", Color(1.0, 0.3, 0.3), 20)
 					shake(4.0, 0.3)
@@ -1228,11 +1767,12 @@ func _use_quick_potion(kind: String) -> void:
 	if full:
 		_hud_node.toast("%s đã đầy" % ("Máu" if kind == "hp" else "MP"), "warn")
 		return
-	_potion_cd_until = now + 1000
-	_hud_node.potion_cooldown(kind, 1.0)
+	_potion_cd_until = now + 450
+	_hud_node.potion_cooldown(kind, 0.45)
 	_fxs.heal(_player.position)
 	Audio.play("pickup", 0.9)
-	Net.action("use", {"item": iid}, {"silent": true})
+	# Gửi máu/MP tức thời như web: server cộng bình vào giá trị này, không phải giá trị lưu cũ
+	Net.action("use", {"item": iid, "hp": Game.hp, "mp": Game.mp}, {"silent": true})
 
 ## Màu viền nút kỹ năng theo loại: tuyệt kỹ vàng, tấn công cam, phòng thủ xanh dương, hồi phục xanh lá, triệu hồi tím.
 func _skill_color(sk: Dictionary) -> Color:
@@ -1249,7 +1789,7 @@ var _sta_used_at := 0
 var _sta_warn_at := 0
 
 func _attack_sta_cost() -> float:
-	return maxf(1.0, roundf(float(Data.STAMINA.get("attack", 4.8)) * float(ATTACK_GAP_MS) / 400.0))
+	return maxf(1.0, roundf(float(Data.STAMINA.get("attack", 4.8)) * float(_weapon().get("cooldown", 360.0)) / 400.0))
 
 ## Trừ thể lực cho một đòn. Không đủ hoặc đang kiệt sức -> false (không đánh được).
 func _spend_sta(cost: float) -> bool:

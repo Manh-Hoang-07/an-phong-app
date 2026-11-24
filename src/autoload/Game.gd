@@ -23,7 +23,8 @@ func bag_size() -> int:
 func has_player() -> bool:
 	return not player.is_empty()
 
-func set_player(p: Variant) -> void:
+## `reset_vitals`: true khi vào game (lấy hp/mp server); false khi đồng bộ lại giữa chừng — như web, máu tức thời do client giữ.
+func set_player(p: Variant, reset_vitals: bool = true) -> void:
 	if typeof(p) == TYPE_DICTIONARY and OS.is_debug_build():
 		print("[PLAYER] school=", p.get("school"), " skills=", JSON.stringify(p.get("skills")).left(200), " slots=", JSON.stringify(p.get("skillSlots")), " supers=", JSON.stringify(p.get("superUlts")), " mounts=", JSON.stringify(p.get("mounts")).left(200))
 	# Chặn payload sai kiểu tu /api/me: gan Dictionary khong dung kieu vao bien
@@ -35,10 +36,9 @@ func set_player(p: Variant) -> void:
 	player = d.duplicate(true)
 	form_active = bool(d.get("formActive", false))
 	# Server gửi hp/mp trong player; client tự giữ giá trị tức thời giữa các lần lưu
-	if not d.has("hp"): hp = int(d.get("hp", 0))
-	else: hp = int(d["hp"])
-	if not d.has("mp"): mp = int(d.get("mp", 0))
-	else: mp = int(d["mp"])
+	if reset_vitals:
+		hp = int(d.get("hp", 0))
+		mp = int(d.get("mp", 0))
 	recalc_stats()
 	player_changed.emit(false)
 
@@ -96,6 +96,72 @@ func _set_bonus() -> Dictionary:
 	var bonus: Dictionary = _as_dict(_as_dict(Data.calc.get("SET_BONUS", {})).get(str(best_id), {}))
 	var tier_key := "at10" if best_n >= int(Data.calc.get("SET_TIER_HIGH", 10)) else "at6"
 	return _as_dict(bonus.get(tier_key, {}))
+
+## Gom hiệu ứng (fx) của đồ đang mặc + Kỳ Nguyên đang bật + bộ 10 món, theo loại (port G.specialFx của web).
+## Kỳ Nguyên rồi đến bộ đè lên trang bị nếu trùng loại, giống thứ tự bên web.
+func special_fx() -> Dictionary:
+	var out := {}
+	var equip: Dictionary = _as_dict(player.get("equip", {}))
+	for slot in Data.calc.get("SLOTS", []):
+		var it: Variant = equip.get(slot, null)
+		if typeof(it) != TYPE_DICTIONARY: continue
+		var fx: Dictionary = _as_dict(Data.item(str((it as Dictionary).get("id", ""))).get("fx", {}))
+		if fx.has("kind"): out[str(fx["kind"])] = fx
+	var kn: Dictionary = _as_dict(player.get("kyNguyen", {}))
+	var kact: Variant = kn.get("active", [])
+	if typeof(kact) == TYPE_ARRAY:
+		var kfx: Dictionary = _as_dict(Data.calc.get("KY_FX", {}))
+		for kid in kact:
+			var fx2: Dictionary = _as_dict(kfx.get(str(kid), {}))
+			if fx2.has("kind"): out[str(fx2["kind"])] = fx2
+	var fx3: Dictionary = _as_dict(_set_bonus().get("fx", {}))
+	if fx3.has("kind"): out[str(fx3["kind"])] = fx3
+	return out
+
+## Nội tại class (Kiếm Tâm, Yếu Điểm, Thành Đồng...): chức nghiệp 2 giữ nội tại class nền, Toàn Năng có tất cả.
+func has_passive(id: String) -> bool:
+	var school := str(player.get("school", ""))
+	if school.is_empty(): return false
+	var sc: Dictionary = _as_dict(_as_dict(Data.raw.get("SCHOOLS", {})).get(school, {}))
+	var base := str(sc.get("base", school))
+	if base.is_empty(): base = school
+	return base == id or base == "toan_nang"
+
+## Tử Linh Dung Hợp: cộng thẳng chỉ số của cả bộ sưu tập bóng ma khi `player.fusion.until` còn hạn (port G.shadowFusion).
+func fusion_active() -> bool:
+	var fu: Dictionary = _as_dict(player.get("fusion", null))
+	return not fu.is_empty() and float(fu.get("until", 0)) > Time.get_unix_time_from_system() * 1000.0
+
+func _fusion_bonus() -> Dictionary:
+	var out := {"hp": 0.0, "mp": 0.0, "sta": 0.0, "def": 0.0}
+	if not fusion_active(): return out
+	var souls: Variant = _as_dict(player.get("fusion", {})).get("souls", [])
+	if typeof(souls) != TYPE_ARRAY: return out
+	var mons: Dictionary = _as_dict(Data.calc.get("FUSION_MON", {}))
+	var curve: Array = Data.calc.get("MON_CURVE", [])
+	var fk: Dictionary = _as_dict(Data.calc.get("FUSION", {}))
+	if curve.is_empty(): return out
+	var owner_lv := maxi(1, int(player.get("level", 1)))
+	for soul in souls:
+		if typeof(soul) != TYPE_DICTIONARY: continue
+		var sd: Dictionary = soul
+		var mon: Dictionary = _as_dict(mons.get(str(sd.get("monster", "")), {}))
+		if mon.is_empty(): continue
+		var sstats: Dictionary = _as_dict(sd.get("stats", {}))
+		var slv := 1
+		if sd.get("lv", null) != null: slv = maxi(1, int(floorf(float(sd["lv"]))))
+		else: slv = maxi(1, int(sstats.get("level", 1)))
+		var base: Array = curve[clampi(int(mon.get("level", 1)) - 1, 0, curve.size() - 1)]
+		var now_c: Array = curve[clampi(slv - 1, 0, curve.size() - 1)]
+		var s_hp := maxf(1.0, roundf(float(mon.get("hp", 1)) * (float(now_c[0]) / float(base[0]))))
+		var s_def := roundf(float(mon.get("def", 0)) * (float(now_c[2]) / float(base[2])))
+		var c: Array = curve[clampi(mini(owner_lv, slv) - 1, 0, curve.size() - 1)]
+		out["hp"] += s_hp * float(fk.get("hp", 1))
+		out["mp"] += float(c[1]) * float(fk.get("mp", 1))
+		out["sta"] += float(c[2]) * float(fk.get("sta", 1))
+		out["def"] += s_def * float(fk.get("def", 1))
+	for k in out.keys(): out[k] = roundf(float(out[k]))
+	return out
 
 func recalc_stats() -> void:
 	if player.is_empty(): return
@@ -186,11 +252,13 @@ func recalc_stats() -> void:
 	for k in set_add.keys(): perk_add[k] = float(perk_add.get(k, 0.0)) + float(set_add[k])
 	var speed_final := roundi(minf(290.0, minf(260.0, 190.0 + float(agi) * 2.0) * sc_speed + float(eq["speed"]) + float(perk_add["speed"])))
 	if nhiem > 0: hp_v *= maxf(0.7, 1.0 - float(Data.calc.get("NHIEM_HP_PENALTY", 0.06)) * float(nhiem))
+	var fu := _fusion_bonus()
+	hp_v += float(fu["hp"]); mp_v += float(fu["mp"]); def_v += float(fu["def"])
 	var max_hp := roundi(hp_v)
 	var max_mp := roundi(mp_v)
 	var atk := roundi(atk_v)
 	var def := roundi(def_v)
-	var max_sta := roundi((float(S.get("base", 100)) + float(S.get("perLevel", 2)) * float(lv - 1) + float(S.get("perAgi", 1)) * float(agi)) * sta_mul * float(bonus.get("sta", 1.0))) + int(eq["sta"])
+	var max_sta := roundi((float(S.get("base", 100)) + float(S.get("perLevel", 2)) * float(lv - 1) + float(S.get("perAgi", 1)) * float(agi)) * sta_mul * float(bonus.get("sta", 1.0))) + int(eq["sta"]) + int(fu["sta"])
 	var wtype := "tay"
 	var wpn: Variant = equip.get("weapon", null)
 	if typeof(wpn) == TYPE_DICTIONARY: wtype = str(Data.item(str((wpn as Dictionary).get("id", ""))).get("wtype", "tay"))
@@ -237,10 +305,10 @@ func apply_patch(patch: Dictionary, quiet: bool = false) -> void:
 		p[k] = set_map[k]
 	var was_quiet: bool = quiet or patch_is_quiet(patch)
 	player = p
-	if p.has("hp"): hp = int(p["hp"])
-	if p.has("mp"): mp = int(p["mp"])
+	# KHÔNG chép hp/mp từ bản vá: server chỉ biết giá trị lưu lần cuối (cũ hơn máu tức thời của client).
+	# Web cũng vậy; hp/mp chỉ lấy từ server qua các sự kiện levelup / school / awaken / heal.
 	# Điểm/đồ/cấp đổi thì tính lại chỉ số (panel Nhân vật không còn hiện toàn 0).
-	var stat_keys := ["points", "equip", "level", "school", "formChoice", "formActive"]
+	var stat_keys := ["points", "equip", "level", "school", "formChoice", "formActive", "fusion", "perks", "kyNguyen"]
 	for k in set_map.keys():
 		if k in stat_keys:
 			recalc_stats()
@@ -272,8 +340,8 @@ func handle_event(ev: Dictionary) -> void:
 			form_active = bool(ev.get("active", false))
 			recalc_stats()
 		"school", "awaken":
-			if ev.has("hp"): hp = int(ev["hp"])
-			if ev.has("mp"): mp = int(ev["mp"])
+			hp = int(player.get("hp", hp))
+			mp = int(player.get("mp", mp))
 		_: pass
 
 func on_events(events: Array) -> void:

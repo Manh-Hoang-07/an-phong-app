@@ -63,9 +63,17 @@ func setup(u: int, id: String, look: String, sprite_override: String = "") -> vo
 	if tint_v == null and not own: tint_v = (Data.mob_art.get("LOOK_TINT", {}) as Dictionary).get(look, null)
 	if tint_v != null: _tint = Color.hex((int(tint_v) << 8) | 0xff)
 	mob_level = int(def.get("level", 1))
+	def_stat = int(def.get("def", 0))
+	mob_style = str(def.get("style", ""))
+	resist = float(def.get("resist", 0.0))
 	_build()
 
 var mob_level := 1
+var def_stat := 0            # phòng thủ của quái (trừ vào sát thương người chơi gây ra)
+var mob_style := ""          # kiểu đòn đặc biệt của trùm (water/ice/void/...)
+var resist := 0.0            # kháng đòn đánh thường (def.resist)
+var flags := 0               # cờ từ server: 1 chậm, 2 đóng băng, 4 phẫn nộ
+var enraged := false         # cờ phẫn nộ từ server (fl & 4): đòn đánh nặng hơn 25%
 
 func _build() -> void:
 	var def: Dictionary = mob_def

@@ -150,7 +150,7 @@ func action(type: String, params: Dictionary = {}, opts: Dictionary = {}) -> Dic
 		var data := await send_action(t, item["params"])
 		# Ưu tiên nhân vật đầy đủ (lỗi hoàn tác / gửi lại rid) — đồng bộ lại hoàn toàn
 		if data.has("player"):
-			Game.set_player(data["player"])
+			Game.set_player(data["player"], false)
 			if data.has("rev"): Game.rev = int(data["rev"])
 		elif data.get("ok") != false and data.has("rev"):
 			if Game.has_player() and data.get("base") == Game.rev:
@@ -160,7 +160,7 @@ func action(type: String, params: Dictionary = {}, opts: Dictionary = {}) -> Dic
 				# Lệch rev: tải lại cả nhân vật như web
 				var fresh := await me()
 				if fresh.has("player"):
-					Game.set_player(fresh["player"])
+					Game.set_player(fresh["player"], false)
 					Game.rev = int(fresh.get("rev", 0))
 		# Sự kiện kèm phản hồi (msg, levelup, loot, map...) phát cho giao diện / thế giới xử lý.
 		if data.get("ok") != false and data.has("events"):

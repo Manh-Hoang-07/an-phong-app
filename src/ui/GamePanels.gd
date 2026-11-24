@@ -33,6 +33,11 @@ func p() -> Dictionary:
 	return Game.player
 
 func act(type: String, params: Dictionary = {}, silent: bool = true) -> void:
+	if type == "use":
+		# Bình thuốc: server cộng vào máu/MP tức thời của client (như web), không phải giá trị lưu cũ
+		params = params.duplicate()
+		params["hp"] = Game.hp
+		params["mp"] = Game.mp
 	Net.action(type, params)
 	if not silent and host: host.toast("Đang xử lý…")
 
@@ -123,6 +128,21 @@ func _bag_match(iid: String) -> bool:
 		"use": return is_use and not is_gear
 		_: return not is_gear and not is_use
 
+## Vết Nhiễm đỏ: cảnh báo (trừ máu, chặn hồi máu ngoài giao chiến) + nút gột bằng Thuốc chữa nhiễm đỏ (cleanse_nhiem).
+func _nhiem_block(parent: Control, entry: Dictionary, params: Dictionary) -> void:
+	var n := int(entry.get("nhiem", 0))
+	if n <= 0: return
+	var meds := 0
+	var bag: Variant = p().get("bag", [])
+	if typeof(bag) == TYPE_ARRAY:
+		for b in bag:
+			if typeof(b) == TYPE_DICTIONARY and str((b as Dictionary).get("id", "")) == "thuoc_nhiem_do": meds += int((b as Dictionary).get("qty", (b as Dictionary).get("n", 1)))
+	var warn := T.label("Nhiễm đỏ bậc %d: chỉ số chính +18%%, máu tối đa -%d%%, không hồi máu ngoài giao chiến." % [n, 6 * n], T.FS_S, T.C_RED)
+	warn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(warn)
+	var btn := W.action_button("Gột bằng Thuốc chữa nhiễm đỏ (%d)" % meds, func(): act("cleanse_nhiem", params), meds <= 0)
+	parent.add_child(btn)
+
 func _bag_detail(e: Dictionary) -> Control:
 	var iid := str(e.get("id", ""))
 	var d: Dictionary = Data.item(iid)
@@ -133,6 +153,7 @@ func _bag_detail(e: Dictionary) -> Control:
 	if qty > 1: body.add_child(T.label("Số lượng: %d" % qty, T.FS_S, T.C_TEXT))
 	if not str(d.get("slot", "")).is_empty():
 		body.add_child(W.action_button("Trang bị", func(): act("equip", {"uid": uidn}); _deselect()))
+		_nhiem_block(body, e, {"uid": uidn})
 	if d.has("kind") and str(d.get("kind", "")) in ["potion", "book", "transform_book", "buff", "box", "food", "consumable"]:
 		body.add_child(W.action_button("Sử dụng", func(): act("use", {"item": iid})))
 	elif d.has("hp") or d.has("mp"):
@@ -281,6 +302,8 @@ func _equip_popup(slot: String, eq: Dictionary) -> Control:
 		det.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sc.add_child(det)
 		v.add_child(sc)
+		var eq_entry: Variant = eq.get(slot, null)
+		if typeof(eq_entry) == TYPE_DICTIONARY: _nhiem_block(v, eq_entry, {"slot": slot})
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
 		var back := W.action_button("Quay lại", func(): equip_detail = false; refresh())

@@ -305,6 +305,12 @@ var calc: Dictionary = {}
 func _load_looks() -> void:
 	looks = {}
 	art_meta = {}
+	# File dữ liệu tính chỉ số BẮT BUỘC: thiếu thì mất toàn bộ chỉ số trang bị/nội tại/Kỳ Nguyên
+	# và app hiển thị máu thấp hơn server rất nhiều (lỗi 3k vs 15k). Báo rõ thay vì bỏ qua im lặng.
+	for req in ["res://data/calc.json", "res://data/mob_art.json"]:
+		if not FileAccess.file_exists(req):
+			push_error("THIEU FILE DU LIEU: %s — chay: node tools/export_calc.js va node tools/export_mobs.js" % req)
+			printerr("THIEU FILE DU LIEU: ", req)
 	for pair in [["res://data/map_looks.json", "looks"], ["res://assets/art/meta.json", "art_meta"], ["res://data/mob_art.json", "mob_art"], ["res://data/calc.json", "calc"]]:
 		if not FileAccess.file_exists(pair[0]): continue
 		var f := FileAccess.open(pair[0], FileAccess.READ)
