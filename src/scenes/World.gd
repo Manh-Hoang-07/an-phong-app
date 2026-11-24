@@ -427,6 +427,9 @@ func _apply_zoom() -> void:
 	var ratio := float(win.y) / maxf(1.0, vis.y)     # điểm ảnh màn hình trên 1 đơn vị logic
 	var n := maxf(1.0, roundf(BASE_ZOOM * ratio))
 	_cam.zoom = Vector2.ONE * (n / ratio)
+	# Nền tính _view theo zoom của camera -> báo nó tính lại sau khi zoom đổi.
+	if _bg_node != null and _bg_node.has_method("refresh_view"):
+		_bg_node.refresh_view.call_deferred()
 
 ## Di chuyển + va chạm + camera: chạy trong _process với delta thật (giới hạn 1/30s). Trước đây ở _physics_process
 ## (60Hz cố định) trong khi hình vẽ theo nhịp màn hình, nên nhịp lệch nhau gây giật.

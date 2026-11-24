@@ -39,9 +39,21 @@ var _shader: Shader = null
 var _flat: TextureRect = null
 var _haze: TextureRect = null
 var _theme := "city"
+var _map_id := ""
+var _low_quality := false
+
+## Kích thước vùng THẾ GIỚI mà camera nhìn thấy (đơn vị của MapView/Player), KHÔNG phải cỡ màn hình.
+## Node2D nền nằm trong không gian thế giới, nên phải chia cho zoom của camera; nếu dùng thẳng
+## get_visible_rect() thì nền bị phóng to đúng bằng zoom (1.176x) và lệch tâm => chân trời tụt thấp, nền lệch mặt đất.
+func _world_view() -> Vector2:
+	var v := get_viewport().get_visible_rect().size
+	var cam := get_viewport().get_camera_2d()
+	if cam != null and cam.zoom.x > 0.0 and cam.zoom.y > 0.0:
+		v /= cam.zoom
+	return v
 
 func _ready() -> void:
-	_view = get_viewport().get_visible_rect().size
+	_view = _world_view()
 
 func _load_tex(pack: String, layer: String) -> Texture2D:
 	for ext in ["png", "jpg"]:
@@ -112,7 +124,9 @@ func set_map(map_id: String, theme: String, low_quality: bool = false) -> void:
 	_flat = null
 	_haze = null
 	_theme = theme
-	_view = get_viewport().get_visible_rect().size
+	_map_id = map_id
+	_low_quality = low_quality
+	_view = _world_view()
 	var look: Dictionary = Data.look(map_id)
 	var layers: Dictionary = look.get("layers", {})
 	var packs: Dictionary = Data.looks.get("packs", {})
@@ -224,5 +238,18 @@ func _apply() -> void:
 		spr.position = tl + Vector2(-off_tex * sc, -float(L["ty"]) * sc)
 
 func resize() -> void:
-	_view = get_viewport().get_visible_rect().size
+	_view = _world_view()
 	_apply()
+
+## Gọi lại khi zoom camera đổi (đổi cỡ cửa sổ / tỉ lệ hiển thị): _view phụ thuộc zoom.
+func refresh_view() -> void:
+	var nv := _world_view()
+	if nv.is_equal_approx(_view): return
+	_view = nv
+	# Lớp ảnh đã tính scale theo _view cũ -> dựng lại cho đúng cỡ.
+	var theme := _theme
+	var mid := _map_id
+	if mid != "":
+		set_map(mid, theme, _low_quality)
+	else:
+		_apply()
