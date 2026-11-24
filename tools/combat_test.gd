@@ -9,12 +9,18 @@ var _frames := 0
 var _stage := 0
 var _fails := 0
 var _mob_id := ""
+var _began := false
 
 func _initialize() -> void:
-	# KHÔNG được nối server thật: xoá thông tin đăng nhập trong bộ nhớ (không ghi đĩa)
+	pass
+
+func _begin() -> void:
+	# Autoload đã sẵn sàng. KHÔNG được nối server thật: đổi địa chỉ về cổng chết + xoá đăng nhập (chỉ trong bộ nhớ)
 	var st = root.get_node("Settings")
 	st.token = ""
 	st.session = ""
+	st.server_url = "http://127.0.0.1:9"
+	Engine.max_fps = 60   # các mốc kiểm tính theo số khung: cố định 60 FPS cho kết quả lặp lại
 	root.get_node("Data").load_local()
 	var d: Dictionary = root.get_node("Data").MONSTERS
 	for k in d.keys():
@@ -73,6 +79,11 @@ func _skill_of(stype: String) -> String:
 	return ""
 
 func _process(_d: float) -> bool:
+	if not _began:
+		_began = true
+		_begin()
+		_frames = 0
+		return false
 	_frames += 1
 	match _frames:
 		2: root.get_node("Socket").stop()
@@ -85,9 +96,35 @@ func _process(_d: float) -> bool:
 		450: _t_rain_check(); _t_companion()
 		560:
 			_t_companion_check()
+			_t_shadow()
+		700:
+			_t_shadow_check()
 			print("combat_test xong, fail=", _fails)
 			quit(1 if _fails > 0 else 0)
 	return false
+
+func _t_shadow() -> void:
+	var G = root.get_node("Game")
+	_setup()
+	G.player["mounts"] = {"active": null, "owned": [], "skill": "bite", "skills": {}, "summoned": []}
+	G.player["shadows"] = {"enabled": true, "active": [1, 2], "roster": [{"uid": 1, "monster": _mob_id, "lv": 20, "stats": {"level": 20}}, {"uid": 2, "monster": _mob_id, "lv": 30, "stats": {"level": 30}}]}
+	G.player["summons"] = {"enabled": true, "choice": "linh_soi", "states": {}, "units": {"linh_soi": {"lv": 10}}}
+	_mob_at(80, 150.0)
+	_w._last_hit_uid = 80
+	_w._last_hit_at = Time.get_ticks_msec()
+	print("--- bóng ma + linh thú")
+
+func _t_shadow_check() -> void:
+	var kinds := {}
+	for k in _w._assist.units.keys(): kinds[str(_w._assist.units[k]["kind"])] = true
+	_check("có bóng ma và linh thú", kinds.has("shadow") and kinds.has("summon"), str(kinds.keys()))
+	var sh := 0
+	var pe := 0
+	for h in _hits():
+		if str(h.get("src", "")) == "shadow": sh += 1
+		if str(h.get("src", "")) == "pet": pe += 1
+	_check("bóng ma tự đánh (src=shadow)", sh >= 1, "gói=%d" % sh)
+	_check("linh thú tự đánh (src=pet)", pe >= 1, "gói=%d" % pe)
 
 func _setup(facing: int = 1) -> void:
 	_clear_mobs(); _reset()
@@ -152,7 +189,7 @@ func _t_projectile() -> void:
 func _count_u(u: int) -> int:
 	var n := 0
 	for h in _hits():
-		if int(h["u"]) == u: n += 1
+		if int(h["u"]) == u and str(h.get("src", "")) == "": n += 1   # chỉ đòn của người chơi, không tính bạn đồng hành
 	return n
 
 func _t_projectile_check() -> void:
@@ -185,6 +222,7 @@ func _t_bow() -> void:
 	_check("cung có đạn bay", _w._projs.size() > 0)
 
 func _t_bow_check() -> void:
+	for h in _hits(): print("   hit ", JSON.stringify(h))
 	_check("mũi tên trúng quái xa 250px", _count_u(50) == 1, "hits=%d" % _count_u(50))
 
 func _t_rain() -> void:
@@ -194,7 +232,7 @@ func _t_rain() -> void:
 	if id == "": return
 	var sk: Dictionary = root.get_node("Data").skill_eff(G.player, id)
 	var cx: float = 640.0 + float(sk.get("width", 300)) * 0.5 + 30.0
-	for i in range(7): _mob_at(60 + i, cx - 640.0 + float(i - 3) * 40.0)
+	for i in range(15): _mob_at(60 + i, cx - 640.0 + float(i - 7) * 40.0)
 	_w._skill_damage(id, sk, "arrow_rain", 1)
 	print("--- arrow_rain ", id, " arrows=", sk.get("arrows"), " width=", sk.get("width"))
 
@@ -203,7 +241,7 @@ func _t_rain_check() -> void:
 	var sk: Dictionary = root.get_node("Data").skill_eff(G.player, _skill_of("arrow_rain"))
 	var total := _hits().size()
 	var arrows := int(sk.get("arrows", 1))
-	_check("arrow_rain: số đòn xấp xỉ số mũi tên (x mục tiêu đứng chồng)", total >= arrows, "hits=%d arrows=%d" % [total, arrows])
+	_check("arrow_rain: mỗi mũi tên một đòn (quái phủ kín vùng)", total >= arrows, "hits=%d arrows=%d" % [total, arrows])
 
 func _t_companion() -> void:
 	_setup()

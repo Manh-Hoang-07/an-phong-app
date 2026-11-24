@@ -1679,6 +1679,12 @@ func _toggle(text: String, hint: String, value: bool, cb: Callable) -> Control:
 func build_config() -> Control:
 	var vb := _vb()
 	vb.add_child(W.section_label("Hiển thị"))
+	var scale_opts := [["0.75", "75%"], ["0.85", "85%"], ["1.0", "100%"], ["1.15", "115%"]]
+	var scale_cur := "0.85"
+	for o in scale_opts:
+		if absf(float(o[0]) - Settings.ui_scale) < 0.01: scale_cur = str(o[0])
+	vb.add_child(T.label("Tỉ lệ hiển thị toàn bộ game (nhỏ hơn = nhìn rộng hơn)", T.FS_S, T.C_MUTED))
+	vb.add_child(W.segmented(scale_opts, scale_cur, func(v): Settings.set_ui_scale(float(v)); refresh()))
 	vb.add_child(_toggle("Đồ họa thấp", "Bớt hạt, tắt lớp nền giữa và thời tiết — nhẹ máy hơn", Settings.quality_low, func(v): Settings.set_quality_low(v)))
 	vb.add_child(_toggle("Giới hạn 30 FPS", "Tiết kiệm pin, máy ít nóng", Settings.fps_cap == 30, func(v): Settings.set_fps_cap(30 if v else 60)))
 	vb.add_child(_toggle("Hiện số sát thương", "Chữ nổi trên đầu quái khi đánh", Settings.show_damage, func(v): Settings.set_show_damage(v)))

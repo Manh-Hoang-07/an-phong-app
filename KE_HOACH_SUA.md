@@ -237,3 +237,19 @@ Nguyên nhân máu thấp (3k thay vì 15k): `recalc_stats` cũ đọc `it.stats
 - **Hồi phục** (`_regen`): chỉ khi không giao chiến 2s, 0,5%/giây; đồ nhiễm chặn hồi máu; Dòng Chảy; Cấm Chú khóa MP.
 - Đợt 2 (cùng ngày): **dung hợp Tử Linh** (cộng chỉ số bóng ma vào `recalc_stats`, tự hết hạn + gửi `fusion_end`); **thú đồng hành** gánh 18% sát thương, gục 15s rồi hồi 50%, hồi máu khi yên, lưu `pets` kèm save/đổi map; **phản sát thương** thủ thế; **Ấn Sát** (Sát Kiếp); **Trấn Hồn** hồi khi hạ quái; **Đóng Băng** bộ Băng Long; **Cổ Ngữ** kỹ năng đầu miễn MP; **Băng Sương** làm chậm; hút máu; kháng đánh thường; buff exec/vsSlowed/chain; kỹ năng gửi kèm slow/freeze/stun/knock; tiêu MP theo `costMul`, hồi chiêu theo `cdr`.
 - Kiểm: `tools/calc_check.gd` (chỉ số, gồm dung hợp) và `tools/fx_check.gd` (hiệu ứng + nội tại) đều lệch 0 so với web. Chưa kiểm với server và cảm ứng thật.
+
+### 2026-11-24 (đợt 3) — Kỹ năng đúng hình dạng, bạn đồng hành, HP
+- **HP**: `apply_patch` không còn chép `hp/mp` server (như web); `set_player` có `reset_vitals`; bình thuốc gửi kèm `hp/mp` tức thời, hồi chiêu bình 0,45s; sự kiện `school/awaken` lấy máu từ `player`.
+- **Kỹ năng** (`_skill_damage`, `_strike_shape`, `_shoot`): vùng hộp/vòng tròn như `hitBox/hitCircle`; aoe bán kính quanh người; kiếm rơi / thiên thạch / mưa tên theo `count/arrows` và độ trễ; đạn bay thật (`Proj.gd`) cho projectile / spread / backstep / cung / trượng; melee có `finisher`; dash đánh suốt quãng lướt + `after`; backstep đẩy lùi + bắn; `kind` = 1/2/3 theo kỹ năng thường/tuyệt kỹ/tuyệt phẩm (trước đây luôn 1 nên bị chặn trần thấp).
+- **Đòn thường theo vũ khí** (`WEAPON_TYPES`): tầm, hệ số, tốc độ, tiêu thể lực; cung/linh châu bắn đạn, trượng bắn sóng xuyên.
+- **Di chuyển**: tốc độ theo `stats.speed` x buff tốc độ, trùm Nước/Băng làm chậm 60%; nhảy có coyote 110ms + bộ đệm 140ms.
+- **Bạn đồng hành** (`src/world/Assist.gd`): thú đồng hành, linh thú Triệu Hồi Sư (kỹ năng riêng theo cấp), bóng ma Tử Linh (nghe `shadow_command`) tự đánh quái; gom đòn 0,5s như web; kỹ năng `summon/shadow_toggle` gửi action thật.
+- **Khác**: nút gột nhiễm đỏ (`cleanse_nhiem`) trong chi tiết đồ; chết thì xóa buff; buff `rage/frenzy` theo tên.
+- **Kiểm**: `tools/combat_test.gd` (chạy thật trong World, đếm gói `hit`), `calc_check`, `fx_check`, fuzz 2500 ca, `ui_smoke`. Mọi tool test đã chặn server thật (địa chỉ 127.0.0.1:9, xoá token trong bộ nhớ).
+- Chưa làm: đạn / sóng / bản sao của trùm (web), khóa mục tiêu (targetMob), bóng ma lên cấp, vài kiểu chiêu trùm chưa rõ hệ số.
+
+### 2026-11-24 (đợt 4) — Hiển thị x0.85, độ nét, chống giật
+- **Tỉ lệ hiển thị toàn bộ game**: `Settings.ui_scale` mặc định 0.85 (`content_scale_factor`: HUD + thế giới nhỏ lại 15%, nhìn rộng hơn). Đổi được ở Cài đặt → Hiển thị (75 / 85 / 100 / 115%), lưu vào `user://settings.cfg`.
+- **Giật / lag**: nguyên nhân là di chuyển + camera chạy trong `_physics_process` (60Hz cố định) còn hình vẽ theo nhịp màn hình, cộng thêm `snap_2d_transforms_to_pixel` làm vị trí nhảy từng bậc theo điểm ảnh logic. Đã chuyển sang `_move_step(delta)` gọi từ `_process` (delta thật, tối đa 1/30s), tắt pixel snap, tích phân trọng lực chính xác theo dt (độ cao nhảy 120,6px ở mọi FPS), không còn ép trần 60 FPS thủ công (dùng vsync theo màn hình; tuỳ chọn 30 FPS giữ nguyên). Đồng bộ bạn đồng hành mỗi 0,5s thay vì mỗi khung.
+- **Độ nét**: zoom camera 1.3 làm tròn để mỗi điểm ảnh gốc ứng với SỐ NGUYÊN điểm ảnh màn hình (`_apply_zoom`), tự tính lại khi đổi cỡ cửa sổ / đổi tỉ lệ hiển thị.
+- Kiểm: `tools/move_test.gd` (tốc độ đều theo mọi dt, camera không trễ, nhảy cao đúng ở 30/60/144 FPS), `combat_test` vẫn qua.

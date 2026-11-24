@@ -13,6 +13,8 @@ var proto: int = DEFAULT_PROTO
 var token: String = ""
 var session: String = ""  ## ap_session cookie lấy từ Set-Cookie của /api/login
 var fps_cap: int = 60          # 60 hoặc 30
+const DEFAULT_UI_SCALE := 0.85
+var ui_scale: float = DEFAULT_UI_SCALE   # tỉ lệ hiển thị toàn bộ game (0.75..1.25): nhỏ hơn = thấy nhiều hơn
 var quality_low: bool = false  # giảm hạt / hiệu ứng khi máy yếu
 var debug_stats: bool = false
 var hints_seen: Dictionary = {}     ## gợi ý lần đầu đã hiện (id -> true)
@@ -31,6 +33,7 @@ func _ready() -> void:
 		token = str(_cfg.get_value("net", "token", ""))
 		session = str(_cfg.get_value("net", "session", ""))
 		fps_cap = int(_cfg.get_value("game", "fps_cap", 60))
+		ui_scale = clampf(float(_cfg.get_value("game", "ui_scale", DEFAULT_UI_SCALE)), 0.6, 1.5)
 		quality_low = bool(_cfg.get_value("game", "quality_low", false))
 		debug_stats = bool(_cfg.get_value("game", "debug_stats", false))
 		last_user = str(_cfg.get_value("net", "last_user", ""))
@@ -39,12 +42,24 @@ func _ready() -> void:
 		hints_seen = _cfg.get_value("ux", "hints_seen", {})
 		volume = float(_cfg.get_value("game", "volume", 0.7))
 	_apply_fps()
+	_apply_display()
+
+## Tỉ lệ hiển thị toàn bộ game (HUD + thế giới). 0.85 = mọi thứ nhỏ lại 15%, nhìn được rộng hơn.
+func _apply_display() -> void:
+	var w := get_window()
+	if w != null: w.content_scale_factor = ui_scale
+
+func set_ui_scale(value: float) -> void:
+	ui_scale = clampf(value, 0.6, 1.5)
+	_apply_display(); _save(); changed.emit("ui_scale", ui_scale)
 
 func _apply_fps() -> void:
-	# 0 = không giới hạn; Engine.max_fps = 60/30 theo cấu hình
-	Engine.max_fps = fps_cap if fps_cap in [30, 60] else 60
-	# Đồng bộ tần số vật lý với FPS để cảm giác di chuyển giống web
-	Engine.physics_ticks_per_second = Engine.max_fps
+	# 30 FPS: cố định 30. Còn lại: để màn hình quyết định nhịp (vsync) — đặt trần 60 trên màn 90/120Hz làm
+	# khung hình đến không đều (giật), nên không giới hạn tay.
+	Engine.max_fps = 30 if fps_cap == 30 else 0
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
+	# Di chuyển nhân vật chạy trong _process theo delta thật, không còn phụ thuộc nhịp vật lý
+	Engine.physics_ticks_per_second = 60
 
 func set_server_url(url: String) -> void:
 	server_url = url.trim_suffix("/")
@@ -89,6 +104,7 @@ func _save() -> void:
 	_cfg.set_value("ux", "hints_seen", hints_seen)
 	_cfg.set_value("game", "volume", volume)
 	_cfg.set_value("game", "fps_cap", fps_cap)
+	_cfg.set_value("game", "ui_scale", ui_scale)
 	_cfg.set_value("game", "quality_low", quality_low)
 	_cfg.set_value("game", "debug_stats", debug_stats)
 	_cfg.save(CFG_PATH)

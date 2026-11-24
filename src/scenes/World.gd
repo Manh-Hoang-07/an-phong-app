@@ -128,6 +128,8 @@ var _other_fx_n := 0
 func _ready() -> void:
 	_char_script = load("res://src/world/CharSprite.gd")
 	_mob_script = load("res://src/world/MobSprite.gd")
+	get_viewport().size_changed.connect(_apply_zoom)
+	Settings.changed.connect(func(k, _v): if k == "ui_scale": _apply_zoom.call_deferred())
 	_assist = AssistScript.new()
 	add_child(_assist)
 	_assist.setup(self)
@@ -310,7 +312,7 @@ func _load_player_map(arrive: String) -> void:
 	if _weather: _weather.apply(look)
 	RenderingServer.set_default_clear_color(Color.from_rgba8((int(look.get("bg", 0x101820)) >> 16) & 255, (int(look.get("bg", 0x101820)) >> 8) & 255, int(look.get("bg", 0x101820)) & 255))
 	if _cam:
-		_cam.zoom = Vector2(1.3, 1.3)
+		_apply_zoom()
 		_cam.limit_left = 0
 		_cam.limit_right = int(float(_cols) * TILE)
 		_cam.limit_top = 0
@@ -396,6 +398,7 @@ func _sync_pet() -> void:
 
 func _process(delta: float) -> void:
 	if not Game.has_player(): return
+	_move_step(minf(delta, 1.0 / 30.0))
 	if _assist != null: _assist.tick(delta)
 	# Nền bám đúng tâm màn hình THẬT của camera (đã bị chặn ở biên map), không phải vị trí nhân vật
 	if _cam and _bg_node:
@@ -414,7 +417,20 @@ func _process(delta: float) -> void:
 	_stamina_tick(delta)
 	_form_tick(delta)
 
-func _physics_process(delta: float) -> void:
+## Thu phóng camera: cỡ ban đầu 1.3 nhưng làm tròn để mỗi điểm ảnh gốc ứng với SỐ NGUYÊN điểm ảnh màn hình
+## (zoom lẻ + lọc nearest làm pixel art vỡ, kém nét). Gọi lại khi đổi kích thước cửa sổ / tỉ lệ hiển thị.
+const BASE_ZOOM := 1.3
+func _apply_zoom() -> void:
+	if _cam == null: return
+	var vis := get_viewport().get_visible_rect().size
+	var win := get_window().size
+	var ratio := float(win.y) / maxf(1.0, vis.y)     # điểm ảnh màn hình trên 1 đơn vị logic
+	var n := maxf(1.0, roundf(BASE_ZOOM * ratio))
+	_cam.zoom = Vector2.ONE * (n / ratio)
+
+## Di chuyển + va chạm + camera: chạy trong _process với delta thật (giới hạn 1/30s). Trước đây ở _physics_process
+## (60Hz cố định) trong khi hình vẽ theo nhịp màn hình, nên nhịp lệch nhau gây giật.
+func _move_step(delta: float) -> void:
 	if not Game.has_player() or _grid.is_empty(): return
 	var now := Time.get_ticks_msec()
 	var dir := _move_dir
@@ -444,8 +460,9 @@ func _physics_process(delta: float) -> void:
 		on_ground = false
 
 	if not on_ground:
+		# Tích phân chính xác theo dt: độ cao nhảy không phụ thuộc FPS
+		_player.position.y += _vy * delta + 0.5 * GRAVITY * delta * delta
 		_vy += GRAVITY * delta
-		_player.position.y += _vy * delta
 		foot = _player.position.y + 30.0
 		gy = _ground_y(_player.position.x, foot)
 		if _vy >= 0.0 and foot >= gy:
@@ -749,7 +766,7 @@ func _free_proj(p: Dictionary) -> void:
 
 func _update_projectiles(delta: float) -> void:
 	if _projs.is_empty(): return
-	var ctx := _hit_ctx()
+	var ctx := {}   # tính lười: chỉ khi có đạn trúng (special_fx khá tốn)
 	for p in _projs.duplicate():
 		var node: Node2D = p["node"]
 		if not is_instance_valid(node): _projs.erase(p); continue
@@ -764,8 +781,12 @@ func _update_projectiles(delta: float) -> void:
 			var mob: Node2D = _mobs[u]
 			if not is_instance_valid(mob) or not mob.alive or (p["hit"] as Dictionary).has(u): continue
 			if absf(mob.position.x - node.position.x) > 350.0: continue
-			if box.intersects(mob.body_rect()):
+			var mr: Rect2 = mob.body_rect()
+			# Quái thấp vẫn bị đạn tầm ngực trúng (web dùng khung sprite cao hơn): nới khung lên tối thiểu 70px
+			if mr.size.y < 70.0: mr = Rect2(mr.position.x, mr.end.y - 70.0, mr.size.x, 70.0)
+			if box.intersects(mr):
 				(p["hit"] as Dictionary)[u] = true
+				if ctx.is_empty(): ctx = _hit_ctx()
 				_hit_mob(int(u), mob, float(o.get("mult", 1.0)), int(o.get("kind", 0)), str(o.get("skill_id", "")), o.get("extra", {}), ctx)
 				if not bool(o.get("pierce", false)):
 					_free_proj(p)

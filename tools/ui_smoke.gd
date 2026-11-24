@@ -16,6 +16,20 @@ func _initialize() -> void:
 		var wh := a[2].split("x")
 		root.size = Vector2i(int(wh[0]), int(wh[1]))
 		DisplayServer.window_set_size(root.size)
+
+func _block_net() -> void:
+	# KHÔNG nối server thật (token đã lưu trên máy sẽ bị dùng): địa chỉ chết + xoá đăng nhập, chỉ trong bộ nhớ
+	var st = root.get_node("Settings")
+	st.token = ""
+	st.session = ""
+	st.server_url = "http://127.0.0.1:9"
+	if not OS.get_environment("SMOKE_SCALE").is_empty():
+		st.ui_scale = float(OS.get_environment("SMOKE_SCALE"))
+		st._apply_display()
+
+var _began := false
+
+func _start() -> void:
 	root.get_node("Data").load_local()
 	match _what:
 		"login": change_scene_to_file("res://src/scenes/Login.tscn")
@@ -42,6 +56,11 @@ func _fake_player() -> Dictionary:
 	}
 
 func _process(_d: float) -> bool:
+	if not _began:
+		_began = true
+		_block_net()
+		_start()
+		return false
 	_frames += 1
 	if _frames == 20 and _what == "formhud":
 		var gg = root.get_node("Game")

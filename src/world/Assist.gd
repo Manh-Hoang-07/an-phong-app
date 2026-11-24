@@ -13,6 +13,7 @@ var units: Dictionary = {}     # key -> {kind, id, node, next_attack, last_comba
 var _batch: Dictionary = {}    # "uid|src" -> {u, src, dmg, slow, dir}
 var _flush_at := 0
 var _next_uid := 910000
+var _sync_at := 0
 
 func setup(world: Node2D) -> void:
 	w = world
@@ -101,7 +102,11 @@ func _focus() -> Node2D:
 # ------------------------------------------------------------------ Vòng lặp
 func tick(delta: float) -> void:
 	if w == null or Game.player.is_empty(): return
-	sync()
+	# Đồng bộ danh sách đơn vị chỉ khi dữ liệu nhân vật đổi hoặc mỗi 0,5s (không dựng lại mỗi khung)
+	var tnow := Time.get_ticks_msec()
+	if _sync_at == 0 or tnow - _sync_at > 500:
+		_sync_at = tnow
+		sync()
 	if units.is_empty(): return
 	var now := Time.get_ticks_msec()
 	var target := _target() if (not w._dead and not w._changing) else null
