@@ -10,3 +10,5 @@ Thumbs.db
 
 # công cụ cá nhân
 .perch/
+.run.log
+.calc_cases.json

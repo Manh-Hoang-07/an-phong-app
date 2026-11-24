@@ -42,7 +42,7 @@ func _build() -> void:
 	var anims: Dictionary = def["anims"]
 	for anim in anims.keys():
 		var path := "%s/%s/%s.png" % [ASSET_DIR, school, anim]
-		if not FileAccess.file_exists(path):
+		if not ResourceLoader.exists(path):
 			continue
 		var tex := load(path) as Texture2D
 		if tex == null:

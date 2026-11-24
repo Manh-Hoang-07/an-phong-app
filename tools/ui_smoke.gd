@@ -29,15 +29,16 @@ func _fake_player() -> Dictionary:
 	return {
 		"name": "Hoàng Phong", "level": 18, "rank": "D", "school": "kiem_si", "map": ("lang" if OS.get_environment("SMOKE_MAP").is_empty() else OS.get_environment("SMOKE_MAP")),
 		"x": (640 if OS.get_environment("SMOKE_MAP").is_empty() else null), "y": (300 if OS.get_environment("SMOKE_MAP").is_empty() else null), "hp": 420, "mp": 120, "sta": 86, "exp": 640, "gold": 12850, "linhNgoc": 35,
+		"perks": ["y_chi_thay", "lien_minh"], "titles": ["Kẻ Thức Tỉnh"], "awakenTier": 3, "formChoice": "awaken3", "kyNguyen": {"owned": ["kn_bat_tu"], "active": ["kn_bat_tu"]}, "shopDiscount": 0.05,
 		"points": {"str": 6, "vit": 4, "agi": 3, "spi": 2}, "freePoints": 7,
-		"skillSlots": ["pa1", "pa2", "pa3", "pa4", "pa5"],
-		"skills": {"pa1": {"lv": 3}, "pa2": {"lv": 2}, "pa3": {"lv": 1}},
+		"skillSlots": ["pa1", "pa2", "pa3", "pa4", null, null, null, null], "superUlts": {}, "mounts": {"active": null, "owned": ["ky_lan"], "skill": "bite", "skills": {"ky_lan": "bite"}, "summoned": []},
+		"skills": {"pa1": 3.0, "pa2": 2.0, "pa3": 1.0},
 		"bag": [
 			{"uid": 1, "id": "binh_mau_nho", "n": 12}, {"uid": 2, "id": "binh_mau_vua", "n": 4},
 			{"uid": 3, "id": "cung_go", "n": 1}, {"uid": 4, "id": "ao_da", "n": 1},
 			{"uid": 5, "id": "chuy_sat", "n": 1}, {"uid": 6, "id": "binh_nl_nho", "n": 7},
 		],
-		"equip": {}, "quest": {"step": 2, "state": "active", "progress": {}},
+		"bagPlus": 3, "equip": ({} if OS.get_environment("SMOKE_EQUIP").is_empty() else {"weapon": {"id": OS.get_environment("SMOKE_EQUIP"), "plus": 3}}), "quest": {"step": 2, "state": "active", "progress": {}},
 	}
 
 func _process(_d: float) -> bool:
@@ -55,6 +56,16 @@ func _process(_d: float) -> bool:
 		var sw := current_scene
 		var sid := OS.get_environment("SMOKE_SKILL")
 		sw._skill_fx.play("cast", sid, sw.get_node("Player").position, 1)
+	if _frames == 20 and _what == "mobs":
+		var w5 := current_scene
+		var p5: Vector2 = w5.get_node("Player").position
+		var ids := OS.get_environment("SMOKE_MOBS").split(",")
+		var lst: Array = []
+		var i5 := 0
+		for mid5 in ids:
+			lst.append({"u": 200 + i5, "id": mid5, "x": p5.x - 160 + i5 * 90, "y": p5.y + 30, "f": -1, "hp": 50, "mh": 100, "al": 1, "st": 0, "fl": 0})
+			i5 += 1
+		w5._on_mobs({"list": lst})
 	if _frames == 20 and _what == "fx":
 		var w3 := current_scene
 		var p3: Vector2 = w3.get_node("Player").position
@@ -106,7 +117,7 @@ func _process(_d: float) -> bool:
 		w._on_event({"t": "loot", "loot": {"lid": "L1", "map": "lang", "x": px + 30, "y": py + 30, "inst": {"id": "binh_mau_nho", "q": 0}}})
 		w._on_event({"t": "msg", "text": "Nhận 120 xu", "color": "#ffd54f"})
 		w._on_event({"t": "levelup", "level": 19})
-	if _frames == 20 and _what in ["bag", "menu", "char", "skills", "bagsel", "shop", "equip", "smith", "map", "npc", "config", "storage", "school", "daily", "teleport", "quest", "social", "trade", "skillsel", "npcq", "npcs", "gate", "code", "mount", "companion", "shadows", "kynguyen", "companionown", "form", "npcan", "confirm", "hint", "bagcmp"]:
+	if _frames == 20 and _what in ["bag", "menu", "char", "skills", "bagsel", "shop", "equip", "smith", "map", "npc", "config", "storage", "school", "daily", "teleport", "quest", "social", "trade", "skillsel", "npcq", "npcs", "gate", "code", "mount", "companion", "shadows", "kynguyen", "companionown", "form", "npcan", "confirm", "hint", "bagcmp", "equipsel", "petgear"]:
 		var w := current_scene
 		if w and w.has_node("MobileHUD"):
 			_hud = w.get_node("MobileHUD").get_child(0)
@@ -130,6 +141,13 @@ func _process(_d: float) -> bool:
 				root.get_node("Game").player["mounts"] = {"owned": ["hinh_nhan", "bong_do"], "summoned": ["bong_do"]}
 				root.get_node("Game").player["pets"] = {"bong_do": {"hp": 60, "maxHp": 100, "lv": 7}}
 				_hud.open_panel("companion")
+			elif _what == "petgear":
+				var gp = root.get_node("Game").player
+				gp["mounts"] = {"owned": ["bong_do"], "summoned": ["bong_do"]}
+				gp["petGear"] = {"bong_do": {"giap": "thu_giap_nho"}}
+				gp["bag"] = [{"uid": 9, "id": "thu_yen_nho", "n": 2}, {"uid": 10, "id": "thu_yen_vua", "n": 1}]
+				gp["level"] = 12
+				_hud.open_panel("companion"); _hud._panels.pet_sel = "bong_do|yen"; _hud._panels.refresh()
 			elif _what == "form":
 				root.get_node("Game").player["awakenTier"] = 2
 				root.get_node("Game").player["formChoice"] = "awaken1"
@@ -146,8 +164,20 @@ func _process(_d: float) -> bool:
 			elif _what == "bagcmp":
 				root.get_node("Game").player["equip"] = {"weapon": {"id": "cung_go", "plus": 0}}
 				_hud.open_panel("bag"); _hud._panels._select("bag", "5")
+			elif _what == "equipsel":
+				# Inject ngay trước khi chụp để gói room từ server không ghi đè equip.
+				root.get_node("Game").player["equip"] = {"weapon": {"id": OS.get_environment("SMOKE_EQUIP") if not OS.get_environment("SMOKE_EQUIP").is_empty() else "cung_go", "plus": 3}}
+				_hud.open_panel("equip"); _hud._panels._select("equip", "weapon")
+				if _hud._panels.has_method("refresh"): _hud._panels.refresh()
 			elif _what == "npcs": _hud.open_dialog("tap_hoa")
 			else: _hud.open_panel(_what)
+	if _frames == 50 and _what == "equipsel":
+		root.get_node("Game").player["equip"] = {"weapon": {"id": OS.get_environment("SMOKE_EQUIP") if not OS.get_environment("SMOKE_EQUIP").is_empty() else "cung_go", "plus": 3}}
+		_hud.open_panel("equip"); _hud._panels._select("equip", "weapon")
+	if _frames == 50 and _what == "petworld":
+		var pet_id := "ky_lan" if OS.get_environment("SMOKE_PET").is_empty() else OS.get_environment("SMOKE_PET")
+		root.get_node("Game").player["mounts"] = {"owned": [pet_id], "summoned": [pet_id], "skill": "bite", "skills": {pet_id: "bite"}}
+		current_scene._sync_pet()
 	if _frames == (260 if _what == "combat" else (25 if _what == "fx" else (20 + int(OS.get_environment("SMOKE_FRAME")) if _what == "skillfx" else (120 if _what.begins_with("npc") else 60)))):
 		var img := root.get_texture().get_image()
 		img.save_png(_out)

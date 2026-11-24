@@ -4,6 +4,7 @@
 ## chết/hồi sinh, đổi bản đồ, đổi phiếu thưởng (`kills`), nhặt đồ, lưu trạng thái.
 
 const T := preload("res://src/ui/UITheme.gd")
+const GlyphArt := preload("res://src/ui/GlyphArt.gd")
 const FloatText := preload("res://src/world/FloatText.gd")
 const LootNode := preload("res://src/world/LootNode.gd")
 const RemotePlayer := preload("res://src/world/RemotePlayer.gd")
@@ -39,6 +40,8 @@ var _fade: ColorRect = null
 var _fxs: Node2D = null
 var _weather: CanvasLayer = null
 var _mob_script: Script = null
+var _pet: Node2D = null          # thú đồng hành đi theo player
+var _pet_id: String = ""
 
 var _players: Dictionary = {}   # id -> RemotePlayer
 var _mobs: Dictionary = {}      # uid -> MobSprite
@@ -280,12 +283,14 @@ func _load_player_map(arrive: String) -> void:
 	if Settings.debug_stats: print("Dựng map ", _map_id, " mất ", Time.get_ticks_msec() - t_bake, "ms")
 	_entities.build(_grid, TILE, _meta, func(r: int, c: int) -> float:
 		return float(_ground_y(float(c) * TILE + TILE * 0.5, float(r) * TILE)))
+	_entities.refresh_visibility(Game.player, _map_id)
 	if _bg_node and _bg_node.has_method("set_map"):
 		_bg_node.set_map(_map_id, theme_id, Settings.quality_low)
 	var look: Dictionary = Data.look(_map_id)
 	if _weather: _weather.apply(look)
 	RenderingServer.set_default_clear_color(Color.from_rgba8((int(look.get("bg", 0x101820)) >> 16) & 255, (int(look.get("bg", 0x101820)) >> 8) & 255, int(look.get("bg", 0x101820)) & 255))
 	if _cam:
+		_cam.zoom = Vector2(1.3, 1.3)
 		_cam.limit_left = 0
 		_cam.limit_right = int(float(_cols) * TILE)
 		_cam.limit_top = 0
@@ -364,8 +369,42 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_V: _cast(6)
 	elif event.is_action_pressed("attack"): _on_attack()
 
+## Đồng bộ thú đồng hành với dữ liệu server (mounts.summoned). Gọi mỗi khung + sau action.
+func _sync_pet() -> void:
+	var mounts: Variant = Game.player.get("mounts", {})
+	var summoned: Array = []
+	if typeof(mounts) == TYPE_DICTIONARY:
+		var sv: Variant = (mounts as Dictionary).get("summoned", [])
+		if typeof(sv) == TYPE_ARRAY: summoned = sv
+		elif typeof(sv) == TYPE_STRING and str(sv) != "": summoned = [sv]
+	var want := str(summoned[0]) if not summoned.is_empty() else ""
+	if want == _pet_id: return
+	if is_instance_valid(_pet): _pet.queue_free(); _pet = null
+	_pet_id = want
+	if want != "" and _mob_script != null:
+		# Dùng MobSprite (đã render quái ổn) làm thú đi theo.
+		var pet: Node2D = _mob_script.new()
+		var def: Dictionary = Data.monster(want)
+		pet.setup(900001, want, str(def.get("look", "")), str(def.get("sprite", "")))
+		pet.set_process(true)
+		pet.set_physics_process(false)
+		pet.z_index = 3
+		var pn: Variant = pet.get("_name")
+		if pn is Node: (pn as Node).visible = false
+		var pb: Variant = pet.get("_bar")
+		if pb is Node: (pb as Node).visible = false
+		# Đặt ngoài _mob_layer để vòng lặp quái của World không gọi show_name(true) lại.
+		var host_node: Node = _mob_layer.get_parent()
+		host_node.add_child(pet)
+		host_node.move_child(pet, _mob_layer.get_index())
+		pet.set_target(_player.position, true)
+		_pet = pet
+
 func _process(delta: float) -> void:
 	if not Game.has_player(): return
+	_sync_pet()
+	if is_instance_valid(_pet) and _pet.has_method("set_target"):
+		_pet.set_target(_player.position + Vector2(-float(_facing) * 42.0, 6.0))
 	# Nền bám đúng tâm màn hình THẬT của camera (đã bị chặn ở biên map), không phải vị trí nhân vật
 	if _cam and _bg_node:
 		_bg_node.set_camera(_cam.get_screen_center_position())
@@ -374,6 +413,9 @@ func _process(delta: float) -> void:
 		_hud_acc = 0.0
 		_hud_dirty = false
 		_refresh_hud()
+	# Chưa nhận được danh sách quái sau 3s: xin server gửi lại (vào phòng bằng pos r=1)
+	if Socket.online and not Socket.mobs_received and Time.get_ticks_msec() - _enter_try > 3000:
+		_on_socket_connected()
 	_update_interact()
 	_regen(delta)
 	_stamina_tick(delta)
@@ -432,7 +474,10 @@ func _physics_process(delta: float) -> void:
 			_player.position.x = nx
 			var ngy := _ground_y(nx, _player.position.y + 30.0)
 			if _player.position.y + 30.0 < ngy and _vy >= 0.0 and on_ground:
-				_player.position.y = ngy - 30.0
+				# Nội suy lên bậc thang thay vì gán cứng -> không bị giật từng ô.
+				var want_y := ngy - 30.0
+				_player.position.y = lerpf(_player.position.y, want_y, clampf(delta * 14.0, 0.0, 1.0))
+				if absf(_player.position.y - want_y) < 0.5: _player.position.y = want_y
 
 	# Hoạt ảnh (ưu tiên: chết > bị đánh > tấn công > trên không > chạy > đứng)
 	var moving := absf(vx) > 1.0 and now >= _knock_until
@@ -534,7 +579,7 @@ func _on_attack() -> void:
 func _cast(index: int) -> void:
 	if _dead or _changing or index >= 7: return
 	var id := _btn_skill(index)
-	var sk: Dictionary = Data.skill(id)
+	var sk: Dictionary = Data.skill_eff(Game.player, id)
 	if sk.is_empty():
 		if _hud_node: _hud_node.toast("Ô kỹ năng trống — mở Kỹ năng để gán", "warn")
 		return
@@ -797,6 +842,7 @@ func _on_action_done(data: Dictionary, type: String) -> void:
 	if type in ["change_map", "teleport", "die", "respawn_choice"]:
 		_reload_after_move(type == "die")
 		return
+	if type == "mount_set": _sync_pet()
 	if _hud_node:
 		_hud_node.refresh_panel()
 		_hud_node.refresh_dialog()
@@ -926,7 +972,10 @@ func _nearest_npc() -> String:
 	return str(npcs[npcs.keys()[0]]) if not npcs.is_empty() else ""
 
 # ------------------------------------------------------------------ Mạng (đúng giao thức server/realtime)
+var _enter_try := 0
+
 func _on_socket_connected() -> void:
+	_enter_try = Time.get_ticks_msec()
 	Socket.send_pos(_map_id, _player.position.x, _player.position.y, _facing, _server_anim(_anim), true, _hp_pct())
 
 func _on_players(msg: Dictionary) -> void:
@@ -972,6 +1021,7 @@ func _add_remote(info: Dictionary) -> void:
 	Social.nearby[id] = {"name": str(info.get("name", "?")), "lv": int(info.get("lv", 1)), "sc": str(info.get("sc", ""))}
 
 func _on_mobs(msg: Dictionary) -> void:
+	print("[MOB] nhan danh sach: ", (msg.get("list", []) as Array).size(), " map=", msg.get("map", "?"))
 	# Gói đầy đủ khi vào map: dựng lại toàn bộ quái.
 	for u in _mobs.keys():
 		var n: Node = _mobs[u]
@@ -1111,22 +1161,35 @@ func _refresh_hud() -> void:
 		if qstate == "active" and not Game.quest_hint.is_empty():
 			qtext = Game.quest_hint
 		else:
-			qtext = "Nhiệm vụ · Bước %s · %s" % [str(q.get("step", 0)), "đang làm" if qstate == "active" else ("có thể trả" if qstate == "done" else "chưa nhận")]
+			var ready := Data.quest_ready(p)
+			var cqq: Dictionary = Data.quest_current(p)
+			if qstate == "active" and ready:
+				qtext = "Trả nhiệm vụ: %s" % str(cqq.get("name", ""))
+			elif qstate == "active":
+				var nl := ""
+				for l in Data.quest_obj_lines(p, cqq.get("obj", {}), q.get("progress", {}) if typeof(q.get("progress", {})) == TYPE_DICTIONARY else {}):
+					if not bool(l[1]): nl = str(l[0]); break
+				qtext = nl if nl != "" else str(cqq.get("name", "Nhiệm vụ"))
+			elif cqq.is_empty():
+				qtext = "Nhiệm vụ: hoàn tất cốt truyện"
+			else:
+				qtext = "Gặp NPC để nhận: %s" % str(cqq.get("name", ""))
 	_hud_node.set_quest(qtext)
 	if _entities:
 		var cq: Dictionary = Data.quest_current(p)
-		_entities.set_quest_marks(str(cq.get("npc", "")), str(q.get("state", "")) if not q.is_empty() else "")
+		_entities.set_quest_marks(str(cq.get("npc", "")), ("done" if Data.quest_ready(p) else str(q.get("state", ""))) if not q.is_empty() else "")
+		_entities.refresh_visibility(p, _map_id)
 	var labels: Array = []
 	for i in range(7):
 		var sid := _btn_skill(i)
 		var sk: Dictionary = Data.skill(sid)
-		labels.append("%s|%s" % [str(sk.get("icon", "✦" if i >= 4 and i < 6 else "·")), str(sk.get("name", sid))])
+		labels.append("%s|%s" % [(GlyphArt.skill_token(sid, str(sk.get("icon", "@star"))) if not sk.is_empty() else ("@star" if i >= 4 and i < 6 else "")), str(sk.get("name", sid))])
 	_hud_node.set_skill_visible(6, _gear_skill_id() != "")
 	_hud_node.set_skill_labels(labels)
 	var colors: Array = []
 	var usable: Array = []
 	for i in range(7):
-		var sk2: Dictionary = Data.skill(_btn_skill(i))
+		var sk2: Dictionary = Data.skill_eff(Game.player, _btn_skill(i))
 		colors.append(_skill_color(sk2) if not sk2.is_empty() else Color(0.5, 0.5, 0.58))
 		usable.append(not sk2.is_empty() and Game.mp >= int(sk2.get("mp", 0)))
 	_hud_node.set_skill_styles(colors, usable)

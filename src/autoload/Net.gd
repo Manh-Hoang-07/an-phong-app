@@ -48,6 +48,7 @@ func request(path: String, body: Variant = null, method: String = "") -> Diction
 	var url: String = Settings.server_url + path
 	var req := HTTPRequest.new()
 	add_child(req)
+	req.timeout = 12.0   # không có timeout thì server không tới được sẽ treo vô hạn
 	var headers := ["Content-Type: application/json", "Accept: application/json"]
 	if not Settings.session.is_empty():
 		headers.append("Cookie: " + Settings.cookie_header())
@@ -154,7 +155,7 @@ func action(type: String, params: Dictionary = {}, opts: Dictionary = {}) -> Dic
 		elif data.get("ok") != false and data.has("rev"):
 			if Game.has_player() and data.get("base") == Game.rev:
 				Game.rev = int(data["rev"])
-				if data.has("patch"): Game.apply_patch(data["patch"])
+				if typeof(data.get("patch", null)) == TYPE_DICTIONARY: Game.apply_patch(data["patch"])
 			else:
 				# Lệch rev: tải lại cả nhân vật như web
 				var fresh := await me()

@@ -4,6 +4,7 @@ extends RefCounted
 ## Quy tắc: chữ >= 13px, vùng chạm >= 44px, bo góc lớn, tương phản cao trên nền tối.
 
 const UISkin := preload("res://src/ui/UISkin.gd")
+const GlyphArt := preload("res://src/ui/GlyphArt.gd")
 const FONT_DIR := "res://assets/fonts/"
 const ICON_DIR := "res://assets/ui/icons/"
 
@@ -14,15 +15,17 @@ const C_PANEL     := Color(0.055, 0.070, 0.118, 0.985)
 const C_CARD      := Color(0.098, 0.121, 0.184, 0.96)
 const C_CARD_HI   := Color(0.145, 0.184, 0.270, 0.98)
 const C_BORDER    := Color(0.36, 0.48, 0.70, 0.85)
-const C_GOLD      := Color(1.00, 0.82, 0.36)
+const C_GOLD      := Color(1.00, 0.84, 0.42)
 const C_GOLD_DK   := Color(0.80, 0.58, 0.16)
-const C_TEXT      := Color(0.92, 0.94, 1.00)
-const C_MUTED     := Color(0.63, 0.68, 0.80)
-const C_RED       := Color(0.94, 0.34, 0.38)
-const C_GREEN     := Color(0.36, 0.86, 0.56)
-const C_BLUE      := Color(0.38, 0.66, 1.00)
-const C_PURPLE    := Color(0.72, 0.50, 0.98)
-const C_SCRIM     := Color(0.0, 0.0, 0.02, 0.55)
+const C_BRASS     := Color(0.82, 0.64, 0.30)   # đồng ấm dùng cho viền/điểm nhấn phụ
+const C_TEXT      := Color(0.94, 0.96, 1.00)
+const C_MUTED     := Color(0.62, 0.68, 0.81)
+const C_FAINT     := Color(0.44, 0.50, 0.63)   # chữ phụ cấp ba (hint, đơn vị)
+const C_RED       := Color(0.95, 0.36, 0.40)
+const C_GREEN     := Color(0.36, 0.88, 0.58)
+const C_BLUE      := Color(0.38, 0.68, 1.00)
+const C_PURPLE    := Color(0.74, 0.50, 0.99)
+const C_SCRIM     := Color(0.0, 0.0, 0.02, 0.62)
 const C_HUD_BG    := Color(0.04, 0.06, 0.12, 0.72)
 
 # ---- Cỡ chữ ----
@@ -58,6 +61,7 @@ static func _build_font(weight: String) -> Font:
 		# Dùng resource đã import (bản export không còn file .woff2 gốc).
 		var f := load(path) as FontFile
 		if f == null: continue
+		f.allow_system_fallback = false   # không nạp font emoji/hệ thống (crash iOS)
 		f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
 		f.hinting = TextServer.HINTING_NONE
 		f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_AUTO
@@ -180,6 +184,10 @@ static func make_theme() -> Theme:
 		t.set_color("font_color", cls, C_TEXT)
 		t.set_font_size("font_size", cls, FS_M)
 		t.set_stylebox("focus", cls, StyleBoxEmpty.new())
+		# CheckButton ke thua stylebox cua Button -> vien vang + nen xanh quanh o bat/tat.
+		# Bo het: chi con thanh truot va nut tron.
+		for st in ["normal", "hover", "pressed", "disabled", "hover_pressed"]:
+			t.set_stylebox(st, cls, StyleBoxEmpty.new())
 	# ProgressBar
 	t.set_stylebox("background", "ProgressBar", UISkin.bar_frame())
 	t.set_stylebox("fill", "ProgressBar", UISkin.bar_fill(C_GREEN))
@@ -200,7 +208,7 @@ static func make_theme() -> Theme:
 # ------------------------------------------------------------------ Factory
 static func label(text: String, size: int = FS_M, color: Color = C_TEXT, bold: bool = false) -> Label:
 	var l := Label.new()
-	l.text = text
+	l.text = GlyphArt.clean(text)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_font_override("font", font(bold))
@@ -221,7 +229,7 @@ static func hud_label(text: String, size: int = FS_M, color: Color = C_TEXT, bol
 
 static func button(text: String, min_size: Vector2 = Vector2(0, 40)) -> Button:
 	var b := Button.new()
-	b.text = text
+	b.text = GlyphArt.clean(text)
 	b.custom_minimum_size = min_size
 	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_override("font", font(true))
@@ -306,8 +314,44 @@ static func hsep(color: Color = C_BORDER) -> HSeparator:
 	return s
 
 static func quality_color(q: int) -> Color:
-	if q >= 5: return C_PURPLE
-	if q >= 4: return C_GOLD
+	if q >= 5: return Color(1.00, 0.66, 0.20)
+	if q >= 4: return C_PURPLE
 	if q >= 3: return C_BLUE
 	if q >= 2: return C_GREEN
 	return C_MUTED
+
+# ------------------------------------------------------------------ Phân cấp chữ / tiêu đề
+## Nhãn nhỏ kiểu "overline" (ví dụ: "THANH KỸ NĂNG", "MỤC TIÊU") — chữ hoa, giãn khoảng, mờ.
+static func overline(text: String, color: Color = C_BRASS) -> Label:
+	var l := label(text.to_upper(), FS_S, color, true)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+## Tiêu đề mục có vạch đồng ngắn bên trái — dùng thay cho section() ở panel cần nhịp rõ.
+static func heading(text: String, color: Color = C_GOLD) -> HBoxContainer:
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.custom_minimum_size = Vector2(0, 20)
+	var bar := ColorRect.new()
+	bar.color = color
+	bar.custom_minimum_size = Vector2(3, 16)
+	bar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(bar)
+	var l := label(text, FS_L, color, true)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(l)
+	return h
+
+## Giá trị số lớn (stats, tiền) — căn phải tuỳ chọn.
+static func stat_value(text: String, color: Color = C_TEXT, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	var l := label(text, FS_XL, color, true)
+	l.horizontal_alignment = align
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l

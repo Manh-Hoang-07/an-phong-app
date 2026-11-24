@@ -8,7 +8,7 @@ const NPC_DIR := "res://assets/npcs/"
 const ART := "res://assets/art/"
 # NPC có ảnh riêng: chiều cao hiển thị (px) — khớp Art NPC_IMAGES của web
 const NPC_IMAGES := {"lao_su": 62.0, "tap_hoa": 62.0, "thu_kho": 64.0}
-const ROLE_MARK_ICON := {"shop": "shop", "smith": "anvil", "storage": "storage", "teleport": "portal", "market": "social", "daily": "quest"}
+const ROLE_MARK_ICON := {"shop": "shop", "smith": "anvil", "storage": "storage", "teleport": "portal", "market": "social", "daily": "quest", "zone": "map"}
 
 var npcs: Array = []      # [{id, pos, node, role, glyph, icon, quest_mark}]
 var portals: Array = []   # [{key, to, pos, node, name}]
@@ -48,6 +48,73 @@ func build(grid: Array, tile: float, meta: Dictionary, ground_fn: Callable) -> v
 		var foot2 := Vector2(float(cr2.x) * tile + tile * 0.5, float(ground_fn.call(cr2.y, cr2.x)))
 		var d: Dictionary = portal_defs[key]
 		_add_portal(str(key), str(d.get("to", "")), foot2, key == gate, portal_defs.size())
+	_build_zone_npcs(grid, tile, meta)
+
+## Người dẫn khu (khu_su): mỗi map 2 người, map rộng 3 người, đặt tự động — cùng thuật toán shared/logic/zone-npcs.js của web.
+func _build_zone_npcs(grid: Array, tile: float, meta: Dictionary) -> void:
+	if Data.npc("khu_su").is_empty() or grid.is_empty(): return
+	var rows := grid.size()
+	var cols := (grid[0] as Array).size()
+	var used: Array = []
+	for n in npcs: used.append((n["pos"] as Vector2).x)
+	for p in portals: used.append((p["pos"] as Vector2).x)
+	var spawn_x: Array = []
+	for ch in (meta.get("spawns", {}) as Dictionary).keys():
+		for r in range(rows):
+			for c in range(cols):
+				if str((grid[r] as Array)[c]) == str(ch): spawn_x.append(float(c) * tile + tile * 0.5)
+	var marks: Array = [0.2, 0.5, 0.8] if cols >= 156 else [0.28, 0.72]
+	for f in marks:
+		var c0 := int(round(float(cols) * float(f)))
+		var done := false
+		for gap in [200.0, 120.0, 0.0]:
+			for d in range(60):
+				var cand: Array = [c0] if d == 0 else [c0 - d, c0 + d]
+				for c in cand:
+					if c < 5 or c > cols - 6: continue
+					var r := _zone_floor_row(grid, rows, cols, c)
+					if r < 0: continue
+					var flat := true
+					for k in [-2, -1, 1, 2]:
+						if _zone_floor_row(grid, rows, cols, c + k) != r: flat = false; break
+					if not flat: continue
+					var x := float(c) * tile + tile * 0.5
+					var clash := false
+					for u in used:
+						if absf(float(u) - x) < 120.0: clash = true; break
+					if clash: continue
+					for u2 in spawn_x:
+						if absf(float(u2) - x) < gap: clash = true; break
+					if clash: continue
+					used.append(x)
+					_add_npc("khu_su", Vector2(x, float(r) * tile))
+					done = true
+					break
+				if done: break
+			if done: break
+
+func _zone_cell(grid: Array, rows: int, cols: int, r: int, c: int) -> String:
+	if r < 0 or r >= rows or c < 0 or c >= cols: return "#"
+	return str((grid[r] as Array)[c])
+
+func _zone_floor_row(grid: Array, rows: int, cols: int, c: int) -> int:
+	for r in range(rows - 1, 2, -1):
+		var ch := _zone_cell(grid, rows, cols, r, c)
+		if ch != "#" and ch != "=": continue
+		var ok := true
+		for k in [1, 2, 3]:
+			var up := _zone_cell(grid, rows, cols, r - k, c)
+			if up == "#" or up == "%" or up == "\"": ok = false; break
+		if ok: return r
+	return -1
+
+## Ẩn / hiện NPC theo tiến độ cốt truyện (appear) — giống web. npc_an do World quản lý riêng.
+func refresh_visibility(player: Dictionary, map_id: String) -> void:
+	for n in npcs:
+		var id := str(n["id"])
+		var show := true
+		if id != "npc_an" and id != "khu_su": show = Data.npc_here(player, map_id, id)
+		(n["node"] as Node2D).visible = show
 
 ## Hình NPC: ảnh gốc (nếu có) hoặc hình vẽ của web; chân ở (0,0), căn giữa theo chiều ngang.
 func make_npc_visual(id: String, def: Dictionary, flip: bool = false) -> Node2D:
@@ -109,12 +176,8 @@ func _add_npc(id: String, foot: Vector2) -> void:
 	qm.position = Vector2(0, -12)
 	qm.visible = false
 	mark.add_child(qm)
+	# Không vẽ biểu tượng dịch vụ trên đầu NPC nữa — chỉ còn dấu nhiệm vụ.
 	var icon_spr := Sprite2D.new()
-	if ROLE_MARK_ICON.has(role):
-		icon_spr.texture = T.icon(str(ROLE_MARK_ICON[role]))
-		icon_spr.scale = Vector2(0.34, 0.34)
-		icon_spr.modulate = Color(1.0, 0.88, 0.5)
-		icon_spr.position = Vector2(0, -4)
 	mark.add_child(icon_spr)
 	var tw := mark.create_tween().set_loops()
 	tw.tween_property(mark, "position:y", -106.0, 0.5)
@@ -187,6 +250,7 @@ func nearest(player_foot: Vector2) -> Dictionary:
 			bd = d; best = {"type": "portal", "key": p["key"], "to": p["to"], "name": p["name"]}
 	for n in npcs:
 		var d2: float = absf(player_foot.x - (n["pos"] as Vector2).x)
+		if not (n["node"] as Node2D).visible: continue
 		if d2 < 90.0 and absf(player_foot.y - (n["pos"] as Vector2).y) < 70.0 and d2 < bd:
 			bd = d2; best = {"type": "npc", "id": n["id"], "name": str(Data.npc(str(n["id"])).get("name", n["id"]))}
 	return best

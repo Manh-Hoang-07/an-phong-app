@@ -20,6 +20,7 @@ signal seal_pressed()
 signal death_choice(where: String)
 
 const T := preload("res://src/ui/UITheme.gd")
+const TouchScroll := preload("res://src/ui/TouchScroll.gd")
 const GP := preload("res://src/ui/GamePanels.gd")
 const W := preload("res://src/ui/PanelWidgets.gd")
 const NpcDialog := preload("res://src/ui/NpcDialog.gd")
@@ -44,8 +45,8 @@ const TAB_ICONS := {
 # Lưới menu chính (8 mục) + hàng dịch vụ (tạm thời cho tới khi chạm NPC trên bản đồ).
 const RAIL_SHORT := {"bag": "Túi", "equip": "Trang bị", "char": "Nhân vật", "skills": "Kỹ năng", "quest": "Nhiệm vụ", "map": "Bản đồ", "social": "Xã hội", "kynguyen": "Kỳ Nguyên", "companion": "Thú cưng", "config": "Cài đặt"}
 const RAIL_TABS := ["bag", "equip", "char", "skills", "quest", "map", "social", "companion", "config"]
-const MENU_MAIN := ["bag", "equip", "char", "skills", "quest", "map", "social", "config"]
-const MENU_MORE := ["form", "kynguyen", "mount", "companion", "shadows", "daily", "school"]
+const MENU_MAIN := ["bag", "equip", "char", "skills", "quest", "map", "social", "companion", "config"]
+const MENU_MORE := []
 const MENU_SERVICES := ["shop", "smith", "storage", "teleport", "npc", "code", "gate"]
 
 const JOY_R := 54.0
@@ -115,8 +116,20 @@ class ActionButton extends Control:
 			add_child(_badge)
 		_badge.text = text
 
+	var _art: Control = null
+
 	func set_glyph(text: String) -> void:
-		glyph.text = text
+		if _art != null:
+			_art.queue_free(); _art = null
+		if text.begins_with("@"):
+			glyph.visible = false
+			_art = T.GlyphArt.make(text, radius * 1.15)
+			_art.set_anchors_preset(Control.PRESET_FULL_RECT)
+			var pd := radius * 0.42
+			_art.offset_left = pd; _art.offset_top = pd; _art.offset_right = -pd; _art.offset_bottom = -pd
+			add_child(_art)
+			return
+		glyph.text = T.GlyphArt.clean(text)
 		glyph.visible = not text.is_empty()
 
 	func start_cooldown(seconds: float) -> void:
@@ -279,7 +292,6 @@ var _low_hp_tween: Tween = null
 var _menu_layer: Control = null
 var _panel_layer: Control = null
 var _panel: PanelContainer = null
-var _panel_title: Label = null
 var _panel_scroll: ScrollContainer = null
 var _panel_body: VBoxContainer = null
 var _panel_fixed: VBoxContainer = null
@@ -325,7 +337,6 @@ func _build() -> void:
 	_build_log_and_chat()
 	_build_toast()
 	_build_screen_fx()
-	_build_exp_bar()
 	_build_interact()
 	_build_banner()
 	_build_menu()
@@ -359,11 +370,11 @@ func _build_top_left() -> void:
 	var box := HBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_theme_constant_override("separation", 6)
-	_anchor_rect(box, Control.PRESET_TOP_LEFT, _inset.x, _inset.y, 270, 84)
+	_anchor_rect(box, Control.PRESET_TOP_LEFT, _inset.x, _inset.y, 232, 70)
 	_root.add_child(box)
 	# Chân dung + cấp độ
 	_avatar_holder = Control.new()
-	_avatar_holder.custom_minimum_size = Vector2(58, 58)
+	_avatar_holder.custom_minimum_size = Vector2(46, 46)
 	_avatar_holder.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_avatar_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(_avatar_holder)
@@ -374,7 +385,7 @@ func _build_top_left() -> void:
 	_avatar_holder.add_child(frame)
 	_portrait = TextureRect.new()
 	_portrait.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_portrait.offset_left = 4; _portrait.offset_top = 4; _portrait.offset_right = -4; _portrait.offset_bottom = -4
+	_portrait.offset_left = 3; _portrait.offset_top = 3; _portrait.offset_right = -3; _portrait.offset_bottom = -3
 	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -383,9 +394,9 @@ func _build_top_left() -> void:
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.add_theme_stylebox_override("panel", T.sb(T.C_GOLD, T.C_GOLD_DK, 1, 9, 0))
 	badge.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	badge.offset_left = -24; badge.offset_top = -16; badge.offset_right = 6; badge.offset_bottom = 4
+	badge.offset_left = -20; badge.offset_top = -13; badge.offset_right = 4; badge.offset_bottom = 3
 	_avatar_holder.add_child(badge)
-	_lv_badge = T.label("1", 12, Color(0.14, 0.09, 0.02), true)
+	_lv_badge = T.label("1", 10, Color(0.14, 0.09, 0.02), true)
 	_lv_badge.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_lv_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	badge.add_child(_lv_badge)
@@ -403,13 +414,22 @@ func _build_top_left() -> void:
 	rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rows.add_theme_constant_override("separation", 4)
 	plate.add_child(rows)
-	var hp_row := _stat_row("heart", T.C_RED, 18.0)
+	# Thanh kinh nghiệm mảnh, nằm ngay trên HP (thay cho thanh vàng dưới màn hình).
+	_exp_bar = ProgressBar.new()
+	_exp_bar.show_percentage = false
+	_exp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_exp_bar.max_value = 100
+	_exp_bar.custom_minimum_size = Vector2(150, 3)
+	_exp_bar.add_theme_stylebox_override("fill", T.sb(T.C_GOLD, Color(0, 0, 0, 0), 0, 2, 0))
+	_exp_bar.add_theme_stylebox_override("background", T.sb(Color(0, 0, 0, 0.45), Color(0, 0, 0, 0), 0, 2, 0))
+	rows.add_child(_exp_bar)
+	var hp_row := _stat_row("heart", T.C_RED, 10.0)
 	_hp_bar = hp_row[0]; _hp_text = hp_row[1]
 	rows.add_child(hp_row[2])
-	var mp_row := _stat_row("drop", T.C_BLUE, 14.0)
+	var mp_row := _stat_row("drop", T.C_BLUE, 9.0)
 	_mp_bar = mp_row[0]; _mp_text = mp_row[1]
 	rows.add_child(mp_row[2])
-	var sta_row := _stat_row("skills", Color(0.30, 0.92, 0.50), 12.0)
+	var sta_row := _stat_row("skills", Color(0.30, 0.92, 0.50), 8.0)
 	_sta_bar = sta_row[0]; _sta_text = sta_row[1]
 	rows.add_child(sta_row[2])
 	# dòng nhiệm vụ: một dòng nhỏ dưới khung chỉ số
@@ -419,12 +439,12 @@ func _build_top_left() -> void:
 	_quest_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_quest_btn.clip_text = true
 	_quest_btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_quest_btn.custom_minimum_size = Vector2(200, 22)
+	_quest_btn.custom_minimum_size = Vector2(200, 26)
 	_quest_btn.icon = T.icon("flag")
 	_quest_btn.expand_icon = true
-	_quest_btn.add_theme_constant_override("icon_max_width", 12)
+	_quest_btn.add_theme_constant_override("icon_max_width", 16)
 	_quest_btn.add_theme_constant_override("h_separation", 5)
-	_quest_btn.add_theme_font_size_override("font_size", 12)
+	_quest_btn.add_theme_font_size_override("font_size", 14)
 	_quest_btn.add_theme_font_override("font", T.font(false))
 	_quest_btn.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
 	_quest_btn.add_theme_color_override("font_hover_color", Color.WHITE)
@@ -432,8 +452,10 @@ func _build_top_left() -> void:
 	_quest_btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	_quest_btn.add_theme_constant_override("outline_size", 4)
 	_quest_btn.add_theme_color_override("icon_normal_color", T.C_GOLD)
-	for st in ["normal", "hover", "pressed", "focus"]:
-		_quest_btn.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	var qsb := T.sb(Color(0.03, 0.05, 0.1, 0.62), Color(T.C_GOLD, 0.45), 1, 10, 8)
+	for st in ["normal", "hover", "pressed"]:
+		_quest_btn.add_theme_stylebox_override(st, qsb)
+	_quest_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	_quest_btn.text = "Nhiệm vụ: chưa nhận"
 	_quest_btn.pressed.connect(func(): open_panel("quest"))
 	col.add_child(_quest_btn)
@@ -697,18 +719,8 @@ func _build_toast() -> void:
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_toast_panel.add_child(_toast)
 
-func _build_exp_bar() -> void:
-	_exp_bar = ProgressBar.new()
-	_exp_bar.show_percentage = false
-	_exp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_exp_bar.max_value = 100; _exp_bar.value = 0
-	_exp_bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_exp_bar.offset_top = -5; _exp_bar.offset_bottom = 0
-	_exp_bar.add_theme_stylebox_override("fill", T.sb(T.C_GOLD, Color(0, 0, 0, 0), 0, 0, 0))
-	_exp_bar.add_theme_stylebox_override("background", T.sb(Color(0, 0, 0, 0.45), Color(0, 0, 0, 0), 0, 0, 0))
-	_root.add_child(_exp_bar)
 
-# ---------------------------------------------------------------- Menu (lưới icon)
+# ---------------------------------------------------------------- Menu (bảng điều khiển)
 func _build_menu() -> void:
 	_menu_layer = Control.new()
 	_menu_layer.visible = false
@@ -723,46 +735,50 @@ func _build_menu() -> void:
 	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_menu_layer.add_child(scrim)
 
-	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", T.UISkin.panel(14))
-	_anchor_rect(card, Control.PRESET_TOP_RIGHT, _inset.z, _inset.y + 54, 660, 100)
-	card.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	_menu_layer.add_child(card)
-	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 10)
-	card.add_child(vb)
-	var grid := GridContainer.new()
-	grid.columns = 7
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	vb.add_child(grid)
-	for tab in MENU_MAIN + MENU_MORE:
-		grid.add_child(_menu_tile(tab))
-	vb.add_child(T.hsep())
-	vb.add_child(T.label("Dịch vụ", T.FS_S, T.C_MUTED, true))
-	var flow := HFlowContainer.new()
-	flow.add_theme_constant_override("h_separation", 6)
-	flow.add_theme_constant_override("v_separation", 6)
-	vb.add_child(flow)
-	for tab in MENU_SERVICES:
-		var b := T.button(str(TAB_LABELS.get(tab, tab)), Vector2(0, 38))
-		b.add_theme_font_size_override("font_size", T.FS_S)
-		b.pressed.connect(func(): _close_menu(); open_panel(tab))
-		flow.add_child(b)
+	# Thanh menu nằm sát đáy màn hình; mỗi ô có nền riêng (thanh không có nền chung).
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	row.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	row.offset_left = _inset.x + 8.0; row.offset_right = -(_inset.z + 8.0)
+	row.offset_bottom = -(_inset.w + 6.0); row.offset_top = -(_inset.w + 6.0 + 58.0)
+	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_menu_layer.add_child(row)
+	for tab in _menu_tabs():
+		row.add_child(_menu_tile(tab))
+
+## Tab trong menu: Linh thú chỉ cho Triệu Hồi Sư, Bóng ma chỉ cho Tử Linh Thuật Sư.
+func _menu_tabs() -> Array:
+	var school := str(Game.player.get("school", ""))
+	var base := str(Data.school(school).get("base", school))
+	var out: Array = MENU_MAIN.duplicate()
+	out.append_array(MENU_MORE)
+	if base == "trieu_hoi_su": out.append("mount")
+	if base == "tu_linh_thuat_su": out.append("shadows")
+	return out
 
 func _menu_tile(tab: String) -> Button:
-	var b := T.button(str(TAB_LABELS.get(tab, tab)), Vector2(84, 64))
+	var b := T.button(str(RAIL_SHORT.get(tab, TAB_LABELS.get(tab, tab))), Vector2(0, 58))
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	b.add_theme_stylebox_override("normal", T.UISkin.tab(false))
+	b.add_theme_stylebox_override("hover", T.UISkin.tab(true))
+	b.add_theme_stylebox_override("pressed", T.UISkin.tab(true))
+	b.add_theme_color_override("font_color", T.C_TEXT)
+	b.add_theme_color_override("font_hover_color", T.C_GOLD)
+	b.add_theme_color_override("font_pressed_color", T.C_GOLD)
+	b.add_theme_font_size_override("font_size", 12)
 	b.icon = T.icon(str(TAB_ICONS.get(tab, "menu")))
 	b.expand_icon = true
 	b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	b.add_theme_constant_override("icon_max_width", 26)
-	b.add_theme_constant_override("h_separation", 0)
-	b.add_theme_color_override("icon_normal_color", T.C_GOLD)
-	b.add_theme_color_override("icon_hover_color", Color.WHITE)
+	b.add_theme_constant_override("icon_max_width", 22)
+	b.add_theme_constant_override("h_separation", 1)
+	b.add_theme_color_override("icon_normal_color", T.C_TEXT)
+	b.add_theme_color_override("icon_hover_color", T.C_GOLD)
 	b.add_theme_color_override("icon_pressed_color", T.C_GOLD)
-	b.add_theme_font_size_override("font_size", T.FS_S)
+	b.autowrap_mode = TextServer.AUTOWRAP_OFF
 	b.pressed.connect(func(): _close_menu(); open_panel(tab))
 	return b
 
@@ -792,7 +808,7 @@ func _build_panel() -> void:
 
 	_panel = PanelContainer.new()
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	_panel.add_theme_stylebox_override("panel", T.UISkin.panel(0))
+	_panel.add_theme_stylebox_override("panel", T.UISkin.panel(12))
 	_panel_layer.add_child(_panel)
 	var outer := HBoxContainer.new()
 	outer.add_theme_constant_override("separation", 0)
@@ -802,31 +818,34 @@ func _build_panel() -> void:
 	var rail_bg := PanelContainer.new()
 	rail_bg.add_theme_stylebox_override("panel", T.UISkin.inset(6))
 	outer.add_child(rail_bg)
-	_rail_scroll = ScrollContainer.new()
+	_rail_scroll = TouchScroll.new()
 	_rail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_rail_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	_rail_scroll.custom_minimum_size = Vector2(62, 0)
+	_rail_scroll.custom_minimum_size = Vector2(70, 0)
 	rail_bg.add_child(_rail_scroll)
 	var rail := VBoxContainer.new()
-	rail.add_theme_constant_override("separation", 2)
+	rail.add_theme_constant_override("separation", 4)
 	rail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_rail_scroll.add_child(rail)
 	for tab in RAIL_TABS:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(56, 37)
+		b.custom_minimum_size = Vector2(60, 46)
 		b.text = str(RAIL_SHORT.get(tab, TAB_LABELS.get(tab, tab)))
 		b.icon = T.icon(str(TAB_ICONS.get(tab, "menu")))
 		b.expand_icon = true
 		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.add_theme_constant_override("icon_max_width", 18)
-		b.add_theme_constant_override("h_separation", 0)
-		b.add_theme_font_size_override("font_size", 10)
+		b.add_theme_constant_override("icon_max_width", 20)
+		b.add_theme_constant_override("h_separation", 1)
+		b.add_theme_font_size_override("font_size", 12)
 		b.add_theme_font_override("font", T.font(true))
 		b.add_theme_color_override("font_color", T.C_MUTED)
 		b.add_theme_color_override("font_hover_color", T.C_GOLD)
 		b.add_theme_color_override("font_pressed_color", T.C_GOLD)
+		b.add_theme_color_override("icon_normal_color", T.C_MUTED)
+		b.add_theme_color_override("icon_hover_color", T.C_GOLD)
+		b.add_theme_color_override("icon_pressed_color", T.C_GOLD)
 		b.tooltip_text = str(TAB_LABELS.get(tab, tab))
 		var t: String = tab
 		b.pressed.connect(func(): open_panel(t))
@@ -838,15 +857,12 @@ func _build_panel() -> void:
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("margin_left", 12)
 	content.add_theme_constant_override("margin_right", 12)
-	content.add_theme_constant_override("margin_top", 8)
+	content.add_theme_constant_override("margin_top", 6)
 	content.add_theme_constant_override("margin_bottom", 10)
 	outer.add_child(content)
 	var pv := VBoxContainer.new()
 	pv.add_theme_constant_override("separation", 6)
 	content.add_child(pv)
-	var head_wrap := PanelContainer.new()
-	head_wrap.add_theme_stylebox_override("panel", T.UISkin.ribbon())
-	pv.add_child(head_wrap)
 	_busy_bar = ProgressBar.new()
 	_busy_bar.custom_minimum_size = Vector2(0, 3)
 	_busy_bar.show_percentage = false
@@ -857,18 +873,18 @@ func _build_panel() -> void:
 	_busy_bar.add_theme_stylebox_override("fill", T.sb(T.C_GOLD, Color(0, 0, 0, 0), 0, 2, 0))
 	pv.add_child(_busy_bar)
 	Net.busy_changed.connect(func(b): if _busy_bar: create_tween().tween_property(_busy_bar, "modulate:a", 1.0 if b else 0.0, 0.15))
-	var head := HBoxContainer.new()
-	head.custom_minimum_size = Vector2(0, 30)
-	head_wrap.add_child(head)
-	_panel_title = T.label("", T.FS_L, T.C_GOLD, true)
-	_panel_title.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_panel_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_panel_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	head.add_child(_panel_title)
-	var close := T.icon_button("close", 32)
+	# Nút X nằm đè lên góc viền phải-trên của khung, không chiếm chỗ của nội dung.
+	var corner := Control.new()
+	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_panel.add_child(corner)
+	var close := T.icon_button("close", 18)
+	close.custom_minimum_size = Vector2(32, 32)
+	close.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	close.offset_left = -18; close.offset_right = 14; close.offset_top = -14; close.offset_bottom = 18
+	close.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	close.pressed.connect(close_panel)
-	head.add_child(close)
-	_panel_scroll = ScrollContainer.new()
+	corner.add_child(close)
+	_panel_scroll = TouchScroll.new()
 	_panel_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_panel_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	pv.add_child(_panel_scroll)
@@ -903,9 +919,9 @@ func _layout() -> void:
 	_panel_w = clampf(vp.x * 0.80, 480.0, 780.0)
 	if _panel:
 		_panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
-		_panel.offset_left = -_panel_w - _inset.z
-		_panel.offset_right = -_inset.z
-		_panel.offset_top = _inset.y
+		_panel.offset_left = -_panel_w - _inset.z - 10.0
+		_panel.offset_right = -_inset.z - 10.0
+		_panel.offset_top = _inset.y + 12.0
 		_panel.offset_bottom = -_inset.w
 	_layout_joy()
 
@@ -929,7 +945,7 @@ func set_hero(_name: String, level: int, _rank: String, school: String) -> void:
 	_lv_badge.text = str(level)
 	if school != _portrait_school:
 		_portrait_school = school
-		var p := W.char_avatar(school, 52)
+		var p := W.char_avatar(school, 42)
 		if p and p.texture: _portrait.texture = p.texture
 		if p: p.queue_free()
 
@@ -1012,7 +1028,6 @@ func open_panel(tab: String, extra: Dictionary = {}) -> void:
 	_open_tab = tab
 	_open_extra = extra
 	_update_rail()
-	_panel_title.text = str(TAB_LABELS.get(tab, tab))
 	refresh_panel(extra)
 	if not _panel_layer.visible:
 		_panel_layer.visible = true
@@ -1025,8 +1040,6 @@ func open_panel(tab: String, extra: Dictionary = {}) -> void:
 		tw.tween_property(_panel, "offset_left", end_l, 0.2)
 		tw.tween_property(_panel, "offset_right", end_r, 0.2)
 	if tab_changed and _panel_layer.visible:
-		_panel_title.modulate.a = 0.0
-		create_tween().tween_property(_panel_title, "modulate:a", 1.0, 0.18)
 		_panel_fixed.modulate.a = 0.0
 		_panel_scroll.modulate.a = 0.0
 		var tw2 := create_tween().set_parallel(true)

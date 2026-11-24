@@ -13,7 +13,7 @@ static var _cache: Dictionary = {}      # {pos, edges, depth}
 static var _pan := Vector2(INF, INF)    # nhớ vị trí kéo giữa các lần mở panel
 static var sel := ""
 static var zoom := 0.8
-const ZOOMS := [0.5, 0.65, 0.8, 1.0]
+const ZOOMS := [0.35, 0.5, 0.65, 0.8, 1.0]
 
 var _canvas: Control
 var _press_pos := Vector2.ZERO
@@ -25,6 +25,8 @@ func _ready() -> void:
 	clip_contents = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	custom_minimum_size = Vector2(200, 200)
+	# Mỗi lần mở panel: căn lại theo zoom vừa khung, không dùng pan cũ của lần trước.
+	_pan = Vector2(INF, INF)
 	var grad := Gradient.new()
 	grad.set_color(0, Color("f0dcae"))
 	grad.add_point(0.7, Color("d9bb80"))
@@ -49,14 +51,20 @@ func _ready() -> void:
 var _need_init := true
 
 func _on_resized() -> void:
-	if _need_init and size.x > 20.0:
+	# Bỏ qua resize giả lúc control mới tạo (size = custom_minimum_size 200).
+	if size.x < 300.0: return
+	if _need_init:
 		_need_init = false
 		_init_pan()
 	else:
 		_clamp_pan()
 
 func _init_pan() -> void:
-	if _pan.x == INF: center_on(str(Game.player.get("map", ROOT_MAP)))
+	# Lấp đầy chiều ngang panel (chiều cao được cắt/kéo bằng pan) -> hết khoảng đen bên phải.
+	if size.x <= 20.0: return
+	_need_init = false
+	zoom = clampf(size.x / W, 0.3, 1.0)
+	if _pan.x == INF or _pan.x == -INF: center_on(str(Game.player.get("map", ROOT_MAP)))
 	else: _apply_pan()
 
 func center_on(id: String) -> void:
@@ -66,8 +74,13 @@ func center_on(id: String) -> void:
 	_apply_pan()
 
 func _clamp_pan() -> void:
-	_pan.x = clampf(_pan.x, minf(0.0, size.x - W * zoom), 0.0)
-	_pan.y = clampf(_pan.y, minf(0.0, size.y - H * zoom), 0.0)
+	# Cho phép căn giữa khi bản đồ nhỏ hơn khung; vẫn chặn kéo quá đà khi phóng to.
+	var min_x := minf(0.0, size.x - W * zoom)
+	var min_y := minf(0.0, size.y - H * zoom)
+	var max_x := maxf(0.0, size.x - W * zoom)
+	var max_y := maxf(0.0, size.y - H * zoom)
+	_pan.x = clampf(_pan.x, min_x, max_x)
+	_pan.y = clampf(_pan.y, min_y, max_y)
 
 func _apply_pan() -> void:
 	_clamp_pan()
@@ -81,14 +94,20 @@ func _build_zoom_buttons() -> void:
 	box.add_theme_constant_override("separation", 4)
 	add_child(box)
 	for d in [1, -1]:
-		var b := T.button("+" if d > 0 else "−", Vector2(38, 38))
+		# Dùng ASCII '-' (U+2212 bị GlyphArt.clean lọc mất -> nút trừ hiện rỗng).
+		var b := T.button("+" if d > 0 else "-", Vector2(38, 38))
 		b.add_theme_font_size_override("font_size", 22)
 		var dd: int = d
 		b.pressed.connect(func(): _zoom_step(dd))
 		box.add_child(b)
 
 func _zoom_step(d: int) -> void:
-	var i := ZOOMS.find(zoom)
+	# Zoom tự vừa khung có thể không nằm trong ZOOMS: tìm mức gần nhất rồi mới bước.
+	var i := -1
+	var best := INF
+	for k in range(ZOOMS.size()):
+		var diff := absf(float(ZOOMS[k]) - zoom)
+		if diff < best: best = diff; i = k
 	if i < 0: i = 2
 	i = clampi(i + d, 0, ZOOMS.size() - 1)
 	var centre := (size * 0.5 - _pan) / zoom

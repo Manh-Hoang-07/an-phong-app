@@ -3,6 +3,7 @@ extends RefCounted
 ## Mọi thao tác gọi Net.action(type, params); luật chơi ở server. host = MobileHUD.
 
 const T := preload("res://src/ui/UITheme.gd")
+const TouchScroll := preload("res://src/ui/TouchScroll.gd")
 const W := preload("res://src/ui/PanelWidgets.gd")
 
 # Trạng thái UI cục bộ (tương đương S của web)
@@ -11,6 +12,8 @@ var selected_key := ""
 var confirm_drop := ""
 var confirm_release := -1
 var confirm_buy := ""
+var equip_detail := false
+var pet_sel := ""
 var shop_tab := "buy"
 var shop_qty := 1
 var smith_tab := "upgrade"
@@ -44,14 +47,14 @@ func _vb(sep: int = 10) -> VBoxContainer:
 
 func _select(where: String, key: String) -> void:
 	selected_where = where; selected_key = key
-	confirm_drop = ""; confirm_buy = ""; refresh()
+	confirm_drop = ""; confirm_buy = ""; equip_detail = false; refresh()
 
 func _deselect() -> void:
-	selected_where = ""; selected_key = ""; confirm_drop = ""; confirm_buy = ""; refresh()
+	selected_where = ""; selected_key = ""; confirm_drop = ""; confirm_buy = ""; equip_detail = false; refresh()
 
 func _gold_row(pl: Dictionary, ngoc: bool = true) -> Control:
-	var items: Array = [["Vàng  %s" % W.fmt_num(int(pl.get("gold", 0))), T.C_GOLD]]
-	if ngoc: items.append(["Linh Ngọc  %s" % W.fmt_num(int(pl.get("linhNgoc", 0))), T.C_PURPLE])
+	var items: Array = [["Vàng  %s" % W.full_num(int(pl.get("gold", 0))), T.C_GOLD]]
+	if ngoc: items.append(["Linh Ngọc  %s" % W.full_num(int(pl.get("linhNgoc", 0))), T.C_PURPLE])
 	return W.chip_row(items)
 
 func _bag_entry(uid: String) -> Dictionary:
@@ -85,7 +88,7 @@ func build_bag() -> Control:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 8)
 	top.add_child(_gold_row(pl))
-	var cap := T.label("Túi %d/%d" % [bag.size(), Data.const_int("BAG_SIZE", 40)], T.FS_S, T.C_MUTED)
+	var cap := T.label("Túi %d/%d" % [bag.size(), Game.bag_size()], T.FS_S, T.C_MUTED)
 	cap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	top.add_child(cap)
@@ -94,14 +97,12 @@ func build_bag() -> Control:
 	var shown := 0
 	for i in range(bag.size()):
 		var e: Dictionary = bag[i] if typeof(bag[i]) == TYPE_DICTIONARY else {}
-		if not _bag_match(str(e.get("id", ""))): continue
 		shown += 1
 		var uid := str(e.get("uid", i))
 		g.add_child(W.item_cell(str(e.get("id", "")), int(e.get("n", e.get("qty", 1))), selected_where == "bag" and selected_key == uid, func(): _select("bag", uid)))
-	var cap_n := Data.const_int("BAG_SIZE", 40) if bag_filter == "all" else maxi(shown, 12)
+	var cap_n := Game.bag_size()
 	for _i in range(shown, cap_n): g.add_child(W.empty_cell())
 	var left_box := _vb(8)
-	left_box.add_child(W.segmented([["all", "Tất cả"], ["gear", "Trang bị"], ["use", "Tiêu hao"], ["misc", "Khác"]], bag_filter, func(f): bag_filter = f; refresh()))
 	left_box.add_child(g)
 	var left: Control = left_box
 	var right: Control = W.empty_detail()
@@ -156,122 +157,479 @@ const EQUIP_NAMES := {"weapon": "Vũ khí", "mu": "Mũ", "ao": "Áo", "gang_tay"
 func _equip_col(slots: Array, eq: Dictionary) -> VBoxContainer:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 6)
-	col.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	for sl in slots:
 		var it: Variant = eq.get(sl, null)
-		var iid := str((it as Dictionary).get("id", "")) if typeof(it) == TYPE_DICTIONARY else ""
-		var plus := int((it as Dictionary).get("plus", 0)) if typeof(it) == TYPE_DICTIONARY else 0
+		var pair := _equip_id_plus(it)
 		var slot := str(sl)
-		col.add_child(W.equip_cell(str(EQUIP_NAMES.get(sl, sl)), iid, plus, selected_where == "equip" and selected_key == slot, func(): _select("equip", slot)))
+		var filled := not str(pair[0]).is_empty()
+		var is_sel: bool = selected_where == "equip" and selected_key == slot
+		var cell := W.equip_cell(str(EQUIP_NAMES.get(sl, sl)), str(pair[0]), int(pair[1]), is_sel, func():
+			if not filled or is_sel: _deselect()
+			else: _select("equip", slot))
+		var cc := CenterContainer.new()
+		cc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		cc.add_child(cell)
+		col.add_child(cc)
 	return col
+
+## Chuẩn hoá giá trị ô trang bị: Dictionary {id, plus} hoặc chuỗi id thuần.
+static func _equip_id_plus(it: Variant) -> Array:
+	if typeof(it) == TYPE_DICTIONARY:
+		return [str((it as Dictionary).get("id", "")), int((it as Dictionary).get("plus", 0))]
+	if typeof(it) == TYPE_STRING and str(it) != "":
+		return [str(it), 0]
+	return ["", 0]
 
 func build_equip() -> Control:
 	var vb := _vb()
 	var pl := p()
 	var eq: Dictionary = pl.get("equip", {})
 	var school := str(pl.get("school", "kiem_si"))
-	var st: Dictionary = Game.stats
-	# Giữa: nhân vật trong khung lõm, tên + chỉ số bên dưới
+	# Giữa: khung nhân vật (có menu nhỏ nổi lên khi chạm một ô) + 5 ô Kỳ Nguyên ngay dưới chân.
 	var mid := _vb(6)
 	mid.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var frame := PanelContainer.new()
 	frame.add_theme_stylebox_override("panel", T.UISkin.inset(6))
 	frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	frame.clip_contents = true
+	frame.add_child(_equip_stage_bg())
 	var body := W.char_body(school, Vector2(140, 190))
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	frame.add_child(body)
+	var bm := MarginContainer.new()
+	bm.add_theme_constant_override("margin_bottom", 44)
+	bm.add_theme_constant_override("margin_top", 6)
+	bm.add_child(body)
+	frame.add_child(bm)
+	frame.add_child(_equip_stat_strip())
+	if selected_where == "equip" and not str(_equip_id_plus(eq.get(selected_key, null))[0]).is_empty():
+		frame.add_child(_equip_popup(selected_key, eq))
 	mid.add_child(frame)
-	var nm := T.label("%s · Lv %d" % [str(pl.get("name", "?")), int(pl.get("level", 1))], T.FS_S, T.C_GOLD, true)
-	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mid.add_child(nm)
 	var cols := HBoxContainer.new()
 	cols.add_theme_constant_override("separation", 10)
 	cols.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cols.alignment = BoxContainer.ALIGNMENT_CENTER
 	cols.add_child(_equip_col(["weapon", "mu", "ao", "gang_tay", "dai_lung"], eq))
 	cols.add_child(mid)
 	cols.add_child(_equip_col(["quan", "giay", "nhan", "day_chuyen", "ngoc_boi"], eq))
-	mid.custom_minimum_size = Vector2(120, 0)
-	var right: Control
-	var sel_it: Variant = eq.get(selected_key, null) if selected_where == "equip" else null
-	if selected_where == "equip" and typeof(sel_it) == TYPE_DICTIONARY:
-		var box := W.item_detail(str((sel_it as Dictionary).get("id", "")), int((sel_it as Dictionary).get("plus", 0)))
-		var sk := selected_key
-		W.box_body(box).add_child(W.action_button("Tháo ra", func(): act("unequip", {"slot": sk}); _deselect()))
-		right = box
-	else:
-		var box2 := W.detail_box()
-		var bd := W.box_body(box2)
-		if selected_where == "equip": bd.add_child(T.label("Ô %s đang trống.\nMở Túi để trang bị." % str(EQUIP_NAMES.get(selected_key, "")), T.FS_S, T.C_MUTED))
-		else: bd.add_child(T.label("Chỉ số", T.FS_M, T.C_GOLD, true))
-		bd.add_child(W.kv("Tấn công", str(int(st.get("atk", 0))), T.C_RED))
-		bd.add_child(W.kv("Phòng thủ", str(int(st.get("def", 0))), T.C_BLUE))
-		bd.add_child(W.kv("Máu", str(int(st.get("maxHp", 0))), T.C_RED))
-		bd.add_child(W.kv("MP", str(int(st.get("maxMp", 0))), T.C_BLUE))
-		bd.add_child(W.kv("Chí mạng", "%s%%" % str(snappedf(float(st.get("crit", 0)), 0.1))))
-		bd.add_child(T.label("Chạm một ô để xem hoặc tháo trang bị.", T.FS_S, Color(T.C_MUTED, 0.8)))
-		right = box2
-	vb.add_child(W.split(cols, right, 210.0))
+	mid.custom_minimum_size = Vector2(290, 0)
+	mid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vb.add_child(W.fill(cols))
 	return W.fill(vb)
 
+## Nền sân khấu cho khung nhân vật: quầng sáng xanh phía sau, bóng đổ và vòng sáng dưới chân.
+func _equip_stage_bg() -> Control:
+	var g := Control.new()
+	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	g.draw.connect(func():
+		var sz := g.size
+		var c := Vector2(sz.x * 0.5, sz.y * 0.42)
+		for i in range(16):
+			var t := float(i) / 15.0
+			g.draw_circle(c, lerpf(sz.y * 0.66, sz.y * 0.07, t), Color(0.30, 0.46, 0.92, 0.03 + 0.012 * t))
+		var foot := Vector2(sz.x * 0.5, sz.y - 52.0)
+		g.draw_set_transform(foot, 0.0, Vector2(1.0, 0.24))
+		for i in range(6):
+			g.draw_circle(Vector2.ZERO, sz.x * 0.30 * (1.0 - float(i) * 0.12), Color(0.0, 0.0, 0.0, 0.16))
+		g.draw_arc(Vector2.ZERO, sz.x * 0.30, 0.0, TAU, 40, Color(T.C_GOLD, 0.35), 1.6, true)
+		g.draw_arc(Vector2.ZERO, sz.x * 0.22, 0.0, TAU, 32, Color(T.C_GOLD, 0.18), 1.2, true)
+		g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE))
+	return g
+
+## Dải chỉ số tóm tắt dưới chân nhân vật: Tấn công / Phòng thủ / Máu.
+func _equip_stat_strip() -> Control:
+	var st: Dictionary = Game.stats
+	if st.is_empty(): st = p().get("stats", {})
+	var v := VBoxContainer.new()
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sp := Control.new()
+	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(sp)
+	var h := HBoxContainer.new()
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_theme_constant_override("separation", 4)
+	h.add_child(_stat_cell("@blade", "", W.fmt_num(int(st.get("atk", 0))), T.C_GOLD))
+	h.add_child(_stat_cell("@shield", "", W.fmt_num(int(st.get("def", 0))), T.C_BLUE))
+	h.add_child(_stat_cell("@heal", "", W.fmt_num(int(st.get("maxHp", 0))), T.C_RED))
+	for c in h.get_children(): c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(h)
+	return v
+
+## Chạm một ô đã có đồ: hiện menu nhỏ giữa khung nhân vật với "Xem chi tiết" / "Tháo ra".
+func _equip_popup(slot: String, eq: Dictionary) -> Control:
+	var pair := _equip_id_plus(eq.get(slot, null))
+	var iid := str(pair[0])
+	var plus := int(pair[1])
+	var d: Dictionary = Data.item(iid)
+	var q := int(d.get("q", 0))
+	var do_unequip := func():
+		act("unequip", {"slot": slot})
+		_deselect()
+	if equip_detail:
+		var box := PanelContainer.new()
+		box.add_theme_stylebox_override("panel", T.UISkin.inset(8))
+		var v := _vb(6)
+		box.add_child(v)
+		var sc := TouchScroll.new()
+		sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		var det := W.item_detail(iid, plus, false)
+		det.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sc.add_child(det)
+		v.add_child(sc)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		var back := W.action_button("Quay lại", func(): equip_detail = false; refresh())
+		back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var off := W.action_button("Tháo ra", do_unequip)
+		off.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(back); row.add_child(off)
+		v.add_child(row)
+		return box
+	var ov := VBoxContainer.new()
+	ov.add_theme_constant_override("separation", 0)
+	# Vùng trống phía trên: chạm vào để đóng menu.
+	var catcher := Button.new()
+	catcher.flat = true
+	catcher.focus_mode = Control.FOCUS_NONE
+	catcher.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for st in ["normal", "hover", "pressed", "focus"]: catcher.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	catcher.pressed.connect(func(): _deselect())
+	ov.add_child(catcher)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", T.UISkin.card(8))
+	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var v2 := _vb(6)
+	card.add_child(v2)
+	var nm := T.label(str(d.get("name", iid)) + ((" +%d" % plus) if plus > 0 else ""), T.FS_M, T.quality_color(q) if q > 1 else T.C_GOLD, true)
+	nm.autowrap_mode = TextServer.AUTOWRAP_OFF
+	v2.add_child(nm)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 6)
+	var b_det := W.action_button("Chi tiết", func(): equip_detail = true; refresh())
+	b_det.custom_minimum_size = Vector2(96, 34)
+	var b_off := W.action_button("Tháo ra", do_unequip)
+	b_off.custom_minimum_size = Vector2(96, 34)
+	b_off.add_theme_color_override("font_color", T.C_RED)
+	hb.add_child(b_det); hb.add_child(b_off)
+	v2.add_child(hb)
+	ov.add_child(card)
+	return ov
+
 # ============================================================ CHAR
+## Ô chỉ số: icon | nhãn | giá trị (giống web: nền thẻ tối, số đậm bên phải).
+func _stat_cell(glyph: String, label_text: String, value: String, color: Color) -> Control:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", T.UISkin.inset(7))
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 6)
+	var g := T.GlyphArt.make(glyph, 18.0, color)
+	g.custom_minimum_size = Vector2(20, 20)
+	g.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(g)
+	if label_text.is_empty():
+		h.alignment = BoxContainer.ALIGNMENT_CENTER
+	else:
+		var l := T.label(label_text, 11, T.C_MUTED)
+		l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		l.clip_text = true
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(l)
+	var v := T.label(value, T.FS_M, T.C_TEXT, true)
+	v.autowrap_mode = TextServer.AUTOWRAP_OFF
+	v.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(v)
+	p.add_child(h)
+	return p
+
+## Nhóm có tiêu đề nhỏ viết hoa + khung nền.
+func _group(title: String, inner: Control, right_text: String = "") -> Control:
+	var box := _vb(8)
+	var hr := HBoxContainer.new()
+	var t := T.overline(title)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hr.add_child(t)
+	if not right_text.is_empty():
+		var rt := T.label(right_text, T.FS_S, T.C_GOLD, true)
+		rt.autowrap_mode = TextServer.AUTOWRAP_OFF
+		hr.add_child(rt)
+	box.add_child(hr)
+	box.add_child(inner)
+	return W.card_row(box)
+
+func _grid2(cells: Array) -> GridContainer:
+	var g := GridContainer.new()
+	g.columns = 2
+	g.add_theme_constant_override("h_separation", 6)
+	g.add_theme_constant_override("v_separation", 6)
+	for c in cells: g.add_child(c)
+	return g
+
+func _row_text(a: String, b: String, b_color: Color) -> Control:
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	var l := T.label(a, T.FS_M, T.C_TEXT, true)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(l)
+	var r := T.label(b, T.FS_S, b_color)
+	r.autowrap_mode = TextServer.AUTOWRAP_OFF
+	h.add_child(r)
+	return h
+
+const PERK_GLYPH := {"y_chi_thay": "@flame", "nhan_thuc_ky_sinh": "@orb", "lien_minh": "@shield", "binh_minh": "@blade",
+	"tu_do": "@wind", "ket_cuc_pha_chuoi": "@bolt", "ket_cuc_giu_loi": "@heal", "ket_cuc_viet_lai": "@star"}
+
+func _char_set_rows(pl: Dictionary) -> Control:
+	var counts := {}
+	var sets: Array = Data.calc.get("SETS", [])
+	var per := maxi(1, int(Data.calc.get("SET_LEVELS", 10)))
+	var eq: Dictionary = pl.get("equip", {}) if typeof(pl.get("equip", {})) == TYPE_DICTIONARY else {}
+	for slot in Data.calc.get("SLOTS", []):
+		var it: Variant = eq.get(slot, null)
+		if typeof(it) != TYPE_DICTIONARY: continue
+		var d: Dictionary = Data.item(str((it as Dictionary).get("id", "")))
+		if str(d.get("slot", "")).is_empty() or sets.is_empty(): continue
+		var idx := mini(sets.size() - 1, (maxi(1, int(d.get("level", 1))) - 1) / per)
+		counts[idx] = int(counts.get(idx, 0)) + 1
+	var lo := int(Data.calc.get("SET_TIER_LOW", 6))
+	var hi := int(Data.calc.get("SET_TIER_HIGH", 10))
+	var box := _vb(6)
+	var idxs: Array = counts.keys()
+	idxs.sort()
+	for idx in idxs:
+		var n := int(counts[idx])
+		var nm := str((sets[int(idx)] as Dictionary).get("name", "Bộ"))
+		var note := "đủ bộ, hiệu ứng đang chạy" if n >= hi else ("còn %d món để đủ bộ" % (hi - n) if n >= lo else "cần %d món mới có thưởng" % lo)
+		var col: Color = T.C_GOLD if n >= hi else (T.C_GREEN if n >= lo else T.C_MUTED)
+		box.add_child(_row_text(nm, "%d/%d · %s" % [n, hi, note], col))
+	if idxs.is_empty(): return null
+	return _group("Bộ trang bị", box)
+
+func _char_ky_nguyen(pl: Dictionary) -> Control:
+	var kn: Dictionary = pl.get("kyNguyen", {}) if typeof(pl.get("kyNguyen", {})) == TYPE_DICTIONARY else {}
+	var owned: Array = kn.get("owned", [])
+	var active: Array = kn.get("active", [])
+	var ids: Array = []
+	for iid in Data.ITEMS.keys():
+		if bool((Data.ITEMS[iid] as Dictionary).get("kyNguyen", false)): ids.append(str(iid))
+	ids.sort_custom(func(a, b): return int(Data.item(a).get("level", 0)) < int(Data.item(b).get("level", 0)))
+	var lvp := int(pl.get("level", 1))
+	var box := _vb(6)
+	for sid in ids:
+		var d: Dictionary = Data.item(sid)
+		var have: bool = sid in owned
+		var on: bool = sid in active
+		var req := int(d.get("level", 1))
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override("separation", 8)
+		var fr := PanelContainer.new()
+		fr.add_theme_stylebox_override("panel", T.UISkin.slot(5 if on else (4 if have else 0), on))
+		fr.add_child(W.item_icon(sid, 30))
+		fr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(fr)
+		var col := _vb(0)
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var nl := T.label(str(d.get("name", sid)).replace("Kỳ Nguyên · ", ""), T.FS_M, T.C_GOLD if have else T.C_TEXT, true)
+		nl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		col.add_child(nl)
+		var state := "đang bật" if on else ("đang tháo" if have else ("cần cấp %d" % req if lvp < req else "mua ở Lầu Trân Bảo"))
+		var sl := T.label(state, 11, T.C_GREEN if on else T.C_MUTED)
+		sl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		col.add_child(sl)
+		var sl2 := T.label(", ".join(W.item_stat_lines(d)), 11, T.C_TEXT)
+		sl2.custom_minimum_size = Vector2(150, 0)
+		col.add_child(sl2)
+		h.add_child(col)
+		var tb := W.action_button("Tháo" if on else ("Trang bị" if have else "Chưa có"), func(): act("toggle_ky_nguyen", {"id": sid}), not have)
+		tb.custom_minimum_size = Vector2(72, 34)
+		tb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(tb)
+		box.add_child(h)
+	return _group("Kỳ Nguyên", box, "%d/%d" % [owned.size(), ids.size()])
+
 func build_char() -> Control:
-	var vb := _vb()
 	var pl := p()
 	var school := str(pl.get("school", "kiem_si"))
 	var st: Dictionary = Game.stats
 	if st.is_empty(): st = pl.get("stats", {})
-	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 12)
-	var portrait := W.char_avatar(school, 76)
-	portrait.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	head.add_child(W.card_row(portrait))
-	var info := _vb(2)
-	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	info.add_child(T.label(str(pl.get("name", "?")), T.FS_XL, T.C_GOLD, true))
-	info.add_child(W.chip_row([["Lv %d" % int(pl.get("level", 1)), T.C_GOLD], ["Hạng %s" % str(pl.get("rank", "E")), T.C_BLUE], [W.school_name(school), T.C_PURPLE]]))
-	head.add_child(info)
-	vb.add_child(head)
-	vb.add_child(W.bar("HP", Game.hp, int(st.get("maxHp", 100)), T.C_RED))
-	vb.add_child(W.bar("MP", Game.mp, int(st.get("maxMp", 100)), T.C_BLUE))
-	var g := _grid(3)
-	g.add_child(W.stat_tile("Tấn công", str(int(st.get("atk", 0))), T.C_RED))
-	g.add_child(W.stat_tile("Phòng thủ", str(int(st.get("def", 0))), T.C_BLUE))
-	g.add_child(W.stat_tile("Chí mạng", "%s%%" % str(snappedf(float(st.get("crit", 0)), 0.1))))
-	g.add_child(W.stat_tile("Sức mạnh KN", "×%s" % str(snappedf(float(st.get("skillMul", 1.0)), 0.01)), T.C_PURPLE))
-	g.add_child(W.stat_tile("Kinh nghiệm", "%s / %s" % [W.fmt_num(int(pl.get("exp", 0))), W.fmt_num(Formulas.exp_to_next(int(pl.get("level", 1))))], T.C_GOLD))
-	g.add_child(W.stat_tile("Vàng", W.fmt_num(int(pl.get("gold", 0))), T.C_GOLD))
-	for c in g.get_children(): c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vb.add_child(g)
-	vb.add_child(T.hsep())
+	var lvl := int(pl.get("level", 1))
+	var sd: Dictionary = Data.school(school)
+	# ---------------- Cột trái
+	var left := _vb(8)
+	# Thẻ đầu: avatar | tên + lớp + EXP | cấp
+	var hh := HBoxContainer.new()
+	hh.add_theme_constant_override("separation", 10)
+	var av := PanelContainer.new()
+	av.add_theme_stylebox_override("panel", T.UISkin.slot(4, false))
+	av.custom_minimum_size = Vector2(52, 52)
+	av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var ag := T.GlyphArt.make(T.GlyphArt.token_of(str(sd.get("icon", ""))), 34.0)
+	ag.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	av.add_child(ag)
+	hh.add_child(av)
+	var idc := _vb(2)
+	idc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var nm0 := T.label(str(pl.get("name", "?")), T.FS_XL, T.C_GOLD, true)
+	nm0.autowrap_mode = TextServer.AUTOWRAP_OFF
+	idc.add_child(nm0)
+	var sub := T.label("%s · Hạng %s" % [W.school_name(school), str(pl.get("rank", "E"))], T.FS_S, T.C_MUTED)
+	sub.autowrap_mode = TextServer.AUTOWRAP_OFF
+	idc.add_child(sub)
+	var need := Formulas.exp_to_next(lvl)
+	var xp := W._flat_bar(int(pl.get("exp", 0)), need, T.C_GOLD.darkened(0.1), 14)
+	var xt := T.hud_label("%s / %s" % [W.fmt_num(int(pl.get("exp", 0))), W.fmt_num(need)], 10, Color.WHITE, true)
+	xt.set_anchors_preset(Control.PRESET_FULL_RECT)
+	xt.autowrap_mode = TextServer.AUTOWRAP_OFF
+	xt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	xt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	xt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	xp.add_child(xt)
+	idc.add_child(xp)
+	hh.add_child(idc)
+	var lc := _vb(0)
+	lc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var lcap := T.label("Cấp", T.FS_S, T.C_MUTED)
+	lcap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lc.add_child(lcap)
+	var lnum := T.label(str(lvl), 30, T.C_GOLD, true)
+	lnum.autowrap_mode = TextServer.AUTOWRAP_OFF
+	lnum.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lc.add_child(lnum)
+	hh.add_child(lc)
+	left.add_child(W.card_row(hh))
+	# Chiến đấu / chi tiết
+	left.add_child(_group("Chiến đấu", _grid2([
+		_stat_cell("@heal", "Máu", W.fmt_num(int(st.get("maxHp", 0))), T.C_RED),
+		_stat_cell("@drop", "Năng lượng", W.fmt_num(int(st.get("maxMp", 0))), T.C_BLUE),
+		_stat_cell("@blade", "Tấn công", W.fmt_num(int(st.get("atk", 0))), T.C_GOLD),
+		_stat_cell("@shield", "Phòng thủ", W.fmt_num(int(st.get("def", 0))), T.C_BLUE)])))
+	left.add_child(_group("Chi tiết", _grid2([
+		_stat_cell("@bolt", "Chí mạng", "%s%%" % str(snappedf(float(st.get("crit", 0)), 0.1)), T.C_GOLD),
+		_stat_cell("@star", "Kỹ năng", "%d%%" % roundi(float(st.get("skillMul", 1.0)) * 100.0), T.C_PURPLE),
+		_stat_cell("@wind", "Tốc chạy", str(int(st.get("speed", 0))), T.C_GREEN)])))
+	var sets_box := _char_set_rows(pl)
+	if sets_box: left.add_child(sets_box)
+	left.add_child(_char_ky_nguyen(pl))
+	var info := _vb(6)
+	info.add_child(_row_text("Giảm giá cửa hàng", "%d%%" % roundi(float(pl.get("shopDiscount", 0)) * 100.0), T.C_MUTED))
+	var titles: Array = pl.get("titles", []) if typeof(pl.get("titles", [])) == TYPE_ARRAY else []
+	info.add_child(_row_text("Danh hiệu", "Chưa có" if titles.is_empty() else str(titles.size()), T.C_MUTED))
+	for t in titles:
+		var tl := T.label("· " + str(t), T.FS_S, T.C_GOLD)
+		tl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		info.add_child(tl)
+	if str(sd.get("desc", "")) != "":
+		var ds := T.label(str(sd.get("desc", "")), 12, T.C_MUTED)
+		ds.custom_minimum_size = Vector2(220, 0)
+		info.add_child(ds)
+	left.add_child(_group("Thông tin", info))
+	# ---------------- Cột phải
+	var right := _vb(8)
 	var free_pts := int(pl.get("freePoints", 0))
-	vb.add_child(W.section_label("Tiềm năng · còn %d điểm" % free_pts))
-	var pts: Dictionary = pl.get("points", {})
-	var label_map := {"str": "Sức mạnh", "vit": "Thể lực", "agi": "Nhanh nhẹn", "spi": "Tinh thần"}
-	var hint_map := {"str": "+2 tấn công / điểm", "vit": "+10 máu, +0.8 thủ / điểm", "agi": "+0.4% chí mạng / điểm", "spi": "+6 MP, sức mạnh kỹ năng"}
-	for key in ["str", "vit", "agi", "spi"]:
+	var pts: Dictionary = pl.get("points", {}) if typeof(pl.get("points", {})) == TYPE_DICTIONARY else {}
+	var pbox := _vb(6)
+	for e in [["str", "Sức mạnh", "@blade", "+2 tấn công"], ["vit", "Thể lực", "@heal", "+10 máu, +0.8 phòng thủ"],
+			["agi", "Nhanh nhẹn", "@wind", "+0.4% chí mạng, tốc chạy"], ["spi", "Tinh thần", "@drop", "+6 NL, +1.5% sức mạnh KN"]]:
+		var key := str(e[0])
+		var pr := PanelContainer.new()
+		pr.add_theme_stylebox_override("panel", T.UISkin.inset(7))
 		var h := HBoxContainer.new()
 		h.add_theme_constant_override("separation", 8)
+		var g := T.GlyphArt.make(str(e[2]), 20.0, T.C_TEXT)
+		g.custom_minimum_size = Vector2(22, 22)
+		g.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(g)
 		var col := _vb(0)
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		col.add_child(T.label("%s  %d" % [str(label_map[key]), int((pts as Dictionary).get(key, 0))], T.FS_M, T.C_TEXT, true))
-		col.add_child(T.label(str(hint_map[key]), T.FS_S, T.C_MUTED))
+		var nr := HBoxContainer.new()
+		nr.add_theme_constant_override("separation", 6)
+		var nl := T.label(str(e[1]), T.FS_M, T.C_TEXT, true)
+		nl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		nr.add_child(nl)
+		var vl := T.label(str(int(pts.get(key, 0))), T.FS_M, T.C_GOLD, true)
+		vl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		nr.add_child(vl)
+		col.add_child(nr)
+		var hl := T.label(str(e[3]), 11, T.C_MUTED)
+		hl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		hl.clip_text = true
+		col.add_child(hl)
 		h.add_child(col)
-		h.add_child(W.action_button("+1", func(): act("add_stat", {"stat": key, "n": 1}), free_pts < 1))
-		h.add_child(W.action_button("+5", func(): act("add_stat", {"stat": key, "n": 5}), free_pts < 5))
-		vb.add_child(W.card_row(h))
-	var kn: Dictionary = pl.get("kyNguyen", {})
-	var n_on: int = (kn.get("active", []) as Array).size()
-	vb.add_child(T.hsep())
-	var ky_btn := W.action_button("Kỳ Nguyên  ·  %d đang bật" % n_on, func(): host.open_panel("kynguyen"))
-	ky_btn.add_theme_color_override("font_color", T.C_GOLD)
-	vb.add_child(ky_btn)
-	var tier := int(pl.get("awakenTier", 0))
-	var fbtn := W.action_button(("Biến hình · Ấn %s%s" % [str(Data.ROMAN[clampi(maxi(1, Data.awaken_tier_of(pl.get("formChoice", ""))) - 1, 0, 4)]), "  ·  đang bật" if Game.form_active else ""]) if tier > 0 else "Biến hình · chưa mở khóa", func(): host.open_panel("form"))
-	fbtn.add_theme_color_override("font_color", T.C_GOLD if tier > 0 else T.C_MUTED)
-	vb.add_child(fbtn)
-	return vb
+		var b1 := W.action_button("+1", func(): act("add_stat", {"stat": key, "n": 1}), free_pts < 1)
+		var b5 := W.action_button("+5", func(): act("add_stat", {"stat": key, "n": 5}), free_pts < 5)
+		b1.custom_minimum_size = Vector2(44, 34); b5.custom_minimum_size = Vector2(44, 34)
+		b1.size_flags_vertical = Control.SIZE_SHRINK_CENTER; b5.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(b1); h.add_child(b5)
+		pr.add_child(h)
+		pbox.add_child(pr)
+	right.add_child(_group("Điểm tiềm năng", pbox, str(free_pts)))
+	# Hình thái
+	var unlocked := int(pl.get("awakenTier", 0))
+	if unlocked >= 1:
+		var cur := maxi(1, Data.awaken_tier_of(pl.get("formChoice", "")))
+		var fb := _vb(6)
+		var fh := HBoxContainer.new()
+		var ft := T.label("Biến Hình %s" % str(Data.ROMAN[cur - 1]), T.FS_M, T.C_TEXT, true)
+		ft.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		fh.add_child(ft)
+		var fs_l := T.label("Đang biến hình" if Game.form_active else "Dạng thường", T.FS_S, T.C_GOLD if Game.form_active else T.C_MUTED)
+		fs_l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		fh.add_child(fs_l)
+		fb.add_child(fh)
+		var fr := HBoxContainer.new()
+		fr.add_theme_constant_override("separation", 6)
+		for t in range(1, unlocked + 1):
+			var tt := t
+			var fbn := W.action_button("Biến Hình %s" % str(Data.ROMAN[t - 1]), func(): act("form_select", {"choice": "awaken%d" % tt}), Game.form_active)
+			fbn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			if tt == cur: fbn.add_theme_color_override("font_color", T.C_GOLD)
+			fr.add_child(fbn)
+		fb.add_child(fr)
+		right.add_child(_group("Hình thái", fb))
+	# Nội tại cốt truyện
+	var perks: Array = pl.get("perks", []) if typeof(pl.get("perks", [])) == TYPE_ARRAY else []
+	var pdefs: Dictionary = Data.calc.get("PERKS", {})
+	var kb := _vb(6)
+	var shown := 0
+	for pid in perks:
+		var pk: Dictionary = pdefs.get(str(pid), {}) if typeof(pdefs.get(str(pid), {})) == TYPE_DICTIONARY else {}
+		if pk.is_empty(): continue
+		shown += 1
+		var pr2 := PanelContainer.new()
+		pr2.add_theme_stylebox_override("panel", T.UISkin.inset(8))
+		var h2 := HBoxContainer.new()
+		h2.add_theme_constant_override("separation", 10)
+		var g2 := T.GlyphArt.make(str(PERK_GLYPH.get(str(pid), "@star")), 24.0, T.C_GOLD)
+		g2.custom_minimum_size = Vector2(26, 26)
+		g2.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h2.add_child(g2)
+		var c2 := _vb(1)
+		c2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var pn := T.label(str(pk.get("name", pid)), T.FS_M, T.C_TEXT, true)
+		pn.autowrap_mode = TextServer.AUTOWRAP_OFF
+		c2.add_child(pn)
+		var pd := T.label(str(pk.get("desc", "")), 12, T.C_MUTED)
+		pd.custom_minimum_size = Vector2(180, 0)
+		c2.add_child(pd)
+		h2.add_child(c2)
+		pr2.add_child(h2)
+		kb.add_child(pr2)
+	if shown == 0:
+		kb.add_child(T.label("Chưa có nội tại. Nội tại mở khi bạn đưa ra lựa chọn trong cốt truyện.", 12, T.C_MUTED))
+	right.add_child(_group("Nội tại cốt truyện", kb))
+	var vb := _vb()
+	vb.add_child(W.split(left, right, 300.0))
+	return W.fill(vb)
 
 # ============================================================ SKILLS
 const SKILL_TYPES := {"dash": "Lướt", "melee": "Cận chiến", "guard": "Thủ thế", "buff": "Cường hóa", "sword_fall": "Kiếm giáng", "aoe": "Diện rộng",
@@ -279,31 +637,39 @@ const SKILL_TYPES := {"dash": "Lướt", "melee": "Cận chiến", "guard": "Th�
 	"meteor": "Thiên thạch", "summon": "Triệu hồi", "shadow_toggle": "Bóng ma", "shadow_command": "Lệnh bóng", "execute": "Hành quyết",
 	"fusion": "Hợp thể", "manaburst": "Bùng nổ", "allin": "Tất tay"}
 
+## Thông số kỹ năng ở một cấp, đúng công thức server (shared/logic/skills.js): MP × hệ số tiêu hao như web.
+func _sk_at(sid: String, lv: int) -> Dictionary:
+	var d: Dictionary = Data.skill_at(sid, maxi(1, lv))
+	if d.is_empty(): return d
+	d["mp"] = roundi(float(d.get("mp", 0)) * float(Game.stats.get("costMul", 1.0)))
+	return d
+
+func _sk_line(sid: String, lv: int) -> String:
+	var d := _sk_at(sid, lv)
+	return "MP %d · Hồi %ss" % [int(d.get("mp", 0)), Data.fmt_cd(float(d.get("cd", 0)))]
+
 func _skill_detail(sid: String, learned: Dictionary, pl: Dictionary) -> Control:
-	var d: Dictionary = Data.skill(sid)
+	var d0: Dictionary = Data.skill(sid)
+	var is_super := bool(d0.get("superUlt", false)) and _supers_of(pl).has(sid)
+	var is_learned := learned.has(sid) or is_super
+	var lv := 0
+	if is_learned: lv = int((learned[sid] as Dictionary).get("lv", 1)) if typeof(learned.get(sid, null)) == TYPE_DICTIONARY else int(learned.get(sid, 1))
+	var d: Dictionary = _sk_at(sid, maxi(1, lv))
 	var box := W.detail_box()
 	var body := W.box_body(box)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 8)
-	var gf := PanelContainer.new()
-	gf.add_theme_stylebox_override("panel", T.UISkin.slot(4 if bool(d.get("ult", false)) else 3))
-	var gl := T.label(str(d.get("icon", "✦")), 28, T.C_TEXT)
-	gl.autowrap_mode = TextServer.AUTOWRAP_OFF
-	gl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	gl.custom_minimum_size = Vector2(40, 40)
-	gf.add_child(gl)
-	head.add_child(gf)
+	var gl := T.GlyphArt.make(W.skill_icon(sid), 48.0, T.C_TEXT, false, true)
+	gl.custom_minimum_size = Vector2(48, 48)
+	head.add_child(gl)
 	var col := _vb(0)
 	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	col.add_child(T.label(str(d.get("name", sid)), T.FS_M, T.C_GOLD, true))
-	var is_super := bool(d.get("superUlt", false)) and (pl.get("superUlts", []) as Array).has(sid)
-	var is_learned := learned.has(sid) or is_super
-	var lv := 0
-	if is_learned: lv = int((learned[sid] as Dictionary).get("lv", 1)) if typeof(learned[sid]) == TYPE_DICTIONARY else int(learned[sid])
-	col.add_child(T.label("Sở hữu · chỉ số cố định" if is_super else (("Cấp %d / 10" % lv) if is_learned else "Chưa học · cần cấp %d" % int(d.get("level", 1))), T.FS_S, T.C_MUTED))
+	if is_super: col.add_child(T.label("Sở hữu · chỉ số cố định", T.FS_S, T.C_MUTED))
+	elif not is_learned: col.add_child(T.label("Do trang bị cấp", T.FS_S, T.C_MUTED))
 	head.add_child(col)
 	body.add_child(head)
-	var chips: Array = [[str(SKILL_TYPES.get(str(d.get("type", "")), "Kỹ năng")), T.C_PURPLE], ["MP %d" % int(d.get("mp", 0)), T.C_BLUE], ["Hồi %ss" % str(d.get("cd", 0)), T.C_MUTED]]
+	var chips: Array = [[str(SKILL_TYPES.get(str(d.get("type", "")), "Kỹ năng")), T.C_PURPLE], ["MP %d" % int(d.get("mp", 0)), T.C_BLUE], ["Hồi %ss" % Data.fmt_cd(float(d.get("cd", 0))), T.C_MUTED]]
 	if bool(d.get("superUlt", false)): chips.push_front(["Tuyệt phẩm", Color("ff8a4a")])
 	elif bool(d.get("ult", false)): chips.push_front(["Tuyệt kỹ", T.C_GOLD])
 	var chip_flow := HFlowContainer.new()
@@ -324,7 +690,7 @@ func _skill_detail(sid: String, learned: Dictionary, pl: Dictionary) -> Control:
 	for ms in [[5, "t5"], [10, "t10"]]:
 		if not d.has(str(ms[1])): continue
 		var reached := is_learned and lv >= int(ms[0])
-		body.add_child(T.label("%s Cấp %d: %s" % ["✓" if reached else "🔒", int(ms[0]), str(d[str(ms[1])])], T.FS_S, T.C_GREEN if reached else Color(T.C_MUTED, 0.8)))
+		body.add_child(T.label("%s Cấp %d: %s" % ["+" if reached else "·", int(ms[0]), str(d[str(ms[1])])], T.FS_S, T.C_GREEN if reached else Color(T.C_MUTED, 0.8)))
 	var pts := int(pl.get("skillPoints", 0))
 	if is_learned:
 		if not is_super:
@@ -347,11 +713,6 @@ func _skill_detail(sid: String, learned: Dictionary, pl: Dictionary) -> Control:
 			if here: bt.add_theme_color_override("font_color", T.C_GOLD)
 			row.add_child(bt)
 		body.add_child(row)
-	else:
-		var req := int(d.get("level", 1))
-		var ok := int(pl.get("level", 1)) >= req
-		body.add_child(W.action_button("Học" if ok else "Cần cấp %d" % req, func(): act("learn_skill", {"skill": sid}), not ok or pts < 1))
-		if ok and pts < 1: body.add_child(T.label("Cần ít nhất 1 điểm kỹ năng.", 12, Color(T.C_MUTED, 0.85)))
 	return box
 
 func _gear_skill_of(pl: Dictionary) -> String:
@@ -363,6 +724,13 @@ func _gear_skill_of(pl: Dictionary) -> String:
 		var g := str(Data.item(str((it as Dictionary).get("id", ""))).get("grantsSkill", ""))
 		if g != "" and not Data.skill(g).is_empty() and not bool(Data.skill(g).get("ult", false)): return g
 	return ""
+
+## Tuyệt phẩm đã sở hữu: server lưu dạng {id: cấp} (cũ có thể là mảng id).
+func _supers_of(pl: Dictionary) -> Array:
+	var v: Variant = pl.get("superUlts", {})
+	if typeof(v) == TYPE_DICTIONARY: return (v as Dictionary).keys()
+	if typeof(v) == TYPE_ARRAY: return v
+	return []
 
 func build_skills() -> Control:
 	var vb := _vb()
@@ -387,40 +755,48 @@ func build_skills() -> Control:
 			if not sid.is_empty(): _select("skill", sid)))
 	left.add_child(bar)
 	left.add_child(T.label("Ô 1–4: kỹ năng thường · Ô 5–6: tuyệt kỹ hoặc tuyệt phẩm (R, X)", 12, Color(T.C_MUTED, 0.85)))
+	# Chỉ liệt kê kỹ năng ĐÃ HỌC, chia 3 nhóm riêng: thường / tuyệt kỹ / tuyệt phẩm.
+	var supers: Array = _supers_of(pl)
+	var group_normal: Array = []   # [sid, lv]
+	var group_ult: Array = []
+	for sk in learned.keys():
+		var sid2 := str(sk)
+		var d2: Dictionary = Data.skill(sid2)
+		if d2.is_empty(): continue
+		var lv2 := int((learned[sk] as Dictionary).get("lv", 1)) if typeof(learned[sk]) == TYPE_DICTIONARY else int(learned[sk])
+		if bool(d2.get("ult", false)) or bool(d2.get("superUlt", false)): group_ult.append([sid2, lv2])
+		else: group_normal.append([sid2, lv2])
+
 	var gsid := _gear_skill_of(pl)
 	if gsid != "":
 		var gd: Dictionary = Data.skill(gsid)
-		left.add_child(T.label("Kỹ năng trang bị (phím V)", T.FS_S, T.C_MUTED, true))
-		left.add_child(W.glyph_row(str(gd.get("icon", "✦")), str(gd.get("name", gsid)), "Do trang bị cấp · MP %d" % int(gd.get("mp", 0)), "Trang bị", selected_where == "skill" and selected_key == gsid, func(): _select("skill", gsid), Color(0.45, 0.92, 0.7)))
-	var supers: Array = pl.get("superUlts", [])
-	if not supers.is_empty():
-		left.add_child(T.hsep())
-		left.add_child(T.label("Tuyệt phẩm", T.FS_S, T.C_MUTED, true))
-		for su in supers:
-			var ss := str(su)
-			var sd: Dictionary = Data.skill(ss)
-			if sd.is_empty(): continue
-			left.add_child(W.glyph_row(str(sd.get("icon", "✦")), str(sd.get("name", ss)), "MP %d · Hồi %ss" % [int(sd.get("mp", 0)), str(sd.get("cd", 0))], "Sở hữu", selected_where == "skill" and selected_key == ss, func(): _select("skill", ss), Color("ff8a4a")))
+		left.add_child(T.heading("Kỹ năng trang bị", Color(0.45, 0.92, 0.7)))
+		left.add_child(W.glyph_row(W.skill_icon(gsid), str(gd.get("name", gsid)), "Do trang bị cấp · MP %d" % int(_sk_at(gsid, 1).get("mp", 0)), "Trang bị", selected_where == "skill" and selected_key == gsid, func(): _select("skill", gsid), Color(0.45, 0.92, 0.7)))
+
 	left.add_child(T.hsep())
-	left.add_child(T.label("Đã học", T.FS_S, T.C_MUTED, true))
-	if learned.is_empty(): left.add_child(_empty("Chưa học kỹ năng nào."))
-	for sid2 in learned.keys():
-		var s2 := str(sid2)
-		var lv := int((learned[sid2] as Dictionary).get("lv", 1)) if typeof(learned[sid2]) == TYPE_DICTIONARY else int(learned[sid2])
+	left.add_child(T.heading("Kỹ năng thường", T.C_GOLD))
+	if group_normal.is_empty(): left.add_child(_empty("Chưa học kỹ năng thường nào."))
+	for it2 in group_normal:
+		var s2 := str(it2[0]); var lv2 := int(it2[1])
 		var d2: Dictionary = Data.skill(s2)
-		left.add_child(W.glyph_row(str(d2.get("icon", "✦")), str(d2.get("name", s2)), "MP %d · Hồi %ss" % [int(d2.get("mp", 0)), str(d2.get("cd", 0))], "Lv %d" % lv, selected_where == "skill" and selected_key == s2, func(): _select("skill", s2)))
-	var school := str(pl.get("school", ""))
-	var allowed := [school, str(Data.school(school).get("base", ""))]
-	var avail: Array = []
-	for sid3 in Data.SKILLS.keys():
-		if str((Data.SKILLS[sid3] as Dictionary).get("school", "")) in allowed and not learned.has(sid3) and not bool((Data.SKILLS[sid3] as Dictionary).get("superUlt", false)): avail.append(str(sid3))
-	avail.sort_custom(func(a, b): return int(Data.skill(a).get("level", 0)) < int(Data.skill(b).get("level", 0)))
-	if not avail.is_empty():
-		left.add_child(T.hsep())
-		left.add_child(T.label("Có thể học", T.FS_S, T.C_MUTED, true))
-		for s4 in avail:
-			var d4: Dictionary = Data.skill(s4)
-			left.add_child(W.glyph_row(str(d4.get("icon", "✦")), str(d4.get("name", s4)), "MP %d · Hồi %ss" % [int(d4.get("mp", 0)), str(d4.get("cd", 0))], "Cấp %d" % int(d4.get("level", 1)), selected_where == "skill" and selected_key == s4, func(): _select("skill", s4), T.C_MUTED))
+		left.add_child(W.glyph_row(W.skill_icon(s2), str(d2.get("name", s2)), _sk_line(s2, lv2), "Lv %d" % lv2, selected_where == "skill" and selected_key == s2, func(): _select("skill", s2)))
+
+	left.add_child(T.hsep())
+	left.add_child(T.heading("Tuyệt kỹ", T.C_PURPLE))
+	if group_ult.is_empty(): left.add_child(_empty("Chưa học tuyệt kỹ nào."))
+	for it3 in group_ult:
+		var s3 := str(it3[0]); var lv3 := int(it3[1])
+		var d3: Dictionary = Data.skill(s3)
+		left.add_child(W.glyph_row(W.skill_icon(s3), str(d3.get("name", s3)), _sk_line(s3, lv3), "Lv %d" % lv3, selected_where == "skill" and selected_key == s3, func(): _select("skill", s3), T.C_PURPLE))
+
+	left.add_child(T.hsep())
+	left.add_child(T.heading("Tuyệt phẩm", Color("ff8a4a")))
+	if supers.is_empty(): left.add_child(_empty("Chưa sở hữu tuyệt phẩm nào."))
+	for su in supers:
+		var ss := str(su)
+		var sd: Dictionary = Data.skill(ss)
+		if sd.is_empty(): continue
+		left.add_child(W.glyph_row(W.skill_icon(ss), str(sd.get("name", ss)), _sk_line(ss, 1), "Sở hữu", selected_where == "skill" and selected_key == ss, func(): _select("skill", ss), Color("ff8a4a")))
 	var right: Control = W.empty_detail("Chạm một kỹ năng để xem chi tiết, nâng cấp hoặc gán vào ô.")
 	if selected_where == "skill" and not Data.skill(selected_key).is_empty():
 		right = _skill_detail(selected_key, learned, pl)
@@ -440,44 +816,81 @@ func _npc_places(npc_id: String) -> String:
 	return " · ".join(out)
 
 ## Dòng mục tiêu có tiến độ. prog: tiến độ lưu trong player.quest.progress (hình dạng linh hoạt).
+## Map có quái này (tối đa 3 tên map).
+func _monster_places(mid: String) -> String:
+	var out: Array = []
+	for map_id in Data.MAPS.keys():
+		var sp: Variant = (Data.MAPS[map_id] as Dictionary).get("spawns", {})
+		if typeof(sp) == TYPE_DICTIONARY and mid in (sp as Dictionary).values():
+			out.append(W.map_name(str(map_id)))
+			if out.size() >= 3: break
+	return ", ".join(out)
+
+## Quái rơi vật phẩm này (tối đa 2 quái, kèm map đầu tiên của mỗi quái).
+func _item_sources(iid: String) -> String:
+	var out: Array = []
+	for mid in Data.MONSTERS.keys():
+		var drops: Variant = (Data.MONSTERS[mid] as Dictionary).get("drops", [])
+		if typeof(drops) != TYPE_ARRAY: continue
+		for dr in drops:
+			if typeof(dr) == TYPE_ARRAY and (dr as Array).size() > 0 and str(dr[0]) == iid:
+				var pl := _monster_places(str(mid)).split(", ")[0]
+				out.append("%s%s" % [W.monster_name(str(mid)), (" (" + pl + ")") if pl != "" else ""])
+				break
+		if out.size() >= 2: break
+	return " · ".join(out)
+
+## Các bước của một nhiệm vụ: mỗi mục tiêu một hàng có đánh dấu, tiến độ và gợi ý nơi làm.
 func _objective_rows(obj: Dictionary, prog: Dictionary, vb: VBoxContainer) -> void:
-	for kind in obj.keys():
+	var pl := p()
+	var lines := Data.quest_obj_lines(pl, obj, prog)
+	var li := 0
+	for kind in ["kill", "collect", "visit", "level", "school"]:
+		if not obj.has(kind): continue
 		var spec: Variant = obj[kind]
-		match str(kind):
+		match kind:
 			"kill":
 				var pk: Dictionary = prog.get("kill", {}) if typeof(prog.get("kill", {})) == TYPE_DICTIONARY else {}
 				for mid in (spec as Dictionary).keys():
-					vb.add_child(_obj_row("Hạ %s" % W.monster_name(str(mid)), int(pk.get(mid, 0)), int(spec[mid])))
+					var where := _monster_places(str(mid))
+					vb.add_child(_obj_row("Hạ %s" % W.monster_name(str(mid)), int(pk.get(mid, 0)), int(spec[mid]), ("Tìm ở: " + where) if where != "" else ""))
 			"collect":
-				var pc: Dictionary = prog.get("collect", {}) if typeof(prog.get("collect", {})) == TYPE_DICTIONARY else {}
 				for iid in (spec as Dictionary).keys():
-					vb.add_child(_obj_row("Thu thập %s" % W.item_name(str(iid)), int(pc.get(iid, 0)), int(spec[iid])))
+					var have := 0
+					for e in pl.get("bag", []):
+						if typeof(e) == TYPE_DICTIONARY and str(e.get("id", "")) == str(iid): have += int(e.get("n", e.get("qty", 1)))
+					var src := _item_sources(str(iid))
+					vb.add_child(_obj_row("Thu thập %s" % W.item_name(str(iid)), have, int(spec[iid]), ("Rơi từ: " + src) if src != "" else ""))
 			"visit":
-				var pv: Variant = prog.get("visit", [])
-				var arr: Array = spec as Array
-				var done_n := 0
-				if typeof(pv) == TYPE_ARRAY:
-					for x in arr:
-						if x in (pv as Array): done_n += 1
-				elif typeof(pv) == TYPE_DICTIONARY:
-					for x in arr:
-						if (pv as Dictionary).get(x, false): done_n += 1
-				vb.add_child(_obj_row("Đến %d địa điểm" % arr.size(), done_n, arr.size()))
-			"level": vb.add_child(_obj_row("Đạt cấp %d" % int(spec), int(Game.player.get("level", 1)), int(spec)))
-			"school": vb.add_child(_obj_row("Chọn class", 1 if not str(Game.player.get("school", "")).is_empty() else 0, 1))
+				var pv: Variant = prog.get("visit", {})
+				for nid in (spec as Array):
+					var seen: bool = typeof(pv) == TYPE_DICTIONARY and bool((pv as Dictionary).get(nid, false))
+					var wh := _npc_places(str(nid))
+					vb.add_child(_obj_row("Gặp %s" % W.npc_name(str(nid)), 1 if seen else 0, 1, ("Ở: " + wh) if wh != "" else ""))
+			"level": vb.add_child(_obj_row("Đạt cấp %d" % int(spec), int(pl.get("level", 1)), int(spec)))
+			"school": vb.add_child(_obj_row("Thức tỉnh class ở Hội trưởng Khải", 1 if not str(pl.get("school", "")).is_empty() else 0, 1))
+	li += lines.size()
 
-func _obj_row(text: String, have: int, need: int) -> Control:
+func _obj_row(text: String, have: int, need: int, hint: String = "") -> Control:
 	var done := have >= need
-	var vb := _vb(2)
+	var vb := _vb(3)
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 8)
-	var mark := T.label("✓" if done else "○", T.FS_M, T.C_GREEN if done else T.C_MUTED, true)
-	mark.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var mark := PanelContainer.new()
+	mark.custom_minimum_size = Vector2(22, 22)
+	mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var msb := T.sb(T.C_GREEN if done else Color(0.1, 0.13, 0.2), T.C_GREEN if done else T.C_MUTED, 1, 11, 0)
+	mark.add_theme_stylebox_override("panel", msb)
+	if done:
+		var ck := T.label("+", T.FS_S, Color(0.05, 0.12, 0.06), true)
+		ck.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ck.autowrap_mode = TextServer.AUTOWRAP_OFF
+		mark.add_child(ck)
 	h.add_child(mark)
-	var t := T.label(text, T.FS_S, T.C_MUTED if done else T.C_TEXT)
+	var t := T.label(text, T.FS_M, T.C_MUTED if done else T.C_TEXT, true)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(t)
-	var n := T.label("%d/%d" % [mini(have, need), need], T.FS_S, T.C_GREEN if done else T.C_GOLD, true)
+	var n := T.label("%d/%d" % [mini(have, need), need], T.FS_M, T.C_GREEN if done else T.C_GOLD, true)
 	n.autowrap_mode = TextServer.AUTOWRAP_OFF
 	h.add_child(n)
 	vb.add_child(h)
@@ -485,10 +898,14 @@ func _obj_row(text: String, have: int, need: int) -> Control:
 		var pb := ProgressBar.new()
 		pb.min_value = 0; pb.max_value = need; pb.value = mini(have, need)
 		pb.show_percentage = false
-		pb.custom_minimum_size = Vector2(0, 8)
+		pb.custom_minimum_size = Vector2(0, 14)
 		pb.add_theme_stylebox_override("background", T.UISkin.bar_frame())
 		pb.add_theme_stylebox_override("fill", T.UISkin.bar_fill(T.C_GREEN if done else T.C_GOLD))
 		vb.add_child(pb)
+	if hint != "" and not done:
+		var hl := T.label(hint, 12, Color(T.C_MUTED, 0.95))
+		hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vb.add_child(hl)
 	return vb
 
 func _reward_chips(rw: Dictionary) -> Control:
@@ -510,9 +927,10 @@ func build_quest() -> Control:
 	var qd: Dictionary = q if typeof(q) == TYPE_DICTIONARY else {}
 	var cur: Dictionary = Data.quest_current(pl)
 	if qd.is_empty() or cur.is_empty():
-		vb.add_child(_empty("Cốt truyện đã hoàn tất.\nHãy làm phụ tuyến và nhiệm vụ ngày.", "quest"))
+		vb.add_child(_empty("Cốt truyện đã hoàn tất.\nHãy làm phụ tuyến.", "quest"))
 	else:
 		var state := str(qd.get("state", "none"))
+		if state == "active" and Data.quest_ready(pl): state = "done"
 		var inner := _vb(8)
 		var head := HBoxContainer.new()
 		head.add_theme_constant_override("separation", 8)
@@ -553,14 +971,7 @@ func build_quest() -> Control:
 			var sp: Dictionary = active[sid] if typeof(active[sid]) == TYPE_DICTIONARY else {}
 			_objective_rows(sq.get("obj", {}), sp, inner2)
 			vb.add_child(W.card_row(inner2))
-	var daily: Dictionary = pl.get("dailyByMap", {}).get(str(pl.get("map", "")), {})
-	if not daily.is_empty():
-		vb.add_child(W.section_label("Nhiệm vụ ngày"))
-		for d in daily.get("list", []):
-			if typeof(d) != TYPE_DICTIONARY: continue
-			var dd := d as Dictionary
-			var done := bool(dd.get("claimed", false))
-			vb.add_child(W.card_row(T.label("%s %s" % ["✓" if done else "•", str(dd.get("name", ""))], T.FS_M, T.C_MUTED if done else T.C_TEXT)))
+	# Nhiệm vụ ngày chỉ hiển thị ở NPC/bảng nhiệm vụ, không đưa vào tab Nhiệm vụ.
 	return vb
 
 func _prettify(id: String) -> String:
@@ -611,39 +1022,16 @@ func _info_row(k: String, v: String) -> Control:
 
 func build_map() -> Control:
 	var vb := _vb(6)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vb.add_child(row)
-	# Trái: sơ đồ có thể kéo
+	var view: Control = WorldMapView.new()
+	view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Bản đồ chiếm toàn bộ phần còn lại (bỏ cột chi tiết).
 	var mapbox := PanelContainer.new()
 	mapbox.add_theme_stylebox_override("panel", T.UISkin.inset(3))
 	mapbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mapbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	row.add_child(mapbox)
-	var view: Control = WorldMapView.new()
-	view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vb.add_child(mapbox)
 	mapbox.add_child(view)
-	# Phải: thông tin khu + chú giải
-	var right := W.detail_box()
-	right.custom_minimum_size = Vector2(214, 0)
-	var rb := W.box_body(right)
-	var info := _vb(4)
-	rb.add_child(info)
-	var here_btn := W.action_button("📍 Về vị trí của tôi", func(): view.center_on(str(p().get("map", ""))))
-	rb.add_child(here_btn)
-	rb.add_child(T.label("Kéo để di chuyển · chạm một điểm để xem. Muốn đi: tới cổng trong game.", 12, Color(T.C_MUTED, 0.9)))
-	var rs := ScrollContainer.new()
-	rs.custom_minimum_size = Vector2(214, 0)
-	rs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	rs.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rs.add_child(right)
-	row.add_child(rs)
-	var cur := WorldMapView.sel if not WorldMapView.sel.is_empty() else str(p().get("map", ""))
-	_map_info(info, cur)
-	view.selected.connect(func(id): _map_info(info, id))
 	return W.fill(vb)
 
 func _dict_values(d: Dictionary) -> Array:
@@ -867,9 +1255,11 @@ func build_daily() -> Control:
 	var vb := _vb()
 	var pl := p()
 	var here := str(pl.get("map", "lang"))
-	var d: Dictionary = pl.get("dailyByMap", {}).get(here, {})
+	var by_map: Variant = pl.get("dailyByMap", {})
+	var d: Dictionary = (by_map as Dictionary).get(here, {}) if typeof(by_map) == TYPE_DICTIONARY else {}
+	if typeof(d) != TYPE_DICTIONARY: d = {}
 	vb.add_child(W.section_label("Bảng nhiệm vụ · %s" % W.map_name(here)))
-	var list: Array = d.get("list", [])
+	var list: Array = d.get("list", []) if typeof(d.get("list", [])) == TYPE_ARRAY else []
 	if list.is_empty(): vb.add_child(_empty("Chưa có nhiệm vụ ngày ở đây.\nMỗi làng có bảng nhiệm vụ riêng.", "quest"))
 	for i in range(list.size()):
 		var item: Dictionary = list[i] if typeof(list[i]) == TYPE_DICTIONARY else {}
@@ -881,10 +1271,13 @@ func build_daily() -> Control:
 		b.custom_minimum_size = Vector2(90, 44)
 		h.add_child(b)
 		vb.add_child(W.card_row(h))
-	var bonus: Dictionary = d.get("bonus", {})
+	var bonus_v: Variant = d.get("bonus", {})
+	var bonus: Dictionary = bonus_v if typeof(bonus_v) == TYPE_DICTIONARY else {}
 	if not bonus.is_empty():
 		vb.add_child(W.action_button("Nhận thưởng thêm", func(): act("daily_bonus", {}), bool(bonus.get("claimed", false))))
-	var w: Dictionary = pl.get("weeklyByMap", {}).get(here, {})
+	var weekly_v: Variant = pl.get("weeklyByMap", {})
+	var w: Dictionary = (weekly_v as Dictionary).get(here, {}) if typeof(weekly_v) == TYPE_DICTIONARY else {}
+	if typeof(w) != TYPE_DICTIONARY: w = {}
 	if not w.is_empty():
 		vb.add_child(T.hsep())
 		vb.add_child(W.section_label("Nhiệm vụ tuần"))
@@ -983,12 +1376,13 @@ func build_school() -> Control:
 		var s: Dictionary = Data.SCHOOLS[sid] if typeof(Data.SCHOOLS[sid]) == TYPE_DICTIONARY else {}
 		if bool(s.get("special", false)) or bool(s.get("evolved", false)): continue
 		var inner2 := _vb(4)
-		inner2.add_child(T.label("%s %s" % [str(s.get("icon", "◆")), str(s.get("name", sid))], T.FS_M, T.C_GOLD, true))
+		inner2.add_child(T.label(str(s.get("name", sid)), T.FS_M, T.C_GOLD, true))
 		inner2.add_child(T.label(str(s.get("desc", "")), T.FS_S, T.C_MUTED))
 		var cid := str(sid)
 		inner2.add_child(W.action_button("Chọn", func(): host.open_panel("school", {"confirm": cid})))
 		var card := W.card_row(inner2)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.custom_minimum_size = Vector2(520, 0)
 		g.add_child(card)
 	vb.add_child(g)
 	return vb
@@ -1025,47 +1419,197 @@ func build_companion() -> Control:
 	var mounts: Dictionary = pl.get("mounts", {}) if typeof(pl.get("mounts", {})) == TYPE_DICTIONARY else {}
 	var owned: Array = mounts.get("owned", [])
 	var summoned: Array = mounts.get("summoned", [])
-	var pets: Dictionary = pl.get("pets", {}) if typeof(pl.get("pets", {})) == TYPE_DICTIONARY else {}
 	vb.add_child(W.chip_row([["Sở hữu  %d" % owned.size(), T.C_GOLD], ["Đang triệu hồi  %d" % summoned.size(), T.C_GREEN]]))
 	if owned.is_empty():
 		vb.add_child(_empty("Bạn chưa có thú đồng hành.\nNhận thú qua mã quà tặng hoặc sự kiện.", "pet"))
 		return vb
-	vb.add_child(T.label("Thú đồng hành đi theo, đánh cùng bạn và chia sẻ một phần sát thương nhận vào.", T.FS_S, T.C_MUTED))
+	vb.add_child(T.label("Thú đi theo và đánh cùng bạn. Chỉ số cố định theo loài, mạnh lên nhờ trang bị thú.", T.FS_S, T.C_MUTED))
 	for mid in owned:
 		var sid := str(mid)
 		var active := sid in summoned
-		var st: Dictionary = pets.get(sid, {}) if typeof(pets.get(sid, {})) == TYPE_DICTIONARY else {}
-		var inner := _vb(6)
+		var m := Data.mount(sid)
+		var card := _vb(6)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.custom_minimum_size = Vector2(520, 0)
 		var head := HBoxContainer.new()
 		head.add_theme_constant_override("separation", 10)
-		var frame := PanelContainer.new()
-		frame.add_theme_stylebox_override("panel", T.UISkin.slot(4 if active else 1, active))
-		var pic := T.icon_rect("pet", 30.0, T.C_GOLD if active else T.C_MUTED)
-		pic.custom_minimum_size = Vector2(40, 40)
-		frame.add_child(pic)
-		head.add_child(frame)
-		var tc := _vb(1)
+		head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		head.custom_minimum_size = Vector2(500, 58)
+		head.add_child(_pet_avatar(sid, 56))
+		var tc := _vb(2)
 		tc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tc.custom_minimum_size = Vector2(240, 0)
 		tc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		tc.add_child(T.label(W.monster_name(sid), T.FS_M, T.C_GOLD if active else T.C_TEXT, true))
-		var sub := "Đang đồng hành" if active else "Đang nghỉ"
-		if st.has("lv"): sub = "Cấp %d · %s" % [int(st.get("lv", 1)), sub]
-		tc.add_child(T.label(sub, T.FS_S, T.C_GREEN if active else T.C_MUTED))
-		head.add_child(tc)
+		var nm_lb := T.label(Data.mount_name(sid), T.FS_L, T.C_GOLD if active else T.C_TEXT, true)
+		nm_lb.autowrap_mode = TextServer.AUTOWRAP_OFF
+		tc.add_child(nm_lb)
+		if not m.is_empty():
+			var ds_lb := T.label(str(m.get("desc", "")), 12, T.C_MUTED)
+			ds_lb.autowrap_mode = TextServer.AUTOWRAP_OFF
+			ds_lb.clip_text = true
+			tc.add_child(ds_lb)
+			var st_lb := T.label("HP %d · Công %d · Thủ %d · MP %d" % [int(m.get("hp", 0)), int(m.get("atk", 0)), int(m.get("def", 0)), int(m.get("mp", 0))], T.FS_S, T.C_TEXT)
+			st_lb.autowrap_mode = TextServer.AUTOWRAP_OFF
+			tc.add_child(st_lb)
 		var tb: Button
-		if active: tb = W.action_button("Thu hồi", func(): act("mount_set", {"id": sid}))
+		if active:
+			tb = W.action_button("Thu hồi", func(): act("mount_set", {"id": sid}))
 		else:
-			tb = T.button_primary("Triệu hồi", Vector2(104, 42))
+			tb = T.button_primary("Triệu hồi", Vector2(104, 38))
 			tb.pressed.connect(func(): act("mount_set", {"id": sid}))
-		tb.custom_minimum_size = Vector2(104, 42)
+		tb.custom_minimum_size = Vector2(104, 38)
+		tb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		head.add_child(tc)
 		head.add_child(tb)
-		inner.add_child(head)
-		if not st.is_empty():
-			inner.add_child(W.bar("Sinh lực", int(st.get("hp", 0)), maxi(1, int(st.get("maxHp", 100))), T.C_GREEN))
-		var card := W.card_row(inner)
-		if active: card.add_theme_stylebox_override("panel", T.UISkin.tab(true))
-		vb.add_child(card)
+		card.add_child(head)
+		card.add_child(_pet_gear_section(pl, sid))
+		vb.add_child(W.card_row(card))
 	return vb
+
+## Anh thú: dùng bộ sprite quái theo look của loài (giống web).
+func _pet_avatar(mid: String, px: int) -> Control:
+	var m := Data.mount(mid)
+	var look := str(m.get("look", "wolf"))
+	if m.is_empty(): look = "wolf"
+	var sheet := str((Data.mob_art.get("LOOK", {}) as Dictionary).get(look, "goblin"))
+	var path := "res://assets/mobs/%s/idle.png" % sheet
+	var fr := PanelContainer.new()
+	fr.add_theme_stylebox_override("panel", T.UISkin.slot(0, false))
+	fr.custom_minimum_size = Vector2(px, px)
+	fr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if ResourceLoader.exists(path):
+		var md: Dictionary = (Data.mob_art.get("MOBS", {}) as Dictionary).get(sheet, {})
+		var fw := int(md.get("fw", 0))
+		var fh := int(md.get("fh", 0))
+		var tex := load(path) as Texture2D
+		var r := TextureRect.new()
+		# Cat khung hinh dau tien cua sprite sheet (sheet gom nhieu frame ngang).
+		if fw > 0 and fh > 0:
+			var at := AtlasTexture.new()
+			at.atlas = tex
+			at.region = Rect2(0, 0, fw, fh)
+			r.texture = at
+		else:
+			r.texture = tex
+		r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		r.custom_minimum_size = Vector2(px - 8, px - 8)
+		r.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var tint_v: Variant = m.get("tint", null)
+		if tint_v != null: r.modulate = Color.hex(0x1000000 + int(tint_v))
+		fr.add_child(r)
+	return fr
+
+## Trang bị thú: 4 ô (yên, dây cương, giáp, vòng cổ). Chạm một ô để mở danh sách món phù hợp trong túi và gán vào,
+## hoặc "Tháo" món đang mặc. Luật (cấp yêu cầu, túi đầy...) do server kiểm: action pet_equip / pet_unequip.
+const PET_SLOTS := [["yen", "Yên"], ["cuong", "Cương"], ["giap", "Giáp"], ["vong", "Vòng"]]
+
+func _pet_gear_section(pl: Dictionary, mid: String) -> Control:
+	var all: Dictionary = pl.get("petGear", {}) if typeof(pl.get("petGear", {})) == TYPE_DICTIONARY else {}
+	var gear: Dictionary = all.get(mid, {}) if typeof(all.get(mid, {})) == TYPE_DICTIONARY else {}
+	var box := _vb(6)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	var gl := T.label("Trang bị", 12, T.C_MUTED)
+	gl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	gl.custom_minimum_size = Vector2(52, 0)
+	gl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(gl)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	for pair in PET_SLOTS:
+		var slot := str(pair[0])
+		var key := mid + "|" + slot
+		var is_sel := pet_sel == key
+		row.add_child(_pet_gear_cell(str(pair[1]), _pet_slot_item(gear, slot), is_sel, func():
+			pet_sel = "" if is_sel else key
+			refresh()))
+	head.add_child(row)
+	var hint := T.label("Chạm một ô để gán / tháo", 12, Color(T.C_MUTED, 0.8))
+	hint.autowrap_mode = TextServer.AUTOWRAP_OFF
+	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(hint)
+	box.add_child(head)
+	if pet_sel.begins_with(mid + "|"):
+		var slot_id := pet_sel.get_slice("|", 1)
+		box.add_child(_pet_gear_picker(pl, mid, slot_id, _pet_slot_item(gear, slot_id)))
+	return box
+
+static func _pet_slot_item(gear: Dictionary, slot: String) -> String:
+	var v: Variant = gear.get(slot, null)
+	return "" if v == null else str(v)
+
+func _pet_gear_cell(slot_name: String, iid: String, selected: bool, cb: Callable) -> Button:
+	var empty := iid.is_empty() or Data.item(iid).is_empty()
+	var q := 0 if empty else int(Data.item(iid).get("q", 0))
+	var b := T.button("", Vector2(46, 46))
+	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = slot_name if empty else W.item_name(iid)
+	var normal: StyleBox = T.UISkin.slot(q, selected, empty)
+	var hot: StyleBox = T.UISkin.slot(q, true, empty)
+	b.add_theme_stylebox_override("normal", normal)
+	b.add_theme_stylebox_override("hover", hot)
+	b.add_theme_stylebox_override("pressed", hot)
+	if empty:
+		var lb := T.label(slot_name, 10, Color(T.C_MUTED, 0.8))
+		lb.autowrap_mode = TextServer.AUTOWRAP_OFF
+		lb.set_anchors_preset(Control.PRESET_FULL_RECT)
+		lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(lb)
+	else:
+		var ic := W.item_icon(iid, 32)
+		ic.set_anchors_preset(Control.PRESET_FULL_RECT)
+		ic.offset_left = 7; ic.offset_top = 7; ic.offset_right = -7; ic.offset_bottom = -7
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(ic)
+	b.pressed.connect(cb)
+	return b
+
+func _pet_gear_picker(pl: Dictionary, mid: String, slot: String, cur_id: String) -> Control:
+	var inner := _vb(6)
+	var slot_name := slot
+	for pair in PET_SLOTS:
+		if str(pair[0]) == slot: slot_name = str(pair[1])
+	var hr := HBoxContainer.new()
+	hr.add_theme_constant_override("separation", 8)
+	var title := T.label("Ô %s" % slot_name, T.FS_M, T.C_GOLD, true)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	hr.add_child(title)
+	if not cur_id.is_empty():
+		var cur_l := T.label("Đang mặc: %s" % W.item_name(cur_id), T.FS_S, T.C_GREEN)
+		cur_l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		cur_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		hr.add_child(cur_l)
+		var off := W.action_button("Tháo", func(): act("pet_unequip", {"pet": mid, "slot": slot}))
+		off.custom_minimum_size = Vector2(72, 34)
+		off.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		hr.add_child(off)
+	inner.add_child(hr)
+	var lv := int(pl.get("level", 1))
+	var seen := {}
+	for e in pl.get("bag", []):
+		if typeof(e) != TYPE_DICTIONARY: continue
+		var iid := str((e as Dictionary).get("id", ""))
+		var d: Dictionary = Data.item(iid)
+		if str(d.get("kind", "")) != "pet_gear" or str(d.get("petSlot", "")) != slot: continue
+		seen[iid] = int(seen.get(iid, 0)) + int((e as Dictionary).get("n", (e as Dictionary).get("qty", 1)))
+	for iid in seen.keys():
+		var need := int(Data.item(str(iid)).get("refLv", 0))
+		var ok: bool = lv >= need and str(iid) != cur_id
+		var r := W.shop_row(str(iid), "Có ×%d" % int(seen[iid]), "Cấp %d" % need, false, Callable())
+		r.disabled = not ok
+		var item_id := str(iid)
+		r.pressed.connect(func(): act("pet_equip", {"pet": mid, "item": item_id}))
+		inner.add_child(r)
+	if seen.is_empty():
+		inner.add_child(T.label("Túi không có trang bị cho ô này. Mua ở tiệm tạp hóa.", T.FS_S, Color(T.C_MUTED, 0.9)))
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", T.UISkin.inset(8))
+	pc.add_child(inner)
+	return pc
 
 # ============================================================ SHADOWS
 func build_shadows() -> Control:
@@ -1106,17 +1650,11 @@ func _toggle(text: String, hint: String, value: bool, cb: Callable) -> Control:
 	cb_btn.toggled.connect(func(v): cb.call(v); Audio.play("ui"))
 	cb_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(cb_btn)
-	return W.card_row(h)
+	# Hang phang: khong vien vang, khong nen xanh cho o bat/tat.
+	return h
 
 func build_config() -> Control:
 	var vb := _vb()
-	# Tài khoản
-	var pl := p()
-	var acc := _vb(2)
-	acc.add_child(T.label(str(pl.get("name", "?")), T.FS_L, T.C_GOLD, true))
-	acc.add_child(T.label("%s · Cấp %d" % [W.school_name(str(pl.get("school", ""))), int(pl.get("level", 1))], T.FS_S, T.C_MUTED))
-	acc.add_child(T.label("Máy chủ: " + Settings.server_url, 12, Color(T.C_MUTED, 0.85)))
-	vb.add_child(W.card_row(acc))
 	vb.add_child(W.section_label("Hiển thị"))
 	vb.add_child(_toggle("Đồ họa thấp", "Bớt hạt, tắt lớp nền giữa và thời tiết — nhẹ máy hơn", Settings.quality_low, func(v): Settings.set_quality_low(v)))
 	vb.add_child(_toggle("Giới hạn 30 FPS", "Tiết kiệm pin, máy ít nóng", Settings.fps_cap == 30, func(v): Settings.set_fps_cap(30 if v else 60)))
@@ -1128,6 +1666,9 @@ func build_config() -> Control:
 	vol_t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vol_head.add_child(vol_t)
 	var vol_v := T.label("%d%%" % int(Settings.volume * 100.0), T.FS_S, T.C_GOLD, true)
+	vol_v.autowrap_mode = TextServer.AUTOWRAP_OFF
+	vol_v.custom_minimum_size = Vector2(48, 0)
+	vol_v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	vol_head.add_child(vol_v)
 	vol_box.add_child(vol_head)
 	var vol := HSlider.new()
@@ -1140,10 +1681,6 @@ func build_config() -> Control:
 	vol_box.add_child(vol)
 	vb.add_child(W.card_row(vol_box))
 	vb.add_child(_toggle("Rung khi bị đánh", "Chỉ có tác dụng trên điện thoại", Settings.haptics, func(v): Settings.set_haptics(v)))
-	vb.add_child(W.section_label("Khác"))
-	vb.add_child(W.action_button("Xem lại gợi ý hướng dẫn", func():
-		Settings.reset_hints()
-		host.toast("Các gợi ý sẽ hiện lại", "success")))
 	var do_out := func():
 		Net.logout()
 		Settings.set_session("")
@@ -1251,8 +1788,8 @@ func build_kynguyen() -> Control:
 	for iid2 in list:
 		var sid := str(iid2)
 		var d: Dictionary = Data.item(sid)
-		var have := sid in owned
-		var on := sid in active
+		var have: bool = sid in owned
+		var on: bool = sid in active
 		var req := int(d.get("level", 1))
 		var inner := _vb(6)
 		var head := HBoxContainer.new()
@@ -1263,6 +1800,7 @@ func build_kynguyen() -> Control:
 		head.add_child(frame)
 		var tc := _vb(2)
 		tc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tc.custom_minimum_size = Vector2(240, 0)
 		tc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		tc.add_child(T.label(str(d.get("name", sid)).replace("Kỳ Nguyên · ", ""), T.FS_L, T.C_GOLD if have else T.C_TEXT, true))
 		var state_txt := "ĐANG BẬT" if on else ("Đã sở hữu · đang tắt" if have else ("Mở khóa ở cấp %d" % req if lvp < req else "Chưa sở hữu"))
@@ -1288,6 +1826,340 @@ func build_kynguyen() -> Control:
 		var card := W.card_row(inner)
 		if on: card.add_theme_stylebox_override("panel", T.UISkin.tab(true))
 		vb.add_child(card)
+	return vb
+
+# ============================================================ SOCIAL (đội, khu, chợ) + TRADE
+var social_tab := "near"
+var market_tab := "buy"
+var market_sel_uid := ""
+var market_confirm := 0
+var market_q := ""
+var market_sort := "price_asc"
+var market_page := 0
+var _market_loaded := false
+
+func _class_name(sc: String) -> String:
+	var d: Dictionary = Data.school(sc)
+	return str(d.get("name", "Tập sự")) if not d.is_empty() else "Tập sự"
+
+func _player_row(info: Dictionary, buttons: Array) -> Control:
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	var col := _vb(0)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(T.label(str(info.get("name", "?")), T.FS_M, T.C_TEXT, true))
+	col.add_child(T.label("Lv %d · %s" % [int(info.get("lv", 1)), _class_name(str(info.get("sc", "")))], T.FS_S, T.C_MUTED))
+	h.add_child(col)
+	for b in buttons: h.add_child(b)
+	# Hang phang: khong vien vang, khong nen xanh cho o bat/tat.
+	return h
+
+func _soc_tab(t: String) -> void:
+	social_tab = t
+	if t == "khu": Socket.send_chlist()
+	if t == "market": _market_refresh()
+	refresh()
+
+func _market_refresh() -> void:
+	if market_tab == "buy":
+		Net.action("market_browse", {"q": market_q, "sort": market_sort, "page": market_page})
+	elif market_tab == "mine":
+		Net.action("market_mine", {})
+
+func build_social() -> Control:
+	var vb := _vb(8)
+	if ctx_extra.has("tab"):
+		social_tab = str(ctx_extra["tab"])
+		ctx_extra.erase("tab")
+	# Chọn khu và chợ không còn nằm trong menu Xã hội (chỉ còn Quanh đây / Đội).
+	if social_tab != "near" and social_tab != "party": social_tab = "near"
+	vb.add_child(W.segmented([["near", "Quanh đây"], ["party", "Đội"]], social_tab, _soc_tab))
+	if social_tab == "party": _social_party(vb)
+	else: _social_near(vb)
+	return vb
+
+func _social_near(vb: VBoxContainer) -> void:
+	if Social.nearby.is_empty():
+		vb.add_child(_empty("Chưa có người chơi nào cùng bản đồ.", "social"))
+		return
+	for id in Social.nearby.keys():
+		var info: Dictionary = Social.nearby[id]
+		var pid: int = int(id)
+		var btns: Array = []
+		if not _is_mate(pid):
+			btns.append(W.action_button("Mời đội", func(): Socket.send_party("inv", {"to": pid}); host.toast("Đã gửi lời mời đội")))
+		btns.append(W.action_button("Giao dịch", func(): Socket.send_trade("inv", {"to": pid}); host.toast("Đã gửi lời mời giao dịch")))
+		vb.add_child(_player_row(info, btns))
+
+func _is_mate(pid: int) -> bool:
+	for m in Social.party.get("members", []):
+		if typeof(m) == TYPE_DICTIONARY and int(m.get("id", 0)) == pid: return true
+	return false
+
+func _social_party(vb: VBoxContainer) -> void:
+	if not Social.in_party():
+		vb.add_child(_empty("Bạn chưa ở trong đội.\nMời người chơi ở tab Quanh đây. Chat đội: /p nội dung.", "social"))
+		return
+	var members: Array = Social.party.get("members", [])
+	var lead: int = int(Social.party.get("leader", 0))
+	var iam_lead := lead == Socket.my_id
+	vb.add_child(W.chip_row([["%d/5 thành viên" % members.size(), T.C_GOLD]]))
+	for m in members:
+		if typeof(m) != TYPE_DICTIONARY: continue
+		var mid: int = int(m.get("id", 0))
+		var inner := _vb(4)
+		var head := HBoxContainer.new()
+		var nm := T.label(("★ " if mid == lead else "") + str(m.get("name", "?")), T.FS_M, T.C_GOLD if mid == lead else T.C_TEXT, true)
+		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		head.add_child(nm)
+		var st := "Lv %d · %s" % [int(m.get("lv", 1)), _class_name(str(m.get("sc", "")))]
+		if not bool(m.get("on", true)): st += " · mất kết nối"
+		if bool(m.get("dead", false)): st += " · đã gục"
+		head.add_child(T.label(st, T.FS_S, T.C_MUTED))
+		inner.add_child(head)
+		inner.add_child(W.bar("HP", int(m.get("hp", 0)) if bool(m.get("on", true)) else 0, 100, T.C_RED))
+		if iam_lead and mid != Socket.my_id:
+			var hb := HBoxContainer.new()
+			hb.add_theme_constant_override("separation", 8)
+			var b1 := W.action_button("Nhường trưởng", func(): Socket.send_party("lead", {"id": mid}))
+			var b2 := W.action_button("Đuổi", func(): Socket.send_party("kick", {"id": mid}))
+			b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			hb.add_child(b1); hb.add_child(b2)
+			inner.add_child(hb)
+		vb.add_child(W.card_row(inner))
+	vb.add_child(W.action_button("Rời đội", func(): Socket.send_party("leave")))
+
+func _social_khu(vb: VBoxContainer) -> void:
+	var ch: Dictionary = Social.channels
+	if ch.is_empty():
+		vb.add_child(_empty("Đang tải danh sách khu…", "map"))
+		return
+	var cur: int = int(ch.get("cur", 1))
+	var cap: int = int(ch.get("cap", 20))
+	vb.add_child(T.label("Đang ở Khu %d · mỗi khu tối đa %d người" % [cur, cap], T.FS_S, T.C_MUTED))
+	var g := _grid(4)
+	for e in ch.get("list", []):
+		if typeof(e) != TYPE_ARRAY or (e as Array).size() < 2: continue
+		var n: int = int(e[0]); var c: int = int(e[1])
+		var b := T.button("Khu %d\n%d/%d" % [n, c, cap], Vector2(0, 56))
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var on := n == cur
+		var sb: StyleBox = T.UISkin.tab(on)
+		b.add_theme_stylebox_override("normal", sb)
+		b.add_theme_stylebox_override("hover", sb)
+		b.disabled = on or c >= cap
+		b.pressed.connect(func(): Socket.send_channel(n); host.toast("Đang chuyển khu…"))
+		g.add_child(b)
+	vb.add_child(g)
+
+func _time_left(ms: float) -> String:
+	var h := int(ms / 3600000.0)
+	var m := int(fmod(ms, 3600000.0) / 60000.0)
+	return "%dg%dp" % [h, m] if h > 0 else "%dp" % m
+
+func _listing_row(l: Dictionary, mine: bool) -> Control:
+	var inst: Dictionary = l.get("inst", {}) if typeof(l.get("inst", {})) == TYPE_DICTIONARY else {}
+	var iid := str(inst.get("id", l.get("item", "")))
+	var d: Dictionary = Data.item(iid)
+	var now := Time.get_unix_time_from_system() * 1000.0
+	var left: String
+	if bool(l.get("expired", false)): left = "hết hạn"
+	elif str(l.get("status", "")) == "sold": left = "đã bán"
+	else: left = "còn " + _time_left(maxf(0.0, float(l.get("expires", now)) - now))
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 10)
+	h.add_child(W.item_cell(iid, int(inst.get("qty", 1)), false, Callable(), ("+%d" % int(inst.get("plus", 0))) if int(inst.get("plus", 0)) > 0 else ""))
+	var col := _vb(0)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.add_child(T.label(str(d.get("name", iid)), T.FS_M, T.C_TEXT, true))
+	var sub := "Cấp %d · %s" % [int(l.get("level", 1)), left]
+	if not mine: sub = "%s · %s" % [str(l.get("seller", "")), sub]
+	col.add_child(T.label(sub, T.FS_S, T.C_MUTED))
+	h.add_child(col)
+	var price := T.label("%s xu" % W.fmt_num(int(l.get("price", 0))), T.FS_M, T.C_GOLD, true)
+	price.autowrap_mode = TextServer.AUTOWRAP_OFF
+	h.add_child(price)
+	var lid: int = int(l.get("id", 0))
+	if mine:
+		if str(l.get("status", "")) == "active":
+			h.add_child(W.action_button("Lấy lại" if bool(l.get("expired", false)) else "Huỷ", func(): Net.action("market_cancel", {"id": lid}); Net.action("market_mine", {})))
+	else:
+		var key := "L%d" % lid
+		if confirm_buy == key:
+			h.add_child(W.action_button("Chắc chắn?", func(): confirm_buy = ""; Net.action("market_buy", {"id": lid}); _market_refresh()))
+		else:
+			h.add_child(W.action_button("Mua", func(): confirm_buy = key; refresh()))
+	# Hang phang: khong vien vang, khong nen xanh cho o bat/tat.
+	return h
+
+func _social_market(vb: VBoxContainer) -> void:
+	vb.add_child(_gold_row(p(), false))
+	vb.add_child(W.segmented([["buy", "Mua"], ["sell", "Đăng bán"], ["mine", "Tin của tôi"]], market_tab, func(t): market_tab = t; market_sel_uid = ""; confirm_buy = ""; _market_refresh(); refresh()))
+	match market_tab:
+		"buy":
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			var le := LineEdit.new()
+			le.placeholder_text = "Tìm theo tên"
+			le.text = market_q
+			le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			le.custom_minimum_size = Vector2(0, 40)
+			le.text_submitted.connect(func(t): market_q = t; market_page = 0; _market_refresh())
+			row.add_child(le)
+			row.add_child(W.action_button("Tìm", func(): market_q = le.text; market_page = 0; _market_refresh()))
+			var sort_btn := W.action_button("Giá ↑" if market_sort == "price_asc" else ("Giá ↓" if market_sort == "price_desc" else "Mới"), func():
+				market_sort = "price_desc" if market_sort == "price_asc" else ("new" if market_sort == "price_desc" else "price_asc")
+				market_page = 0; _market_refresh(); refresh())
+			row.add_child(sort_btn)
+			vb.add_child(row)
+			var br: Dictionary = Social.browse
+			var list: Array = br.get("list", [])
+			if list.is_empty(): vb.add_child(_empty("Chưa có món nào đang bán.\nChợ chỉ mở khi bạn đứng trong làng.", "shop"))
+			for l in list:
+				if typeof(l) == TYPE_DICTIONARY: vb.add_child(_listing_row(l, false))
+			var per: int = maxi(1, int(br.get("per", 20)))
+			var pages: int = maxi(1, int(ceil(float(int(br.get("total", 0))) / float(per))))
+			var pg := HBoxContainer.new()
+			pg.add_theme_constant_override("separation", 8)
+			var prev := W.action_button("‹", func(): market_page = maxi(0, market_page - 1); _market_refresh(), market_page <= 0)
+			var nxt := W.action_button("›", func(): market_page += 1; _market_refresh(), market_page + 1 >= pages)
+			prev.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			nxt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			pg.add_child(prev)
+			var pl := T.label("Trang %d/%d" % [market_page + 1, pages], T.FS_S, T.C_MUTED)
+			pl.autowrap_mode = TextServer.AUTOWRAP_OFF
+			pg.add_child(pl)
+			pg.add_child(nxt)
+			vb.add_child(pg)
+		"sell":
+			vb.add_child(T.label("Chạm một món trong túi rồi đặt giá. Thuế 5% khi bán được, tin tồn tại 48 giờ.", T.FS_S, T.C_MUTED))
+			var g := _grid(7)
+			for e in p().get("bag", []):
+				if typeof(e) != TYPE_DICTIONARY: continue
+				var d: Dictionary = Data.item(str(e.get("id", "")))
+				if str(d.get("kind", "")) == "quest": continue
+				var uid := str(e.get("uid", ""))
+				g.add_child(W.item_cell(str(e.get("id", "")), int(e.get("n", e.get("qty", 1))), market_sel_uid == uid, func(): market_sel_uid = uid; refresh()))
+			vb.add_child(g)
+			if market_sel_uid != "":
+				var e2 := _bag_entry(market_sel_uid)
+				if not e2.is_empty():
+					var inner := _vb(6)
+					inner.add_child(T.label("Đăng bán: " + W.item_name(str(e2.get("id", ""))), T.FS_M, T.C_GOLD, true))
+					var pr := HBoxContainer.new()
+					pr.add_theme_constant_override("separation", 8)
+					var price_le := LineEdit.new()
+					price_le.placeholder_text = "Giá (xu)"
+					price_le.custom_minimum_size = Vector2(0, 40)
+					price_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+					price_le.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+					pr.add_child(price_le)
+					var qty_all: int = int(e2.get("n", e2.get("qty", 1)))
+					pr.add_child(W.action_button("Đăng bán", func():
+						var pv := int(price_le.text.to_int())
+						if pv < 1: host.toast("Nhập giá hợp lệ", "warn"); return
+						Net.action("market_list", {"uid": int(market_sel_uid), "qty": qty_all, "price": pv})
+						market_sel_uid = ""; refresh()))
+					inner.add_child(pr)
+					if qty_all > 1: inner.add_child(T.label("Sẽ đăng cả %d món." % qty_all, T.FS_S, T.C_MUTED))
+					vb.add_child(W.card_row(inner))
+		_:
+			var ml: Array = Social.mine.get("list", [])
+			if ml.is_empty(): vb.add_child(_empty("Bạn chưa đăng bán món nào.", "shop"))
+			for l2 in ml:
+				if typeof(l2) == TYPE_DICTIONARY: vb.add_child(_listing_row(l2, true))
+
+func _trade_side(s: Dictionary, title: String, mine: bool) -> Control:
+	var inner := _vb(6)
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var ttl := T.label(title + ("  [đã khoá]" if bool(s.get("locked", false)) else ""), T.FS_M, T.C_GREEN if bool(s.get("locked", false)) else T.C_GOLD, true)
+	ttl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	ttl.clip_text = true
+	inner.add_child(ttl)
+	var g := _grid(4)
+	var items: Array = s.get("items", [])
+	for e in items:
+		if typeof(e) != TYPE_DICTIONARY: continue
+		var uid: int = int(e.get("uid", 0))
+		g.add_child(W.item_cell(str(e.get("id", "")), int(e.get("qty", 1)), false, func(): if mine: _trade_unset(uid), ("+%d" % int(e.get("plus", 0))) if int(e.get("plus", 0)) > 0 else ""))
+	if items.is_empty(): inner.add_child(T.label("Chưa đặt gì", T.FS_S, T.C_MUTED))
+	inner.add_child(g)
+	if mine:
+		var gr := HBoxContainer.new()
+		gr.add_theme_constant_override("separation", 6)
+		var xl := T.label("Xu", T.FS_S, T.C_MUTED)
+		xl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		gr.add_child(xl)
+		var le := LineEdit.new()
+		le.text = str(int(s.get("gold", 0)))
+		le.custom_minimum_size = Vector2(0, 38)
+		le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		le.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+		le.text_submitted.connect(func(t): _trade_push(_trade_items(), maxi(0, t.to_int())))
+		le.focus_exited.connect(func(): if le.text.to_int() != int(s.get("gold", 0)): _trade_push(_trade_items(), maxi(0, le.text.to_int())))
+		gr.add_child(le)
+		inner.add_child(gr)
+	else:
+		inner.add_child(T.label("Xu: %s" % W.fmt_num(int(s.get("gold", 0))), T.FS_S, T.C_GOLD))
+	var card := W.card_row(inner)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.custom_minimum_size = Vector2(230, 0)
+	return card
+
+func _trade_items() -> Array:
+	var out: Array = []
+	for e in (Social.trade.get("me", {}) as Dictionary).get("items", []):
+		if typeof(e) == TYPE_DICTIONARY: out.append({"uid": int(e.get("uid", 0)), "qty": int(e.get("qty", 1))})
+	return out
+
+func _trade_push(items: Array, gold: int) -> void:
+	Socket.send_trade("set", {"items": items, "gold": gold})
+
+func _trade_unset(uid: int) -> void:
+	var items := _trade_items().filter(func(i): return int(i["uid"]) != uid)
+	_trade_push(items, int((Social.trade.get("me", {}) as Dictionary).get("gold", 0)))
+
+func build_trade() -> Control:
+	var vb := _vb(8)
+	if not Social.in_trade():
+		vb.add_child(_empty("Không có giao dịch nào đang mở.", "bag"))
+		return vb
+	var me: Dictionary = Social.trade.get("me", {})
+	var them: Dictionary = Social.trade.get("them", {})
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 8)
+	cols.add_child(_trade_side(me, "Bạn đưa", true))
+	cols.add_child(_trade_side(them, "%s đưa" % str(them.get("name", "?")), false))
+	vb.add_child(cols)
+	var locked := bool(me.get("locked", false))
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	var lk := W.action_button("Bỏ khoá" if locked else "Khoá", func(): Socket.send_trade("lock", {"on": not locked}))
+	lk.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(lk)
+	var cn := W.action_button("Huỷ giao dịch", func(): Socket.send_trade("cancel"))
+	cn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(cn)
+	vb.add_child(hb)
+	vb.add_child(T.label("Mọi thay đổi bỏ khoá cả hai bên. Khi cả hai cùng khoá, giao dịch được thực hiện.", T.FS_S, T.C_MUTED))
+	vb.add_child(W.section_label("Túi của bạn (chạm để đặt vào, tối đa 8 món)"))
+	var offered := {}
+	for i in _trade_items(): offered[int(i["uid"])] = true
+	var g := _grid(8)
+	for e in p().get("bag", []):
+		if typeof(e) != TYPE_DICTIONARY: continue
+		var d: Dictionary = Data.item(str(e.get("id", "")))
+		var uid: int = int(e.get("uid", 0))
+		if offered.has(uid) or str(d.get("kind", "")) == "quest": continue
+		var qty: int = int(e.get("n", e.get("qty", 1)))
+		g.add_child(W.item_cell(str(e.get("id", "")), qty, false, func():
+			var items := _trade_items()
+			if items.size() >= 8: host.toast("Tối đa 8 món", "warn"); return
+			items.append({"uid": uid, "qty": qty})
+			_trade_push(items, int(me.get("gold", 0)))))
+	vb.add_child(g)
 	return vb
 
 # ============================================================ DISPATCH

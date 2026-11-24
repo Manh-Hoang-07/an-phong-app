@@ -3,6 +3,8 @@ extends RefCounted
 ## Không chứa luật chơi — mọi action đều gọi Net.action() ở GamePanels.
 
 const T := preload("res://src/ui/UITheme.gd")
+const TouchScroll := preload("res://src/ui/TouchScroll.gd")
+const GlyphArt := preload("res://src/ui/GlyphArt.gd")
 
 static func clear(node: Node) -> void:
 	for c in node.get_children():
@@ -28,7 +30,7 @@ static func skill_name(sid: String) -> String:
 
 static func skill_icon(sid: String) -> String:
 	var d: Dictionary = Data.skill(sid)
-	return str(d.get("icon", "✦"))
+	return GlyphArt.skill_token(sid, str(d.get("icon", "@star")))
 
 static func school_name(sid: String) -> String:
 	var d: Dictionary = Data.school(sid)
@@ -36,7 +38,7 @@ static func school_name(sid: String) -> String:
 
 static func school_icon(sid: String) -> String:
 	var d: Dictionary = Data.school(sid)
-	return str(d.get("icon", "◆"))
+	return str(d.get("icon", "@orb"))
 
 static func map_name(mid: String) -> String:
 	var d: Dictionary = Data.map_def(mid)
@@ -55,30 +57,71 @@ static func fmt_num(n: int) -> String:
 	if n >= 10000: return "%.1fK" % (float(n) / 1000.0)
 	return str(n)
 
+## Số tiền viết đủ (không rút gọn), có dấu chấm ngăn cách hàng nghìn.
+static func full_num(n: int) -> String:
+	var s := str(absi(n))
+	var out := ""
+	for i in range(s.length()):
+		if i > 0 and (s.length() - i) % 3 == 0: out += "."
+		out += s.substr(i, 1)
+	return ("-" if n < 0 else "") + out
+
 static func bar(label_text: String, value: int, maximum: int, color: Color) -> VBoxContainer:
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 5)
+	vb.add_theme_constant_override("separation", 2)
 	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Nhãn và giá trị chung một dòng: "HP  420 / 520" (không tách 2 dòng).
 	var head := HBoxContainer.new()
-	var l := T.label(label_text, T.FS_S, T.C_MUTED)
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_theme_constant_override("separation", 6)
+	var l := T.label(label_text, T.FS_S, T.C_MUTED, true)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.custom_minimum_size = Vector2(34, 0)
 	head.add_child(l)
 	var v := T.label("%d / %d" % [value, maximum], T.FS_S, color, true)
+	v.autowrap_mode = TextServer.AUTOWRAP_OFF
 	v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	v.custom_minimum_size = Vector2(80, 0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(v)
 	vb.add_child(head)
+	vb.add_child(_flat_bar(value, maximum, color, 10))
+	return vb
+
+## Thanh phẳng bo tròn (StyleBoxFlat) — không bị méo khi phần đầy rất ngắn như thanh có khung 9-slice.
+static func _flat_bar(value: int, maximum: int, color: Color, h: float) -> ProgressBar:
 	var pb := ProgressBar.new()
 	pb.min_value = 0
 	pb.max_value = maxi(1, maximum)
 	pb.value = clampi(value, 0, maxi(1, maximum))
-	pb.custom_minimum_size = Vector2(0, 18)
+	pb.custom_minimum_size = Vector2(0, h)
 	pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	pb.show_percentage = false
-	pb.add_theme_stylebox_override("fill", T.UISkin.bar_fill(color))
-	pb.add_theme_stylebox_override("background", T.UISkin.bar_frame())
-	vb.add_child(pb)
-	return vb
+	var r := int(h * 0.5)
+	pb.add_theme_stylebox_override("background", T.sb(Color(0.02, 0.035, 0.07, 0.96), Color(0.34, 0.42, 0.58, 0.75), 1, r, 0))
+	pb.add_theme_stylebox_override("fill", T.sb(color, Color(0, 0, 0, 0), 0, r, 0))
+	return pb
+
+## Thanh một dòng: nhãn | thanh có số "giá trị / tối đa" nằm giữa thanh.
+static func bar_inline(label_text: String, value: int, maximum: int, color: Color) -> HBoxContainer:
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	var l := T.label(label_text, T.FS_S, T.C_MUTED, true)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.custom_minimum_size = Vector2(36, 0)
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(l)
+	var pb := _flat_bar(value, maximum, color.darkened(0.12), 16)
+	pb.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	pb.custom_minimum_size = Vector2(170, 16)
+	var t := T.hud_label("%d / %d" % [value, maximum], 11, Color.WHITE, true)
+	t.set_anchors_preset(Control.PRESET_FULL_RECT)
+	t.autowrap_mode = TextServer.AUTOWRAP_OFF
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pb.add_child(t)
+	h.add_child(pb)
+	return h
 
 static func card(title: String, subtitle: String = "", color: Color = T.C_BORDER) -> PanelContainer:
 	var p := PanelContainer.new()
@@ -272,7 +315,7 @@ static func char_body(school_id: String, size: Vector2 = Vector2(150, 200)) -> T
 	var tex := load(path) as Texture2D
 	if tex == null: return tr
 	var fw := float(def[0]); var fh := float(def[1]); var cx := float(def[2]); var fy := float(def[3])
-	var h := minf(fy + 6.0, 170.0)
+	var h := minf(fy + 6.0, fh)
 	var w := minf(h * size.x / size.y, fw)
 	var at := AtlasTexture.new()
 	at.atlas = tex
@@ -328,7 +371,7 @@ static func shop_row(iid: String, subtitle: String, price_text: String, selected
 static func chip(text: String, color: Color = T.C_BORDER) -> PanelContainer:
 	var p := PanelContainer.new()
 	var sb: StyleBoxTexture = T.UISkin.pill()
-	sb.content_margin_left = 12; sb.content_margin_right = 12; sb.content_margin_top = 3; sb.content_margin_bottom = 3
+	sb.content_margin_left = 12; sb.content_margin_right = 12; sb.content_margin_top = 4; sb.content_margin_bottom = 4
 	sb.modulate_color = Color(1, 1, 1, 1)
 	p.add_theme_stylebox_override("panel", sb)
 	var l := T.label(text, T.FS_S, color, true)
@@ -338,7 +381,8 @@ static func chip(text: String, color: Color = T.C_BORDER) -> PanelContainer:
 
 # ============================================================ Thành phần giao diện đợt 2
 const STAT_NAMES := {"atk": "Tấn công", "def": "Phòng thủ", "hp": "Máu", "mp": "Năng lượng", "crit": "Chí mạng",
-	"speed": "Tốc độ", "sta": "Thể lực", "skill": "Sức mạnh kỹ năng", "lifesteal": "Hút máu"}
+	"speed": "Tốc độ", "sta": "Thể lực", "skill": "Sức mạnh kỹ năng", "lifesteal": "Hút máu",
+	"cdr": "Hồi chiêu", "goldfind": "Xu rơi", "expfind": "Kinh nghiệm", "boss": "Sát thương trùm", "staRegen": "Hồi thể lực"}
 const QUALITY_NAMES := ["Thường", "Thường", "Tốt", "Hiếm", "Huyền thoại", "Thần thoại"]
 
 static func chip_row(items: Array) -> HBoxContainer:
@@ -357,14 +401,14 @@ static func split(left: Control, right: Control, right_w: float = 224.0) -> HBox
 	h.add_theme_constant_override("separation", 10)
 	h.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var ls := ScrollContainer.new()
+	var ls := TouchScroll.new()
 	ls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ls.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	ls.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ls.add_child(left)
 	h.add_child(ls)
-	var rs := ScrollContainer.new()
+	var rs := TouchScroll.new()
 	rs.custom_minimum_size = Vector2(right_w, 0)
 	rs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	rs.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -419,20 +463,21 @@ static func segmented(opts: Array, current: String, cb: Callable) -> HBoxContain
 		h.add_child(b)
 	return h
 
-static func section_label(text: String) -> Label:
-	var l := T.label(text, T.FS_M, T.C_GOLD, true)
-	return l
+static func section_label(text: String) -> HBoxContainer:
+	return T.heading(text, T.C_GOLD)
 
 ## Ô thông số (nhãn nhỏ + giá trị lớn) dùng trong panel Nhân vật.
 static func stat_tile(label_text: String, value: String, color: Color = T.C_TEXT) -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", T.UISkin.card(8))
+	p.add_theme_stylebox_override("panel", T.UISkin.card(9))
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 0)
+	vb.add_theme_constant_override("separation", 2)
 	p.add_child(vb)
-	vb.add_child(T.label(label_text, T.FS_S, T.C_MUTED))
-	vb.add_child(T.label(value, T.FS_L, color, true))
+	var cap := T.overline(label_text, T.C_FAINT)
+	vb.add_child(cap)
+	var val := T.label(value, T.FS_XL, color, true)
+	vb.add_child(val)
 	return p
 
 ## Dòng chỉ số của vật phẩm: "+13 Tấn công".
@@ -442,7 +487,7 @@ static func item_stat_lines(d: Dictionary) -> Array:
 	for k in st.keys():
 		var v := float(st[k])
 		var shown := ("%d" % int(v)) if is_equal_approx(v, roundf(v)) else ("%.1f" % v)
-		var unit := "%" if str(k) == "crit" else ""
+		var unit := "%" if str(k) in ["crit", "cdr", "goldfind", "expfind", "boss", "lifesteal", "skill", "staRegen"] else ""
 		out.append("+%s%s %s" % [shown, unit, str(STAT_NAMES.get(k, k))])
 	if d.has("hp") and str(d.get("kind", "")) == "potion": out.append("Hồi %d máu" % int(d["hp"]))
 	if d.has("mp") and str(d.get("kind", "")) == "potion": out.append("Hồi %d MP" % int(d["mp"]))
@@ -535,6 +580,7 @@ static func list_row(icon_node: Control, title: String, subtitle: String = "", t
 
 static func card_row(inner: Control) -> PanelContainer:
 	var p := PanelContainer.new()
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	p.add_theme_stylebox_override("panel", T.UISkin.card(8))
 	p.add_child(inner)
 	return p
@@ -586,10 +632,8 @@ static func glyph_row(glyph: String, title: String, subtitle: String, right_text
 	h.offset_left = 10; h.offset_right = -10
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_theme_constant_override("separation", 10)
-	var g := T.label(glyph, 26, T.C_TEXT)
-	g.autowrap_mode = TextServer.AUTOWRAP_OFF
-	g.custom_minimum_size = Vector2(34, 0)
-	g.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var g := GlyphArt.make(glyph, 40.0, T.C_TEXT, false, true)
+	g.custom_minimum_size = Vector2(40, 40)
 	g.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(g)
@@ -628,11 +672,9 @@ static func skill_cell(glyph: String, num: int, selected: bool, cb: Callable) ->
 	b.add_theme_stylebox_override("normal", sel if selected else normal)
 	b.add_theme_stylebox_override("hover", sel)
 	b.add_theme_stylebox_override("pressed", sel)
-	var g := T.label(glyph if not glyph.is_empty() else "·", 26, T.C_TEXT if not glyph.is_empty() else T.C_MUTED)
-	g.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var g := GlyphArt.make(glyph if not glyph.is_empty() else ".", 30.0, T.C_TEXT if not glyph.is_empty() else T.C_MUTED)
 	g.set_anchors_preset(Control.PRESET_FULL_RECT)
-	g.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	g.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	g.offset_left = 8; g.offset_top = 8; g.offset_right = -8; g.offset_bottom = -8
 	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(g)
 	var n := T.hud_label(str(num), 11, T.C_GOLD, true)

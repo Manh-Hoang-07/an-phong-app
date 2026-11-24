@@ -1,17 +1,26 @@
 extends RefCounted
 ## "Skin" game: khung / nút / ô đồ / ribbon / thanh máu vẽ procedural bằng code (không cần file ảnh).
-## Mỗi kiểu là một ảnh nhỏ có viền vàng nổi khối, nền gradient, khử răng cưa; dùng như StyleBoxTexture 9-slice.
+## Mỗi kiểu là một ảnh nhỏ có viền đồng nổi khối, nền slate-gradient sâu, khử răng cưa; dùng như StyleBoxTexture 9-slice.
 ## Control dùng skin nên đặt texture_filter = LINEAR (HUD/Login/Boot đã đặt ở root).
+## Hướng nghệ thuật: dark slate + warm brass — viền đồng đa lớp, rãnh tối, rim-light phía trên.
 
 static var _cache: Dictionary = {}
 
 # ------------------------------------------------------------------ Bảng màu skin
-const GOLD_HI := Color(0.98, 0.84, 0.46)
-const GOLD_MID := Color(0.78, 0.58, 0.20)
-const GOLD_LO := Color(0.42, 0.28, 0.07)
-const INK := Color(0.02, 0.03, 0.06)
+const GOLD_HI   := Color(1.00, 0.88, 0.56)   # đồng sáng (đỉnh bevel)
+const GOLD_MID  := Color(0.82, 0.62, 0.24)   # đồng giữa
+const GOLD_LO   := Color(0.45, 0.30, 0.09)   # đồng tối (đáy bevel)
+const BRASS_HI  := Color(0.72, 0.55, 0.28)
+const BRASS_LO  := Color(0.24, 0.16, 0.06)
+const INK       := Color(0.02, 0.03, 0.06)
+const SLATE_TOP := Color(0.10, 0.14, 0.23, 1)
+const SLATE_BOT := Color(0.035, 0.052, 0.10, 1)
 
-const QUALITY := [Color(0.45, 0.52, 0.66), Color(0.55, 0.62, 0.76), Color(0.36, 0.82, 0.50), Color(0.36, 0.64, 1.0), Color(0.80, 0.52, 1.0), Color(1.0, 0.70, 0.22)]
+# Độ hiếm: bạc → xanh lá → xanh dương → tím → cam huyền thoại.
+const QUALITY := [
+	Color(0.56, 0.61, 0.69), Color(0.62, 0.74, 0.55), Color(0.30, 0.85, 0.52),
+	Color(0.30, 0.62, 1.00), Color(0.72, 0.42, 1.00), Color(1.00, 0.66, 0.20),
+]
 
 # ------------------------------------------------------------------ Lõi vẽ
 ## Khoảng cách có dấu tới hình chữ nhật bo góc (âm = bên trong).
@@ -66,55 +75,59 @@ static func _paint(w: int, h: int, r: float, layers: Array, studs: Color = Color
 	return img
 
 static func _box(key: String, w: int, h: int, r: float, layers: Array, margin: int, content: int = 8, studs: Color = Color(0, 0, 0, 0), gloss: float = 0.0) -> StyleBoxTexture:
-	if _cache.has(key): return (_cache[key] as StyleBoxTexture).duplicate() as StyleBoxTexture
+	var ck := "%s|%d" % [key, content]   # content_margin khác nhau thì không dùng chung bản cache
+	if _cache.has(ck): return (_cache[ck] as StyleBoxTexture).duplicate() as StyleBoxTexture
 	var sb := StyleBoxTexture.new()
 	sb.texture = ImageTexture.create_from_image(_paint(w, h, r, layers, studs, gloss))
 	sb.texture_margin_left = margin; sb.texture_margin_right = margin
 	sb.texture_margin_top = margin; sb.texture_margin_bottom = margin
 	sb.content_margin_left = content; sb.content_margin_right = content
 	sb.content_margin_top = content; sb.content_margin_bottom = content
-	_cache[key] = sb
+	_cache[ck] = sb
 	return sb.duplicate() as StyleBoxTexture
 
 # ------------------------------------------------------------------ Khung lớn
-## Khung panel: viền vàng nổi khối, nền xanh đêm gradient, đinh tán ở 4 góc.
+## Khung panel: viền đồng nổi khối nhiều tầng, rãnh tối, nền slate gradient, đinh tán 4 góc, rim-light.
 static func panel(content: int = 12) -> StyleBoxTexture:
 	var L := [
-		[0.0, 1.2, Color(0.01, 0.01, 0.03, 1), Color(0.01, 0.01, 0.03, 1)],
-		[1.2, 2.2, GOLD_HI, GOLD_LO],
-		[3.4, 1.0, Color(0.10, 0.07, 0.02, 1), Color(0.10, 0.07, 0.02, 1)],
-		[4.4, -1.0, Color(0.105, 0.145, 0.25, 1), Color(0.035, 0.05, 0.10, 1)],
-		[4.4, 1.0, Color(1, 1, 1, 0.20), Color(1, 1, 1, 0.02)],
+		[0.0, 1.6, Color(0.0, 0.0, 0.01, 1), Color(0.0, 0.0, 0.01, 1)],
+		[1.6, 0.9, BRASS_LO, Color(0.10, 0.07, 0.02, 1)],
+		[2.5, 2.2, GOLD_HI, GOLD_MID],
+		[4.7, 0.9, Color(0.95, 0.80, 0.45, 1), Color(0.35, 0.24, 0.08, 1)],
+		[5.6, 1.3, INK, INK],
+		[6.9, -1.0, SLATE_TOP, SLATE_BOT],
+		[6.9, 1.6, Color(1, 1, 1, 0.18), Color(1, 1, 1, 0.0)],
 	]
-	return _box("panel", 56, 56, 15.0, L, 20, content)
+	return _box("panel", 56, 56, 15.0, L, 20, content, Color(0.55, 0.42, 0.20, 0.9))
 
-## Thẻ con bên trong panel: nền tối hơn, viền mảnh.
+## Thẻ con bên trong panel: nền slate tối hơn, viền xanh thép mảnh, rim-light nhẹ.
 static func card(content: int = 8) -> StyleBoxTexture:
 	var L := [
-		[0.0, 1.0, Color(0.30, 0.38, 0.55, 0.65), Color(0.20, 0.26, 0.40, 0.65)],
-		[1.0, -1.0, Color(0.10, 0.14, 0.23, 0.96), Color(0.06, 0.085, 0.15, 0.96)],
-		[1.0, 1.0, Color(1, 1, 1, 0.07), Color(1, 1, 1, 0.0)],
+		[0.0, 1.0, Color(0.46, 0.56, 0.74, 0.60), Color(0.26, 0.33, 0.50, 0.60)],
+		[1.0, -1.0, Color(0.11, 0.15, 0.24, 0.97), Color(0.06, 0.09, 0.16, 0.97)],
+		[1.0, 1.2, Color(1, 1, 1, 0.11), Color(1, 1, 1, 0.0)],
 	]
 	return _box("card", 36, 36, 10.0, L, 12, content)
 
 ## Khung "lõm" tối (nền danh sách, khung chi tiết).
 static func inset(content: int = 8) -> StyleBoxTexture:
 	var L := [
-		[0.0, 1.0, Color(0.0, 0.0, 0.0, 0.8), Color(0.0, 0.0, 0.0, 0.8)],
-		[1.0, -1.0, Color(0.02, 0.03, 0.06, 0.92), Color(0.05, 0.07, 0.12, 0.92)],
-		[1.0, 1.0, Color(0.30, 0.38, 0.55, 0.30), Color(0.30, 0.38, 0.55, 0.10)],
+		[0.0, 1.2, Color(0.0, 0.0, 0.0, 0.9), Color(0.0, 0.0, 0.0, 0.9)],
+		[1.2, -1.0, Color(0.025, 0.04, 0.075, 0.95), Color(0.05, 0.07, 0.13, 0.95)],
+		[1.2, 1.0, Color(0.36, 0.46, 0.64, 0.30), Color(0.36, 0.46, 0.64, 0.06)],
 	]
 	return _box("inset", 36, 36, 10.0, L, 12, content)
 
-## Thanh tiêu đề (ribbon) vàng đồng.
+## Thanh tiêu đề (ribbon) đồng đánh bóng — dùng cho header panel.
 static func ribbon() -> StyleBoxTexture:
 	var L := [
 		[0.0, 1.0, Color(0.02, 0.01, 0.0, 1), Color(0.02, 0.01, 0.0, 1)],
-		[1.0, 1.6, GOLD_HI, GOLD_MID],
-		[2.6, -1.0, Color(0.20, 0.13, 0.05, 1), Color(0.09, 0.06, 0.03, 1)],
-		[2.6, 1.0, Color(1, 0.85, 0.5, 0.30), Color(1, 0.85, 0.5, 0.0)],
+		[1.0, 1.8, GOLD_HI, GOLD_MID],
+		[2.8, 1.0, Color(0.55, 0.38, 0.12, 1), Color(0.28, 0.18, 0.05, 1)],
+		[3.8, -1.0, Color(0.26, 0.18, 0.06, 1), Color(0.10, 0.06, 0.02, 1)],
+		[3.8, 1.0, Color(1, 0.88, 0.55, 0.32), Color(1, 0.88, 0.55, 0.0)],
 	]
-	return _box("ribbon", 40, 32, 7.0, L, 12, 8, Color(0, 0, 0, 0), 0.5)
+	return _box("ribbon", 40, 32, 7.0, L, 12, 8, Color(0, 0, 0, 0), 0.6)
 
 # ------------------------------------------------------------------ Nút
 ## kind: "default" | "primary" | "danger" | "ghost"; state: "normal" | "hover" | "pressed" | "disabled"
@@ -123,16 +136,16 @@ static func button(kind: String = "default", state: String = "normal", content: 
 	var top: Color; var bot: Color; var edge: Color; var hi := Color(1, 1, 1, 0.30)
 	match kind:
 		"primary":
-			top = Color(1.0, 0.89, 0.55); bot = Color(0.86, 0.60, 0.16); edge = Color(0.36, 0.22, 0.03)
+			top = Color(1.0, 0.91, 0.62); bot = Color(0.88, 0.62, 0.18); edge = Color(0.38, 0.24, 0.04)
 		"danger":
-			top = Color(0.78, 0.30, 0.34); bot = Color(0.45, 0.12, 0.16); edge = Color(0.17, 0.03, 0.05)
+			top = Color(0.86, 0.36, 0.38); bot = Color(0.50, 0.14, 0.18); edge = Color(0.20, 0.04, 0.06)
 		"ghost":
-			top = Color(0.14, 0.19, 0.30, 0.85); bot = Color(0.08, 0.11, 0.19, 0.85); edge = Color(0.35, 0.45, 0.65, 0.7); hi = Color(1, 1, 1, 0.10)
+			top = Color(0.16, 0.22, 0.34, 0.9); bot = Color(0.09, 0.13, 0.22, 0.9); edge = Color(0.42, 0.52, 0.70, 0.75); hi = Color(1, 1, 1, 0.12)
 		_:
-			top = Color(0.27, 0.36, 0.56); bot = Color(0.13, 0.19, 0.33); edge = Color(0.03, 0.05, 0.10)
+			top = Color(0.30, 0.40, 0.60); bot = Color(0.14, 0.21, 0.36); edge = Color(0.04, 0.06, 0.12)
 	match state:
 		"hover":
-			top = top.lightened(0.12); bot = bot.lightened(0.10)
+			top = top.lightened(0.13); bot = bot.lightened(0.11)
 		"pressed":
 			var t := top; top = bot.darkened(0.08); bot = t.darkened(0.12); hi = Color(1, 1, 1, 0.0)
 			edge = GOLD_MID if kind != "primary" else Color(0.5, 0.3, 0.05)
@@ -141,6 +154,7 @@ static func button(kind: String = "default", state: String = "normal", content: 
 	var L := [
 		[0.0, 1.0, edge, edge],
 		[1.0, -1.0, top, bot],
+		[1.0, 2.5, Color(0, 0, 0, 0.0), Color(0, 0, 0, 0.22)],
 		[1.0, 1.0, hi, Color(hi, 0.0)],
 	]
 	return _box(key, 36, 36, 10.0, L, 12, content, Color(0, 0, 0, 0), 0.0 if state == "pressed" else 0.45)
@@ -148,38 +162,40 @@ static func button(kind: String = "default", state: String = "normal", content: 
 ## Nút tròn (menu, chat, đóng). size = đường kính.
 static func round_button(size: int, state: String = "normal", gold: bool = false) -> StyleBoxTexture:
 	var key := "rb_%d_%s_%s" % [size, state, str(gold)]
-	var top := Color(0.22, 0.30, 0.48, 0.95); var bot := Color(0.09, 0.13, 0.24, 0.95)
-	var rim := GOLD_HI if gold else Color(0.62, 0.72, 0.92)
-	var rim2 := GOLD_LO if gold else Color(0.25, 0.33, 0.52)
-	if state == "pressed": top = bot; bot = Color(0.25, 0.33, 0.52, 0.95); rim = GOLD_HI
-	if state == "hover": top = top.lightened(0.1)
+	var top := Color(0.24, 0.33, 0.52, 0.96); var bot := Color(0.09, 0.13, 0.25, 0.96)
+	var rim := GOLD_HI if gold else Color(0.68, 0.78, 0.95)
+	var rim2 := GOLD_LO if gold else Color(0.28, 0.37, 0.56)
+	if state == "pressed": top = bot; bot = Color(0.27, 0.36, 0.55, 0.96); rim = GOLD_HI
+	if state == "hover": top = top.lightened(0.11)
 	var L := [
 		[0.0, 1.0, Color(0.0, 0.0, 0.02, 0.95), Color(0.0, 0.0, 0.02, 0.95)],
 		[1.0, 1.8, rim, rim2],
 		[2.8, -1.0, top, bot],
-		[2.8, 1.0, Color(1, 1, 1, 0.22), Color(1, 1, 1, 0.0)],
+		[2.8, 1.0, Color(1, 1, 1, 0.24), Color(1, 1, 1, 0.0)],
 	]
 	var m := size / 2
 	return _box(key, size, size, float(size) * 0.5, L, m, 0, Color(0, 0, 0, 0), 0.4)
 
 # ------------------------------------------------------------------ Ô đồ
-## q: độ hiếm 0..5. selected: viền vàng. Nền lõm tối + viền màu theo độ hiếm.
+## q: độ hiếm 0..5. selected: viền vàng + inner glow. Nền lõm tối + viền màu theo độ hiếm.
 static func slot(q: int = 0, selected: bool = false, empty: bool = false) -> StyleBoxTexture:
 	var key := "slot_%d_%s_%s" % [q, str(selected), str(empty)]
 	var qc: Color = QUALITY[clampi(q, 0, 5)]
-	var edge: Color = GOLD_HI if selected else (Color(qc, 0.35) if empty else qc)
-	var bg_top := Color(0.02, 0.03, 0.06, 1) if not selected else Color(0.12, 0.16, 0.26, 1)
-	var bg_bot := Color(0.09, 0.12, 0.20, 1) if not selected else Color(0.20, 0.26, 0.40, 1)
+	var edge: Color = GOLD_HI if selected else (Color(qc, 0.4) if empty else qc)
+	var bg_top := Color(0.03, 0.04, 0.08, 1) if not selected else Color(0.14, 0.18, 0.29, 1)
+	var bg_bot := Color(0.10, 0.13, 0.22, 1) if not selected else Color(0.22, 0.28, 0.44, 1)
 	if empty:
 		bg_top = Color(0.03, 0.04, 0.07, 0.85); bg_bot = Color(0.06, 0.08, 0.13, 0.85)
 	var L := [
 		[0.0, 1.0, Color(0, 0, 0, 0.95), Color(0, 0, 0, 0.95)],
-		[1.0, 1.8 if selected else 1.4, edge, Color(edge, 0.55)],
+		[1.0, 1.8 if selected else 1.4, edge, Color(edge, 0.5)],
 		[2.4, -1.0, bg_top, bg_bot],
-		[2.4, 2.0, Color(0, 0, 0, 0.55), Color(0, 0, 0, 0.0)],
+		[2.4, 2.0, Color(0, 0, 0, 0.5), Color(0, 0, 0, 0.0)],
 	]
 	if q >= 3 and not empty:
-		L.append([2.4, 6.0, Color(qc, 0.0), Color(qc, 0.22)])
+		L.append([2.4, 7.0, Color(qc, 0.0), Color(qc, 0.28)])
+	if selected:
+		L.append([2.4, 5.0, Color(GOLD_HI, 0.22), Color(GOLD_HI, 0.0)])
 	return _box(key, 40, 40, 8.0, L, 12, 0)
 
 ## Ô kỹ năng/tròn dùng cho emoji: dùng round_button thay thế.
@@ -188,16 +204,16 @@ static func slot(q: int = 0, selected: bool = false, empty: bool = false) -> Sty
 static func bar_frame(content: int = 0) -> StyleBoxTexture:
 	var L := [
 		[0.0, 1.0, Color(0, 0, 0, 0.95), Color(0, 0, 0, 0.95)],
-		[1.0, 1.5, Color(0.88, 0.70, 0.30), Color(0.40, 0.28, 0.08)],
-		[2.5, -1.0, Color(0.01, 0.015, 0.03, 0.95), Color(0.05, 0.07, 0.12, 0.95)],
+		[1.0, 1.6, Color(0.90, 0.74, 0.34), Color(0.42, 0.30, 0.10)],
+		[2.6, -1.0, Color(0.01, 0.02, 0.04, 0.96), Color(0.05, 0.07, 0.13, 0.96)],
 	]
 	return _box("bar_frame", 24, 18, 9.0, L, 9, content)
 
 static func bar_fill(color: Color) -> StyleBoxTexture:
 	var key := "bar_fill_" + color.to_html()
 	var L := [
-		[0.0, -1.0, color.lightened(0.28), color.darkened(0.30)],
-		[0.0, 1.0, Color(1, 1, 1, 0.35), Color(1, 1, 1, 0.0)],
+		[0.0, -1.0, color.lightened(0.30), color.darkened(0.32)],
+		[0.0, 1.0, Color(1, 1, 1, 0.38), Color(1, 1, 1, 0.0)],
 	]
 	return _box(key, 24, 14, 7.0, L, 7, 0, Color(0, 0, 0, 0), 0.5)
 
@@ -208,31 +224,31 @@ static func tab(active: bool) -> StyleBoxTexture:
 	if active:
 		L = [
 			[0.0, 1.0, Color(0, 0, 0, 0.9), Color(0, 0, 0, 0.9)],
-			[1.0, 1.6, GOLD_HI, GOLD_MID],
-			[2.6, -1.0, Color(0.20, 0.27, 0.42, 1), Color(0.11, 0.16, 0.28, 1)],
-			[2.6, 1.0, Color(1, 1, 1, 0.20), Color(1, 1, 1, 0)],
+			[1.0, 1.8, GOLD_HI, GOLD_MID],
+			[2.8, -1.0, Color(0.22, 0.30, 0.46, 1), Color(0.12, 0.17, 0.29, 1)],
+			[2.8, 1.2, Color(1, 1, 1, 0.22), Color(1, 1, 1, 0)],
 		]
 	else:
 		L = [
-			[0.0, 1.0, Color(0.30, 0.38, 0.55, 0.45), Color(0.20, 0.26, 0.40, 0.45)],
-			[1.0, -1.0, Color(0.08, 0.11, 0.19, 0.9), Color(0.05, 0.07, 0.13, 0.9)],
+			[0.0, 1.0, Color(0.38, 0.47, 0.62, 0.5), Color(0.24, 0.30, 0.44, 0.5)],
+			[1.0, -1.0, Color(0.09, 0.12, 0.20, 0.92), Color(0.05, 0.07, 0.13, 0.92)],
 		]
 	return _box(key, 32, 32, 9.0, L, 11, 6, Color(0, 0, 0, 0), 0.4 if active else 0.0)
 
 ## Viên thuốc HUD (nhiệm vụ, tên map): nền tối mờ, viền vàng mảnh.
 static func pill() -> StyleBoxTexture:
 	var L := [
-		[0.0, 1.0, Color(GOLD_MID, 0.85), Color(GOLD_LO, 0.85)],
-		[1.0, -1.0, Color(0.05, 0.08, 0.15, 0.80), Color(0.03, 0.045, 0.09, 0.80)],
-		[1.0, 1.0, Color(1, 1, 1, 0.10), Color(1, 1, 1, 0.0)],
+		[0.0, 1.0, Color(GOLD_MID, 0.9), Color(GOLD_LO, 0.9)],
+		[1.0, -1.0, Color(0.05, 0.08, 0.15, 0.82), Color(0.03, 0.045, 0.09, 0.82)],
+		[1.0, 1.0, Color(1, 1, 1, 0.12), Color(1, 1, 1, 0.0)],
 	]
 	return _box("pill", 36, 36, 17.0, L, 17, 8)
 
 ## Khung thông tin trạng thái (HP/MP/thể lực) góc trái-trên: nền tối mờ, viền vàng mảnh, góc bo vừa.
 static func plate(content: int = 6) -> StyleBoxTexture:
 	var L := [
-		[0.0, 1.0, Color(GOLD_MID, 0.9), Color(GOLD_LO, 0.9)],
-		[1.0, -1.0, Color(0.06, 0.09, 0.16, 0.78), Color(0.03, 0.045, 0.09, 0.78)],
-		[1.0, 1.0, Color(1, 1, 1, 0.10), Color(1, 1, 1, 0.0)],
+		[0.0, 1.0, Color(GOLD_MID, 0.92), Color(GOLD_LO, 0.92)],
+		[1.0, -1.0, Color(0.06, 0.09, 0.16, 0.80), Color(0.03, 0.045, 0.09, 0.80)],
+		[1.0, 1.0, Color(1, 1, 1, 0.12), Color(1, 1, 1, 0.0)],
 	]
 	return _box("plate", 36, 36, 12.0, L, 13, content)

@@ -7,6 +7,7 @@ signal open_panel_requested(tab: String, extra: Dictionary)
 signal confirm_requested(title: String, body: String, ok_text: String, cb: Callable)
 
 const T := preload("res://src/ui/UITheme.gd")
+const TouchScroll := preload("res://src/ui/TouchScroll.gd")
 const MapEntities := preload("res://src/world/MapEntities.gd")
 
 const ROLE_NAMES := {"quest": "Nhiệm vụ", "shop": "Cửa hàng", "smith": "Thợ rèn", "storage": "Thủ kho", "teleport": "Dịch chuyển",
@@ -76,7 +77,7 @@ func _ready() -> void:
 	_role_chip = T.label("", T.FS_S, T.C_MUTED)
 	_role_chip.autowrap_mode = TextServer.AUTOWRAP_OFF
 	ph.add_child(_role_chip)
-	var scroll := ScrollContainer.new()
+	var scroll := TouchScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	mid.add_child(scroll)
@@ -103,7 +104,7 @@ func _ready() -> void:
 	var close := T.icon_button("close", 30)
 	close.pressed.connect(close_dialog)
 	top.add_child(close)
-	var os := ScrollContainer.new()
+	var os := TouchScroll.new()
 	os.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	os.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	right.add_child(os)
@@ -181,7 +182,7 @@ func _opt(text: String, icon_name: String, primary: bool, cb: Callable, disabled
 		b.add_theme_constant_override("h_separation", 8)
 		b.add_theme_color_override("icon_normal_color", Color(0.16, 0.09, 0.01) if primary else T.C_GOLD)
 		b.add_theme_color_override("icon_hover_color", Color(0.16, 0.09, 0.01) if primary else T.C_GOLD)
-	b.pressed.connect(cb)
+	if cb.is_valid(): b.pressed.connect(cb)
 	b.disabled = disabled
 	_opts.add_child(b)
 
@@ -190,35 +191,78 @@ func _rebuild_options() -> void:
 	var nd: Dictionary = Data.npc(npc_id)
 	var role := str(nd.get("role", ""))
 	var pl: Dictionary = Game.player
-	var q: Dictionary = pl.get("quest", {}) if typeof(pl.get("quest", {})) == TYPE_DICTIONARY else {}
 	var id := npc_id
-	if role == "quest" and not q.is_empty():
+	var map_id := str(pl.get("map", ""))
+	if id == "npc_an":
+		_hidden_npc_options(pl)
+		_opt("Rời đi", "", false, close_dialog)
+		return
+	# ---- Nhiệm vụ chính: chỉ NPC giao nhiệm vụ hiện tại mới có lựa chọn (giống web)
+	var q: Dictionary = pl.get("quest", {}) if typeof(pl.get("quest", {})) == TYPE_DICTIONARY else {}
+	var cur: Dictionary = Data.quest_current(pl)
+	if not cur.is_empty() and str(cur.get("npc", "")) == id:
 		var state := str(q.get("state", "none"))
+		var qname := str(cur.get("name", "Nhiệm vụ"))
 		if state == "none":
-			_opt("Nhận nhiệm vụ", "quest", true, func(): Net.action("quest_accept", {}))
-		elif state == "done" or state == "active":
-			_opt("Trả nhiệm vụ", "quest", state == "done", func(): Net.action("quest_complete", {}))
-	var side: Dictionary = pl.get("side", {}) if typeof(pl.get("side", {})) == TYPE_DICTIONARY else {}
-	if role == "quest":
-		for sid in (side.get("active", {}) as Dictionary).keys():
-			var s := str(sid)
-			_opt("Trả phụ tuyến", "quest", false, func(): Net.action("side_complete", {"id": s}))
-	match role:
-		"daily": _opt("Bảng nhiệm vụ ngày", "quest", true, func(): _panel("daily"))
-		"storage": _opt("Mở kho", "storage", true, func(): _panel("storage"))
-		"smith": _opt("Lò rèn", "anvil", true, func(): _panel("smith"))
-		"teleport": _opt("Dịch chuyển", "portal", true, func(): _panel("teleport"))
-		"shop": _opt("Xem cửa hàng", "shop", true, func(): _panel("shop", {"npc": id}))
-		"market": _opt("Chợ người chơi", "social", true, func(): _panel("social"))
-		"mystic": _opt("Nhập mật mã", "quest", true, func(): _panel("code"))
+			var need := int(cur.get("minLevel", 0))
+			if int(pl.get("level", 1)) < need:
+				_opt("Nhiệm vụ: %s (cần cấp %d)" % [qname, need], "quest", false, Callable(), true)
+			else:
+				_opt("Nhiệm vụ: %s" % qname, "quest", true, func(): Net.action("quest_accept", {}))
+		elif Data.quest_ready(pl):
+			var gm := str(q.get("map", ""))
+			if gm != "" and gm != map_id and not Data.map_def(gm).is_empty():
+				_opt("Hãy quay về %s để trả nhiệm vụ" % str(Data.map_def(gm).get("name", gm)), "quest", false, Callable(), true)
+			elif typeof(cur.get("choices", null)) == TYPE_ARRAY:
+				for ch in cur["choices"]:
+					var cid := str((ch as Dictionary).get("id", ""))
+					_opt(str((ch as Dictionary).get("label", "...")), "chat", true, func(): Net.action("quest_complete", {"choice": cid}))
+			else:
+				_opt("Trả nhiệm vụ: %s" % qname, "quest", true, func(): Net.action("quest_complete", {}))
+		else:
+			_opt("Đang làm: %s" % qname, "quest", false, func(): _panel("quest"))
+	# ---- Hội trưởng Khải: class, hạng, tẩy điểm
 	if id == "lao_su":
+		if str(pl.get("school", "")).is_empty() and str(cur.get("id", "")) == "q6" and str(q.get("state", "")) == "active":
+			var lv5: bool = int(pl.get("level", 1)) >= 5
+			_opt("Thức tỉnh class%s" % ("" if lv5 else " (cần cấp 5)"), "char", lv5, func(): _panel("school"), not lv5)
 		_opt("Đánh giá hạng", "char", false, func(): Net.action("rank_eval", {}))
-		_opt("Tẩy điểm kỹ năng", "skills", false, func(): confirm_requested.emit("Tẩy điểm kỹ năng?", "Toàn bộ điểm kỹ năng sẽ được hoàn lại và kỹ năng đã học bị đặt lại.", "Tẩy điểm", func(): Net.action("reset_skills", {})))
-	if id == "npc_an": _hidden_npc_options(pl)
-	_opt("Trò chuyện", "chat", false, func(): Net.action("talk", {"npc": id}))
-	_opt("Đặt điểm hồi sinh ở đây", "gear", false, func():
-		Net.action("set_respawn", {"x": roundi(float(pl.get("x", 0))), "y": roundi(float(pl.get("y", 0)))}))
-	_opt("Rời đi", "", false, close_dialog)
+		if not str(pl.get("school", "")).is_empty() and not (pl.get("skills", {}) as Dictionary).is_empty():
+			var books := 0
+			for e in pl.get("bag", []):
+				if typeof(e) == TYPE_DICTIONARY and str(e.get("id", "")) == "sach_tay_ky_nang": books += int(e.get("n", e.get("qty", 1)))
+			if books > 0:
+				_opt("Tẩy điểm kỹ năng (1 Sách Tẩy + %d xu)" % (100 * int(pl.get("level", 1))), "skills", false, func(): confirm_requested.emit("Tẩy điểm kỹ năng?", "Toàn bộ điểm kỹ năng sẽ được hoàn lại và kỹ năng đã học bị đặt lại.", "Tẩy điểm", func(): Net.action("reset_skills", {})))
+			else:
+				_opt("Tẩy điểm kỹ năng — cần 1 Sách Tẩy (mua ở Lầu Trân Bảo bằng Linh Ngọc)", "skills", false, Callable(), true)
+	# ---- Phụ tuyến do NPC này giao
+	for sq in Data.SIDE_QUESTS:
+		if typeof(sq) != TYPE_DICTIONARY or str(sq.get("npc", "")) != id: continue
+		var sid := str(sq.get("id", ""))
+		if Data.side_done(pl, sid): continue
+		if Data.side_active(pl, sid):
+			if Data.side_ready(pl, sid): _opt("Trả phụ tuyến: %s" % str(sq.get("name", sid)), "quest", true, func(): Net.action("side_complete", {"id": sid}))
+			else: _opt("Phụ tuyến: %s (đang làm)" % str(sq.get("name", sid)), "quest", false, func(): _panel("quest"))
+		elif Data.side_available(pl, sq):
+			_opt("Nhận phụ tuyến: %s" % str(sq.get("name", sid)), "quest", false, func(): Net.action("side_accept", {"id": sid}))
+	# ---- Dịch vụ theo vai trò NPC
+	match role:
+		"daily": _opt("Xem nhiệm vụ hằng ngày", "quest", true, func(): _panel("daily"))
+		"mystic": _opt("Nói mật mã", "quest", false, func(): _panel("code"))
+		"market": _opt("Mở chợ người chơi", "social", true, func(): _panel("social", {"tab": "market"}))
+		"smith": _opt("Nâng cấp trang bị", "anvil", false, func(): _panel("smith"))
+		"storage": _opt("Gửi / lấy đồ", "storage", false, func(): _panel("storage"))
+		"zone": _opt("Chọn khu", "map", true, func(): _panel("social", {"tab": "khu"}))
+		"teleport":
+			_opt("Dịch chuyển giữa các Tân Đô", "portal", true, func(): _panel("teleport"))
+			if Data.is_village(Data.map_def(map_id)):
+				var rb: Variant = pl.get("respawnByMap", {})
+				var saved: bool = typeof(rb) == TYPE_DICTIONARY and (rb as Dictionary).has(map_id)
+				_opt("Cập nhật điểm hồi sinh" if saved else "Đặt điểm hồi sinh", "gear", false, func():
+					Net.action("set_respawn", {"x": roundi(float(pl.get("x", 0))), "y": roundi(float(pl.get("y", 0)))}))
+	if nd.has("shop") or role == "shop":
+		_opt("Mua bán", "shop", true, func(): _panel("shop", {"npc": id}))
+	_opt("Tạm biệt", "", false, close_dialog)
 
 func _panel(tab: String, extra: Dictionary = {}) -> void:
 	close_dialog()
@@ -246,3 +290,13 @@ func _hidden_npc_options(pl: Dictionary) -> void:
 	var base := str(Data.school(school).get("base", school))
 	if base in Data.EVOLUTION_SCHOOLS and not bool(Data.school(school).get("evolved", false)) and not bool(done.get("evolution", false)):
 		_opt("Tiến hóa chức nghiệp%s" % ("" if lvl >= 25 else " (cần cấp 25)"), "skills", lvl >= 25, func(): Net.action("advancement_accept", {"milestone": "evolution"}), lvl < 25)
+	# Class đặc biệt mở bằng mật mã: thức tỉnh tại đây khi đã mở khoá
+	var unl: Variant = pl.get("unlocks", {})
+	if typeof(unl) == TYPE_DICTIONARY:
+		for sch in Data.SCHOOLS.keys():
+			var sd: Dictionary = Data.school(str(sch))
+			if not bool(sd.get("special", false)) or bool(sd.get("evolved", false)): continue
+			if not bool((unl as Dictionary).get(sch, false)) or str(pl.get("school", "")) == str(sch): continue
+			var ok5: bool = lvl >= 5
+			var sc := str(sch)
+			_opt("Thức tỉnh %s%s" % [str(sd.get("name", sc)), "" if ok5 else " (cần cấp 5)"], "char", ok5, func(): Net.action("awaken_pick", {"school": sc}), not ok5)

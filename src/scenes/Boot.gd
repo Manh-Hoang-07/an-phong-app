@@ -58,13 +58,6 @@ func _start() -> void:
 		_retry.visible = true
 		return
 
-	_set_status("Đang kiểm tra phiên bản…", "", 0.55)
-	var same: bool = await Data.check_version()
-	if not same:
-		_set_status("Dữ liệu app đã cũ", "Server có bản mới (dataHash khác). Cập nhật app để chơi đúng.", 0.55)
-		_retry.visible = true
-		return
-
 	# Có token thì thử vào thẳng, không thì sang màn đăng nhập
 	if not Settings.token.is_empty() or not Settings.session.is_empty():
 		_set_status("Đang đăng nhập lại…", "", 0.8)

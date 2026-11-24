@@ -19,6 +19,12 @@ var _peer := WebSocketPeer.new()
 var _running: bool = false
 var _retry: int = 0
 var _reconnect_at: int = 0
+var _connect_started: int = 0
+var _close_handled: bool = false
+var last_close_code: int = 0
+var connect_attempts: int = 0
+var rx_count: int = 0
+var mobs_received: bool = false
 var _outbox: Array[String] = []
 var _heartbeat_at: int = 0
 var _pos_state: Dictionary = {}
@@ -37,6 +43,7 @@ func stop() -> void:
 	_running = false
 	online = false
 	_peer.close(1000, "thoát app")
+	mobs_received = false
 	set_process(false)
 
 func _connect() -> void:
@@ -44,11 +51,22 @@ func _connect() -> void:
 	var url: String = Settings.ws_url()
 	if not Settings.session.is_empty():
 		url += "?token=" + Settings.session.uri_encode()
+	_peer = WebSocketPeer.new()
+	_peer.inbound_buffer_size = 1 << 20
+	_peer.outbound_buffer_size = 1 << 18
+	_peer.max_queued_packets = 4096
+	# Server cũ chỉ đọc cookie ap_session lúc bắt tay WS (chưa có ?token=): gửi cả hai cách.
+	if not Settings.session.is_empty():
+		_peer.handshake_headers = PackedStringArray(["Cookie: " + Settings.cookie_header()])
+	_connect_started = Time.get_ticks_msec()
+	_close_handled = false
+	connect_attempts += 1
+	print("[WS] noi ", Settings.ws_url(), " token_len=", Settings.session.length())
 	var err := _peer.connect_to_url(url)
-	if err != OK:
-		_schedule_reconnect()
-		return
 	set_process(true)
+	if err != OK:
+		_close_handled = true
+		_schedule_reconnect()
 
 func _schedule_reconnect() -> void:
 	var wait: int = mini(10000, int(1000 * pow(1.6, _retry)))
@@ -61,6 +79,7 @@ func _process(_delta: float) -> void:
 	if state == WebSocketPeer.STATE_OPEN:
 		if not online:
 			online = true
+			print("[WS] MO ket noi")
 			_retry = 0
 			_pos_state.clear()   # vào lại phòng ở gói pos kế tiếp
 			connected_to_server.emit()
@@ -71,24 +90,32 @@ func _process(_delta: float) -> void:
 			var text := raw.get_string_from_utf8()
 			var parsed: Variant = JSON.parse_string(text)
 			if typeof(parsed) != TYPE_DICTIONARY: continue
+			rx_count += 1
 			_dispatch(parsed)
 	elif state == WebSocketPeer.STATE_CLOSED:
+		var code := _peer.get_close_code()
 		if online:
 			online = false
-			disconnected_from_server.emit(_peer.get_close_code())
-		var code := _peer.get_close_code()
+			disconnected_from_server.emit(code)
+		if last_close_code != code or online == false and _close_handled == false: print("[WS] DONG code=", code, " reason=", _peer.get_close_reason())
+		last_close_code = code
+		if not _close_handled:
+			_close_handled = true
+			_schedule_reconnect()
 		# 4001: tài khoản mở ở nơi khác; 4003: phiên hết hạn → không nối lại
 		if code != 4001 and code != 4003 and _running and Time.get_ticks_msec() >= _reconnect_at:
-			_schedule_reconnect()
+			_connect()
 	elif state == WebSocketPeer.STATE_CLOSING:
 		pass
 	else:  # CONNECTING
-		if Time.get_ticks_msec() >= _reconnect_at + 10000:
+		# Quá 15 giây kể từ lúc BẮT ĐẦU nối mà chưa mở được thì thử lại (trước đây so với _reconnect_at=0 nên bị ngắt ngay).
+		if Time.get_ticks_msec() - _connect_started >= 15000:
 			_peer.close()
 			_schedule_reconnect()
 
 func _dispatch(m: Dictionary) -> void:
 	var t := str(m.get("t", ""))
+	if rx_count < 12 or t == "mobs" or t == "room": print("[WS] nhan t=", t, " size=", str(m).length())
 	message_received.emit(m)
 	# 'batch': server gộp nhiều gói quái cùng nhịp — mở ra theo đúng thứ tự
 	if t == "batch":
@@ -102,7 +129,9 @@ func _dispatch(m: Dictionary) -> void:
 			my_id = int(m.get("id", 0)); hello.emit(my_id)
 		"room":
 			channel = int(m.get("ch", 1)); room.emit(m)
-		"mobs": mobs.emit(m)
+		"mobs":
+			mobs_received = true
+			mobs.emit(m)
 		"patch":
 			Game.apply_push_patch(m)
 			patch.emit(m)

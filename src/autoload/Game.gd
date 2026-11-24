@@ -16,10 +16,16 @@ var form_active := false     ## đang biến hình (Ấn thức tỉnh)
 var sta_locked := false      ## kiệt sức: không đánh được tới khi hồi qua ngưỡng
 var quest_hint := ""      ## tiến độ nhiệm vụ gần nhất từ sự kiện queststep (hiện ở HUD)
 
+## Sức chứa túi: khớp G.bagSize của web (40 + 10 mỗi lần mở rộng, tối đa 3 lần).
+func bag_size() -> int:
+	return Data.const_int("BAG_SIZE", 40) + 10 * clampi(int(player.get("bagPlus", 0)), 0, 3)
+
 func has_player() -> bool:
 	return not player.is_empty()
 
 func set_player(p: Variant) -> void:
+	if typeof(p) == TYPE_DICTIONARY and OS.is_debug_build():
+		print("[PLAYER] school=", p.get("school"), " skills=", JSON.stringify(p.get("skills")).left(200), " slots=", JSON.stringify(p.get("skillSlots")), " supers=", JSON.stringify(p.get("superUlts")), " mounts=", JSON.stringify(p.get("mounts")).left(200))
 	# Chặn payload sai kiểu tu /api/me: gan Dictionary khong dung kieu vao bien
 	# typed Dictionary gay EXC_BAD_ACCESS ngay khi goi .is_empty() tren iOS/arm64.
 	if typeof(p) != TYPE_DICTIONARY:
@@ -41,9 +47,56 @@ func set_player(p: Variant) -> void:
 static func _as_dict(v: Variant) -> Dictionary:
 	return v if typeof(v) == TYPE_DICTIONARY else {}
 
-## Web: App.stats = GameData.calcStats(player, {form}). Server KHÔNG gửi stats trong payload,
-## nên client phải tự tính. Bản rút gọn: level curve của class + điểm潜力 + stats trang bị + crit.
-## Đủ để các panel hiện số thật thay vì toàn 0 (các hệ số perks/set/awaken chỉ ảnh hưởng tinh chỉnh).
+## Port đầy đủ GameData.calcStats của web (shared/logic/player.js): trang bị (phẩm chất, cường hóa, dòng phụ, nhiễm),
+## Kỳ Nguyên, đường cong class, nội tại, thưởng bộ, ấn thức tỉnh khi biến hình. Không gồm dung hợp bóng ma.
+func _inst_stats(it: Dictionary) -> Dictionary:
+	var item_def: Dictionary = Data.item(str(it.get("id", "")))
+	var st: Dictionary = _as_dict(item_def.get("stats", {}))
+	var all := {}
+	if st.is_empty(): return all
+	var qm: Dictionary = _as_dict(Data.calc.get("QUALITY_MUL", {}))
+	var qv: Variant = it.get("q", null)
+	var q := int(qv) if qv != null else int(item_def.get("minQ", 1))
+	var rv: Variant = it.get("roll", null)
+	var roll := float(rv) if rv != null else 1.0
+	var nh := float(Data.calc.get("NHIEM_STAT_MUL", 1.18)) if float(it.get("nhiem", 0)) > 0.0 else 1.0
+	var mul := roll * float(qm.get(str(q), 1.0)) * (1.0 + 0.08 * float(it.get("plus", 0))) * nh
+	for k in st.keys():
+		if str(k) == "crit": all[k] = Formulas.r1(float(st[k]))
+		else: all[k] = float(roundi(float(st[k]) * mul))
+	var aff: Variant = it.get("aff", [])
+	if typeof(aff) == TYPE_ARRAY:
+		for a in aff:
+			if typeof(a) == TYPE_ARRAY and (a as Array).size() >= 2:
+				all[a[0]] = Formulas.r1(float(all.get(a[0], 0.0)) + float(a[1]))
+	return all
+
+## Thưởng bộ trang bị đang mặc ({mul, add} hoặc {}).
+func _set_bonus() -> Dictionary:
+	var counts := {}
+	var sets: Array = Data.calc.get("SETS", [])
+	if sets.is_empty(): return {}
+	var lvl_per := maxi(1, int(Data.calc.get("SET_LEVELS", 10)))
+	var equip: Dictionary = _as_dict(player.get("equip", {}))
+	for slot in Data.calc.get("SLOTS", []):
+		var it: Variant = equip.get(slot, null)
+		if typeof(it) != TYPE_DICTIONARY: continue
+		var d: Dictionary = Data.item(str((it as Dictionary).get("id", "")))
+		if str(d.get("slot", "")).is_empty(): continue
+		var lv := maxi(1, int(d.get("level", 1)))
+		var idx := mini(sets.size() - 1, (lv - 1) / lvl_per)
+		var sid := int((sets[idx] as Dictionary).get("id", 0))
+		counts[sid] = int(counts.get(sid, 0)) + 1
+	var best_id := -1
+	var best_n := 0
+	for sid in counts.keys():
+		if int(counts[sid]) > best_n:
+			best_n = int(counts[sid]); best_id = int(sid)
+	if best_id < 0 or best_n < int(Data.calc.get("SET_TIER_LOW", 6)): return {}
+	var bonus: Dictionary = _as_dict(_as_dict(Data.calc.get("SET_BONUS", {})).get(str(best_id), {}))
+	var tier_key := "at10" if best_n >= int(Data.calc.get("SET_TIER_HIGH", 10)) else "at6"
+	return _as_dict(bonus.get(tier_key, {}))
+
 func recalc_stats() -> void:
 	if player.is_empty(): return
 	var lv := maxi(1, int(player.get("level", 1)))
@@ -51,53 +104,105 @@ func recalc_stats() -> void:
 	var school := str(player.get("school", ""))
 	var schools: Dictionary = _as_dict(Data.raw.get("SCHOOLS", {}))
 	var sc: Dictionary = _as_dict(schools.get(school, {}))
-	if sc.is_empty():
-		var base := str(sc.get("base", ""))
-		sc = _as_dict(schools.get(base, {}))
+	var base_sc: Dictionary = _as_dict(schools.get(str(sc.get("base", "")), {}))
+	var extra: Dictionary = _as_dict(_as_dict(Data.calc.get("SCHOOL_EXTRA", {})).get(school, {}))
 	var curve: Dictionary = _as_dict(sc.get("curve", {}))
-	if curve.is_empty():
-		curve = {"hp": [100, 40], "mp": [30, 8], "atk": [8, 4], "def": [3, 2]}
-	var evo_mul := 1.0
-	if bool(sc.get("evolved", false)): evo_mul = 1.3
+	if curve.is_empty(): curve = _as_dict(base_sc.get("curve", {}))
+	if curve.is_empty(): curve = _as_dict(Data.calc.get("NOVICE_CURVE", {"hp": [100, 50], "mp": [40, 6], "atk": [8, 5], "def": [2, 2.5]}))
+	var evo_mul := float(Data.calc.get("EVOLUTION_MUL", 1.3)) if bool(sc.get("evolved", false)) else 1.0
 	var lvl := func(key: String) -> float:
 		var a: Array = curve.get(key, [0, 0])
 		return (float(a[0]) + float(a[1]) * float(lv - 1)) * evo_mul
-	# Cộng stats từ 10 ô trang bị (mỗi món có thể có stats và quality mul; dùng stats đã lưu).
-	var eq_add := {"hp": 0.0, "mp": 0.0, "atk": 0.0, "def": 0.0, "crit": 0.0, "speed": 0.0, "sta": 0.0}
+	# Cộng chỉ số 10 ô trang bị + Kỳ Nguyên đang bật
+	var eq := {"hp": 0.0, "mp": 0.0, "atk": 0.0, "def": 0.0, "crit": 0.0, "lifesteal": 0.0, "cdr": 0.0, "speed": 0.0, "boss": 0.0, "goldfind": 0.0, "expfind": 0.0, "sta": 0.0, "staRegen": 0.0, "skill": 0.0}
 	var equip: Dictionary = _as_dict(player.get("equip", {}))
-	for slot in equip.keys():
-		var it: Dictionary = _as_dict(equip.get(slot, {}))
-		var st: Dictionary = _as_dict(it.get("stats", {}))
-		for k in st.keys():
-			if eq_add.has(k): eq_add[k] += float(st[k])
+	var nhiem := 0
+	for slot in Data.calc.get("SLOTS", []):
+		var it: Variant = equip.get(slot, null)
+		if typeof(it) != TYPE_DICTIONARY: continue
+		nhiem += int((it as Dictionary).get("nhiem", 0))
+		var s := _inst_stats(it)
+		for k in s.keys(): eq[k] = float(eq.get(k, 0.0)) + float(s[k])
+	var kn: Dictionary = _as_dict(player.get("kyNguyen", {}))
+	var kdef: Dictionary = _as_dict(Data.calc.get("KY_NGUYEN", {}))
+	var kact: Variant = kn.get("active", [])
+	if typeof(kact) == TYPE_ARRAY:
+		for kid in kact:
+			var ks: Dictionary = _as_dict(kdef.get(str(kid), {}))
+			for k in ks.keys(): eq[k] = float(eq.get(k, 0.0)) + float(ks[k])
 	var vit := int(pts.get("vit", 0))
 	var spi := int(pts.get("spi", 0))
 	var str_ := int(pts.get("str", 0))
 	var agi := int(pts.get("agi", 0))
-	var max_hp := int(roundf(float(lvl.call("hp")) + float(vit) * 10.0 + float(eq_add["hp"])))
-	var max_mp := int(roundf(float(lvl.call("mp")) + float(spi) * 6.0 + float(eq_add["mp"])))
-	var atk := int(roundf(float(lvl.call("atk")) + float(str_) * 2.0 + float(eq_add["atk"])))
-	var def := int(roundf(float(lvl.call("def")) + floorf(float(vit) * 0.8) + float(eq_add["def"])))
-	var crit: float = 3.0 + float(agi) * 0.4 + float(eq_add["crit"])
-	# Ấn thức tỉnh đang bật: nhân hệ số (máu, năng lượng, tấn công, phòng thủ; thể lực theo hệ số năng lượng)
-	var sta_mul := 1.0
+	var hp_v: float = float(lvl.call("hp")) + float(vit) * 10.0 + float(eq["hp"])
+	var mp_v: float = float(lvl.call("mp")) + float(spi) * 6.0 + float(eq["mp"])
+	var atk_v: float = float(lvl.call("atk")) + float(str_) * 2.0 + float(eq["atk"])
+	var def_v: float = float(lvl.call("def")) + floorf(float(vit) * 0.8) + float(eq["def"])
+	var crit: float = 3.0 + float(agi) * 0.4 + float(eq["crit"])
+	# Nội tại cốt truyện
+	var perk_mul := {"hp": 1.0, "mp": 1.0, "atk": 1.0, "def": 1.0}
+	var perk_add := {"crit": 0.0, "boss": 0.0, "cdr": 0.0, "goldfind": 0.0, "expfind": 0.0, "skill": 0.0, "speed": 0.0, "lifestealAdd": 0.0}
+	var perks_def: Dictionary = _as_dict(Data.calc.get("PERKS", {}))
+	var plist: Variant = player.get("perks", [])
+	if typeof(plist) == TYPE_ARRAY:
+		for pid in plist:
+			var pk: Dictionary = _as_dict(perks_def.get(str(pid), {}))
+			var pm: Dictionary = _as_dict(pk.get("mul", {}))
+			var pa: Dictionary = _as_dict(pk.get("add", {}))
+			for k in pm.keys(): perk_mul[k] = float(perk_mul.get(k, 1.0)) * float(pm[k])
+			for k in pa.keys(): perk_add[k] = float(perk_add.get(k, 0.0)) + float(pa[k])
+	var skill_mul := 1.0 + float(spi) / (float(spi) + 150.0)
+	if float(eq["skill"]) != 0.0: skill_mul *= 1.0 + float(eq["skill"]) / 100.0
+	if float(perk_add["skill"]) != 0.0: skill_mul *= 1.0 + float(perk_add["skill"]) / 100.0
+	var cost_mul := 1.0
+	var bonus: Dictionary = _as_dict(sc.get("bonus", {}))
+	if not sc.is_empty():
+		if bonus.has("critAdd"): crit += float(bonus["critAdd"])
+		var sp := 0.0
+		if bonus.get("skillPower", null) != null: sp = float(bonus["skillPower"])
+		elif extra.get("skillPower", null) != null: sp = float(extra["skillPower"])
+		if sp > 0.0: skill_mul *= sp
+		if extra.get("skillCost", null) != null: cost_mul = float(extra["skillCost"])
+	var sc_speed := float(bonus.get("speed", 1.0))
+	hp_v *= float(perk_mul["hp"]); mp_v *= float(perk_mul["mp"]); atk_v *= float(perk_mul["atk"]); def_v *= float(perk_mul["def"])
+	# Thưởng mặc đủ bộ
+	var sb := _set_bonus()
+	var set_add: Dictionary = _as_dict(sb.get("add", {}))
+	var sm: Dictionary = _as_dict(sb.get("mul", {}))
+	if sm.has("hp"): hp_v *= float(sm["hp"])
+	if sm.has("mp"): mp_v *= float(sm["mp"])
+	if sm.has("atk"): atk_v *= float(sm["atk"])
+	if sm.has("def"): def_v *= float(sm["def"])
+	# Ấn thức tỉnh đang bật
+	var S: Dictionary = Data.STAMINA
+	var sta_mul := float(S.get("maxMul", 1.3))
 	if form_active:
 		var aw: Dictionary = _as_dict(Data.awaken(maxi(1, Data.awaken_tier_of(player.get("formChoice", "")))))
 		var m: Dictionary = _as_dict(aw.get("mul", {}))
 		if not m.is_empty():
-			max_hp = int(roundf(float(max_hp) * float(m.get("hp", 1.0))))
-			max_mp = int(roundf(float(max_mp) * float(m.get("mp", 1.0))))
-			atk = int(roundf(float(atk) * float(m.get("atk", 1.0))))
-			def = int(roundf(float(def) * float(m.get("def", 1.0))))
-			sta_mul = float(m.get("mp", 1.0))
-	var S: Dictionary = Data.STAMINA
-	var bonus: Dictionary = _as_dict(sc.get("bonus", {}))
-	var max_sta := int(roundf((float(S.get("base", 100)) + float(S.get("perLevel", 2)) * float(lv - 1) + float(S.get("perAgi", 1)) * float(agi)) * sta_mul * float(bonus.get("sta", 1.0)))) + int(eq_add["sta"])
+			hp_v *= float(m.get("hp", 1.0)); mp_v *= float(m.get("mp", 1.0)); atk_v *= float(m.get("atk", 1.0)); def_v *= float(m.get("def", 1.0))
+			sta_mul = maxf(float(m.get("mp", 1.0)), sta_mul)
+	crit += float(perk_add["crit"])
+	for k in set_add.keys(): perk_add[k] = float(perk_add.get(k, 0.0)) + float(set_add[k])
+	var speed_final := roundi(minf(290.0, minf(260.0, 190.0 + float(agi) * 2.0) * sc_speed + float(eq["speed"]) + float(perk_add["speed"])))
+	if nhiem > 0: hp_v *= maxf(0.7, 1.0 - float(Data.calc.get("NHIEM_HP_PENALTY", 0.06)) * float(nhiem))
+	var max_hp := roundi(hp_v)
+	var max_mp := roundi(mp_v)
+	var atk := roundi(atk_v)
+	var def := roundi(def_v)
+	var max_sta := roundi((float(S.get("base", 100)) + float(S.get("perLevel", 2)) * float(lv - 1) + float(S.get("perAgi", 1)) * float(agi)) * sta_mul * float(bonus.get("sta", 1.0))) + int(eq["sta"])
+	var wtype := "tay"
+	var wpn: Variant = equip.get("weapon", null)
+	if typeof(wpn) == TYPE_DICTIONARY: wtype = str(Data.item(str((wpn as Dictionary).get("id", ""))).get("wtype", "tay"))
 	stats = {
-		"maxSta": max_sta,
-		"maxHp": max_hp, "maxMp": max_mp, "atk": atk, "def": def,
-		"crit": crit, "speed": 100.0 + eq_add["speed"],
-		"skillMul": 1.0 + float(spi) / float(spi + 150),
+		"maxSta": max_sta, "maxHp": max_hp, "maxMp": max_mp, "atk": atk, "def": def,
+		"crit": minf(60.0, Formulas.r1(crit)), "speed": float(speed_final), "skillMul": skill_mul, "costMul": cost_mul, "wtype": wtype, "nhiem": nhiem,
+		"staRegen": maxf(0.0, Formulas.r1(float(eq["staRegen"]))),
+		"lifesteal": minf(15.0, Formulas.r1(float(eq["lifesteal"]) + float(bonus.get("lifestealAdd", 0.0)) + float(perk_add["lifestealAdd"]))),
+		"cdr": minf(30.0, Formulas.r1(float(eq["cdr"]) + float(perk_add["cdr"]) + float(bonus.get("cdrAdd", 0.0)))),
+		"boss": minf(80.0, Formulas.r1(float(eq["boss"]) + float(perk_add["boss"]))),
+		"goldfind": minf(100.0, Formulas.r1(float(eq["goldfind"]) + float(perk_add["goldfind"]))),
+		"expfind": minf(60.0, Formulas.r1(float(eq["expfind"]) + float(perk_add["expfind"]))),
 	}
 	# Giữ hp/mp trong khoảng mới (web cũng clamp khi recalc).
 	hp = clampi(hp, 0, max_hp)
