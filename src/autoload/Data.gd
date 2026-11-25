@@ -111,6 +111,14 @@ func skill_lv(pl: Dictionary, id: String) -> int:
 	if typeof(learned) == TYPE_DICTIONARY and (learned as Dictionary).has(id):
 		var v: Variant = (learned as Dictionary)[id]
 		return int((v as Dictionary).get("lv", 1)) if typeof(v) == TYPE_DICTIONARY else int(v)
+	# Kỹ năng do trang bị cấp: cấp mượn = cấp nhân vật / 8 (cấp 12 → 1, 40 → 5, 80 → 10) — như G.gearSkillLevel của web
+	var eq: Variant = pl.get("equip", {})
+	if typeof(eq) == TYPE_DICTIONARY:
+		for slot in (eq as Dictionary).keys():
+			var it: Variant = (eq as Dictionary)[slot]
+			if typeof(it) != TYPE_DICTIONARY: continue
+			if str(item(str((it as Dictionary).get("id", ""))).get("grantsSkill", "")) == id:
+				return clampi(int(floor(float(int(pl.get("level", 1))) / 8.0)), 1, 10)
 	return 1
 
 ## Thông số dùng khi bấm kỹ năng: theo cấp đã học, MP nhân hệ số tiêu hao (giống web). Hồi chiêu giữ nguyên số thực.
@@ -343,7 +351,7 @@ const ROMAN := ["I", "II", "III", "IV", "V"]
 const MOUNTS := {
 	"soi_xam": {"name": "Sói Xám", "look": "wolf", "tint": 0xb8c1cc, "hp": 2400, "mp": 60, "sta": 100, "atk": 180, "def": 150,
 		"desc": "Sói đồng hành nhanh nhẹn, lao vào cắn mục tiêu."},
-	"than_lan": {"name": "Thằn Lằn Đầm", "look": "wolf", "tint": 0xffffff, "hp": 2800, "mp": 60, "sta": 100, "atk": 170, "def": 190,
+	"than_lan": {"name": "Thằn Lằn Đầm", "look": "lizard", "tint": 0xffffff, "hp": 2800, "mp": 60, "sta": 100, "atk": 170, "def": 190,
 		"desc": "Thằn lằn đồng hành, dùng vuốt cào mục tiêu."},
 	"soi_tuyet": {"name": "Sói Tuyết Bạc", "look": "wolf", "tint": 0xe5f3ff, "hp": 3000, "mp": 60, "sta": 100, "atk": 210, "def": 170,
 		"desc": "Sói núi tuyết khỏe hơn, chuyên tấn công áp sát."},

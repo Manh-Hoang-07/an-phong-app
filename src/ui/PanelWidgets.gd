@@ -142,6 +142,8 @@ static func card_body(p: PanelContainer) -> VBoxContainer:
 static func action_button(text: String, cb: Callable, disabled: bool = false) -> Button:
 	var b := T.button(text, Vector2(0, 40))
 	b.disabled = disabled
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # nhãn dài tự xuống dòng, không làm panel phình quá màn hình
+	b.clip_text = false
 	if cb.is_valid(): b.pressed.connect(cb)
 	return b
 
@@ -404,14 +406,14 @@ static func split(left: Control, right: Control, right_w: float = 224.0) -> HBox
 	var ls := TouchScroll.new()
 	ls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ls.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	ls.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	ls.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ls.add_child(left)
 	h.add_child(ls)
 	var rs := TouchScroll.new()
 	rs.custom_minimum_size = Vector2(right_w, 0)
 	rs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	rs.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rs.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rs.add_child(right)
 	h.add_child(rs)
@@ -513,8 +515,115 @@ static func compare_with_equipped(d: Dictionary) -> Array:
 		if absf(dv) > 0.0001: out.append([str(STAT_NAMES.get(k, k)), dv, str(k) == "crit"])
 	return out
 
+const ALL_LABELS := {"atk": "Tấn công", "def": "Phòng thủ", "hp": "Máu", "mp": "Năng lượng", "crit": "Chí mạng", "lifesteal": "Hút máu",
+	"cdr": "Giảm hồi chiêu", "speed": "Tốc chạy", "boss": "Sát thương lên trùm", "goldfind": "Xu rơi thêm", "expfind": "Kinh nghiệm thêm",
+	"sta": "Thể lực", "staRegen": "Hồi thể lực", "skill": "Sát thương kỹ năng"}
+const PCT_STATS := ["crit", "staRegen", "skill", "cdr", "lifesteal", "boss", "goldfind", "expfind"]
+const SLOT_LABELS := {"weapon": "Vũ khí", "mu": "Mũ", "ao": "Áo", "gang_tay": "Găng tay", "dai_lung": "Đai lưng", "quan": "Quần",
+	"giay": "Giày", "nhan": "Nhẫn", "day_chuyen": "Dây chuyền", "ngoc_boi": "Ngọc bội"}
+
+static func stat_label(k: String) -> String: return str(ALL_LABELS.get(k, STAT_NAMES.get(k, k)))
+static func stat_unit(k: String) -> String: return "%" if k in PCT_STATS else ""
+static func fmt_stat(v: float) -> String:
+	return ("%d" % int(v)) if is_equal_approx(v, roundf(v)) else ("%.1f" % v)
+
+## Chỉ số chính của một món (như G.instStats(inst).main của web): nhân độ ngẫu nhiên, phẩm chất, cấp cường hóa, nhiễm.
+static func inst_main(entry: Dictionary) -> Dictionary:
+	var d: Dictionary = Data.item(str(entry.get("id", "")))
+	var st: Dictionary = d.get("stats", {}) if typeof(d.get("stats", {})) == TYPE_DICTIONARY else {}
+	var out := {}
+	var qm: Dictionary = Data.calc.get("QUALITY_MUL", {})
+	var qv: Variant = entry.get("q", null)
+	var q := int(qv) if qv != null else int(d.get("minQ", 1))
+	var rv: Variant = entry.get("roll", null)
+	var roll := float(rv) if rv != null else 1.0
+	var nh := float(Data.calc.get("NHIEM_STAT_MUL", 1.18)) if float(entry.get("nhiem", 0)) > 0.0 else 1.0
+	var mul := roll * float(qm.get(str(q), 1.0)) * (1.0 + 0.08 * float(entry.get("plus", 0))) * nh
+	for k in st.keys():
+		out[k] = Formulas.r1(float(st[k])) if str(k) == "crit" else float(roundi(float(st[k]) * mul))
+	return out
+
+## Độ hoàn hảo 0-100% (G.perfection).
+static func inst_perfection(entry: Dictionary) -> int:
+	var rv: Variant = entry.get("roll", null)
+	var parts: Array = [((float(rv) if rv != null else 1.0) - 0.8) / 0.4]
+	var aff: Variant = entry.get("aff", [])
+	if typeof(aff) == TYPE_ARRAY:
+		for a in aff:
+			parts.append(float((a as Array)[2]) if typeof(a) == TYPE_ARRAY and (a as Array).size() > 2 and (a as Array)[2] != null else 0.5)
+	var s := 0.0
+	for x in parts: s += float(x)
+	return int(roundf(s / float(parts.size()) * 100.0))
+
+static func set_of_item(d: Dictionary) -> Dictionary:
+	if str(d.get("slot", "")).is_empty(): return {}
+	var sets: Array = Data.calc.get("SETS", [])
+	if sets.is_empty(): return {}
+	var per := maxi(1, int(Data.calc.get("SET_LEVELS", 10)))
+	var lv := maxi(1, int(d.get("level", 1)))
+	return sets[mini(sets.size() - 1, int(floor(float(lv - 1) / float(per))))]
+
+## Khối thông tin của MỘT món cụ thể (có độ ngẫu nhiên / dòng phụ / cường hóa) — như itemInfo của web.
+static func _inst_block(body: VBoxContainer, d: Dictionary, entry: Dictionary, compare: bool) -> void:
+	var pl: Dictionary = Game.player
+	var q := clampi(int(entry.get("q", d.get("minQ", 1))), 0, 5)
+	var tags: Array = []
+	var set_d := set_of_item(d)
+	if not set_d.is_empty(): tags.append("Bộ %s (cấp %d–%d)" % [str(set_d.get("name", "")), int(set_d.get("min", 0)), int(set_d.get("max", 0))])
+	if bool(entry.get("seal", false)): tags.append("Đã khắc ấn")
+	if float(entry.get("nhiem", 0)) > 0.0: tags.append("Nhiễm đỏ bậc %d" % int(entry["nhiem"]))
+	var wt: Dictionary = (Data.calc.get("WEAPON_TYPES", {}) as Dictionary).get(str(d.get("wtype", "")), {})
+	if str(d.get("slot", "")) == "weapon" and not wt.is_empty(): tags.append(str(wt.get("name", "")))
+	if not tags.is_empty():
+		var tl := T.label(" · ".join(tags), 12, T.C_MUTED)
+		tl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.add_child(tl)
+	var main := inst_main(entry)
+	var parts: Array = []
+	for k in main.keys(): parts.append("%s +%s%s" % [stat_label(str(k)), fmt_stat(float(main[k])), stat_unit(str(k))])
+	for pline in parts:
+		body.add_child(T.label(str(pline), T.FS_S, T.C_GREEN, true))
+	var aff: Variant = entry.get("aff", [])
+	if typeof(aff) == TYPE_ARRAY:
+		for a in aff:
+			if typeof(a) != TYPE_ARRAY or (a as Array).size() < 2: continue
+			var pp := float(a[2]) if (a as Array).size() > 2 and a[2] != null else 0.5
+			body.add_child(T.label("◆ %s +%s%s%s" % [stat_label(str(a[0])), fmt_stat(float(a[1])), stat_unit(str(a[0])), " ★" if pp >= 0.8 else ""], T.FS_S, T.C_BLUE))
+	var pf := inst_perfection(entry)
+	body.add_child(T.label("Độ hoàn hảo: %d%%" % pf, T.FS_S, T.C_GOLD if pf >= 80 else (T.C_GREEN if pf >= 50 else T.C_MUTED), true))
+	if compare:
+		var slot := str(d.get("slot", ""))
+		var cur: Variant = (pl.get("equip", {}) as Dictionary).get(slot, null)
+		if typeof(cur) == TYPE_DICTIONARY and int((cur as Dictionary).get("uid", -1)) != int(entry.get("uid", -2)):
+			var a_all: Dictionary = Game._inst_stats(entry)
+			var b_all: Dictionary = Game._inst_stats(cur)
+			var keys := {}
+			for k in a_all.keys(): keys[k] = true
+			for k in b_all.keys(): keys[k] = true
+			body.add_child(hsep())
+			body.add_child(T.label("So với %s%s đang mặc:" % [str(Data.item(str(cur.get("id", ""))).get("name", "")), (" +%d" % int(cur.get("plus", 0))) if int(cur.get("plus", 0)) > 0 else ""], 12, T.C_MUTED, true))
+			var any := false
+			for k in keys.keys():
+				var dv := roundf((float(a_all.get(k, 0.0)) - float(b_all.get(k, 0.0))) * 10.0) / 10.0
+				if absf(dv) < 0.05: continue
+				any = true
+				body.add_child(T.label("%s %s%s%s %s" % [stat_label(str(k)), "+" if dv > 0 else "-", fmt_stat(absf(dv)), stat_unit(str(k)), "▲" if dv > 0 else "▼"], T.FS_S, T.C_GREEN if dv > 0 else T.C_RED, true))
+			if not any: body.add_child(T.label("như nhau", T.FS_S, T.C_MUTED))
+		elif typeof(cur) != TYPE_DICTIONARY:
+			body.add_child(T.label("Ô này đang trống ▲", T.FS_S, T.C_GREEN, true))
+	if float(entry.get("nhiem", 0)) > 0.0:
+		var nt := int(entry["nhiem"])
+		var nl := T.label("Nhiễm đỏ bậc %d: +%d%% chỉ số, −%d%% máu tối đa, không hồi máu ngoài giao chiến" % [nt, int(roundf((float(Data.calc.get("NHIEM_STAT_MUL", 1.18)) - 1.0) * 100.0)), int(roundf(float(Data.calc.get("NHIEM_HP_PENALTY", 0.06)) * float(nt) * 100.0))], T.FS_S, T.C_RED)
+		nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.add_child(nl)
+	var gs: String = str(d.get("grantsSkill", ""))
+	if gs != "" and not Data.skill(gs).is_empty():
+		var gl := T.label("Cấp kỹ năng: %s — %s. Tháo ra là mất, không tốn điểm kỹ năng." % [str(Data.skill(gs).get("name", gs)), str(Data.skill(gs).get("desc", ""))], T.FS_S, T.C_PURPLE)
+		gl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.add_child(gl)
+
 ## Thẻ chi tiết vật phẩm: icon + tên + độ hiếm + yêu cầu + chỉ số (+ so sánh với đang mặc) + mô tả.
-static func item_detail(iid: String, extra_plus: int = 0, compare: bool = true) -> PanelContainer:
+static func item_detail(iid: String, extra_plus: int = 0, compare: bool = true, entry: Dictionary = {}) -> PanelContainer:
 	var d: Dictionary = Data.item(iid)
 	var q := int(d.get("q", 0))
 	var box := detail_box()
@@ -547,9 +656,11 @@ static func item_detail(iid: String, extra_plus: int = 0, compare: bool = true) 
 		var ok2 := str(pl.get("school", "")) == school or str(Data.school(str(pl.get("school", ""))).get("base", "")) == school
 		reqs.add_child(chip(school_name(school), T.C_GREEN if ok2 else T.C_RED))
 	if reqs.get_child_count() > 0: body.add_child(reqs)
-	for line in item_stat_lines(d):
+	var use_inst := not entry.is_empty() and not str(d.get("slot", "")).is_empty()
+	if use_inst: _inst_block(body, d, entry, compare)
+	for line in ([] if use_inst else item_stat_lines(d)):
 		body.add_child(T.label(line, T.FS_S, T.C_GREEN))
-	if compare:
+	if compare and not use_inst:
 		var cmp := compare_with_equipped(d)
 		if not cmp.is_empty():
 			body.add_child(hsep())

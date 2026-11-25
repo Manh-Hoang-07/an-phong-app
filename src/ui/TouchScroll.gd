@@ -13,6 +13,7 @@ var _last_pos := Vector2.ZERO
 var _vel := 0.0
 var _last_t := 0
 var _pressed_ctrl: Control = null
+var horizontal := false        # true: vuốt ngang (thanh menu), không hiện thanh cuộn
 
 func _ready() -> void:
 	scroll_deadzone = 100000      # tắt vuốt gốc, dùng bộ xử lý bên dưới
@@ -25,7 +26,7 @@ func _inside(p: Vector2) -> bool:
 
 func _is_scrollable() -> bool:
 	if not is_visible_in_tree(): return false
-	var sb := get_v_scroll_bar()
+	var sb: ScrollBar = get_h_scroll_bar() if horizontal else get_v_scroll_bar()
 	return sb != null and sb.max_value > sb.page + 1.0
 
 func _no_drag_target(c: Control) -> bool:
@@ -63,18 +64,18 @@ func _input(event: InputEvent) -> void:
 			_tracking = false; _dragging = false
 			return
 		if not _dragging:
-			if absf(mm.position.y - _press_pos.y) < DRAG_START: return
+			if absf((mm.position.x - _press_pos.x) if horizontal else (mm.position.y - _press_pos.y)) < DRAG_START: return
 			_dragging = true
 			_cancel_press()
 			_last_pos = mm.position
 			_last_t = Time.get_ticks_msec()
-		var dy := mm.position.y - _last_pos.y
+		var dy := (mm.position.x - _last_pos.x) if horizontal else (mm.position.y - _last_pos.y)
 		_last_pos = mm.position
 		var now := Time.get_ticks_msec()
 		var dt := maxf(0.001, float(now - _last_t) / 1000.0)
 		_last_t = now
 		_vel = lerpf(_vel, dy / dt, 0.6)
-		scroll_vertical = int(scroll_vertical - dy)
+		_scroll_by(-dy)
 		get_viewport().set_input_as_handled()
 
 ## Điều khiển sâu nhất dưới điểm chạm (không dựa vào hover vì cảm ứng không có hover).
@@ -109,7 +110,12 @@ func _cancel_press() -> void:
 func _process(delta: float) -> void:
 	if _tracking or absf(_vel) < 25.0:
 		return
-	scroll_vertical = int(scroll_vertical - _vel * delta)
+	_scroll_by(-_vel * delta)
 	_vel *= exp(-FRICTION * delta)
-	var sb := get_v_scroll_bar()
-	if scroll_vertical <= 0 or scroll_vertical >= int(sb.max_value - sb.page): _vel = 0.0
+	var sb: ScrollBar = get_h_scroll_bar() if horizontal else get_v_scroll_bar()
+	var cur := scroll_horizontal if horizontal else scroll_vertical
+	if cur <= 0 or cur >= int(sb.max_value - sb.page): _vel = 0.0
+
+func _scroll_by(d: float) -> void:
+	if horizontal: scroll_horizontal = int(scroll_horizontal + d)
+	else: scroll_vertical = int(scroll_vertical + d)

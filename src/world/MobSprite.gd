@@ -38,7 +38,47 @@ var _flash_until := 0
 var _hit_until := 0
 var _height := 44.0
 
-func setup(u: int, id: String, look: String, sprite_override: String = "") -> void:
+## Hình thú đồng hành / linh thú: sprite sheet riêng trong assets/pets (cùng bộ ảnh với web, public/js/art/pets.js),
+## KHÔNG mượn sprite quái. fw/fh: khung; frames: số khung; left: hình gốc quay trái; lift: bay cao hơn mặt đất (px).
+const PET_DIR := "res://assets/pets/"
+const PET_DEF := {
+	"wolf": {"fw": 174, "fh": 98, "frames": {"run": 3, "walk": 4, "attack": 5}, "left": true, "scale": 0.75, "files": {"run": "wolf-run", "walk": "wolf-walk", "attack": "wolf-attack"}},
+	"horse": {"fw": 82, "fh": 66, "frames": {"run": 7, "walk": 7}, "scale": 0.82, "files": {"run": "horse-walk", "walk": "horse-walk"}},
+	"dragon": {"fw": 454, "fh": 249, "frames": {"run": 8, "walk": 8, "attack": 8}, "scale": 0.3, "lift": -6, "rate": {"walk": 10, "run": 14, "attack": 14}, "files": {"run": "dragon-run", "walk": "dragon-run", "attack": "dragon-attack"}},
+	"bat": {"fw": 150, "fh": 147, "frames": {"run": 4, "walk": 4, "attack": 3}, "left": true, "scale": 0.6, "lift": 30, "rate": {"walk": 8, "run": 12, "attack": 10}, "files": {"run": "bat-run", "walk": "bat-run", "attack": "bat-attack"}},
+	"bird": {"fw": 48, "fh": 32, "frames": {"walk": 11, "run": 11, "attack": 11}, "rows": {"walk": 2, "run": 4, "attack": 3}, "scale": 1.6, "files": {"walk": "bird", "run": "bird", "attack": "bird"}},
+	"lizard": {"fw": 209, "fh": 118, "frames": {"run": 8, "walk": 8, "attack": 8}, "scale": 0.55, "files": {"run": "lizard-run", "walk": "lizard-walk", "attack": "lizard-attack"}},
+	"fox": {"fw": 177, "fh": 128, "frames": {"walk": 10, "run": 12, "attack": 10}, "scale": 0.55, "rate": {"walk": 10, "run": 16, "attack": 14}, "files": {"run": "fox-run", "walk": "fox-walk", "attack": "fox-attack"}},
+	"insect": {"fw": 136, "fh": 117, "frames": {"walk": 10, "run": 10, "attack": 12}, "scale": 0.5, "lift": 20, "rate": {"walk": 14, "run": 18, "attack": 16}, "files": {"run": "insect-run", "walk": "insect-walk", "attack": "insect-attack"}},
+}
+var pet_look := ""
+var _pet_files: Dictionary = {}   # anim (idle/run/attack) -> đường dẫn ảnh
+var _pet_rows: Dictionary = {}    # anim -> hàng trong sheet (chỉ bird)
+
+func _use_pet(look: String) -> void:
+	var d: Dictionary = PET_DEF[look]
+	var frames: Dictionary = d["frames"]
+	var files: Dictionary = d["files"]
+	var rate: Dictionary = d.get("rate", {})
+	var sc := float(d.get("scale", 1.0))
+	var anims := {}
+	for pair in [["idle", "walk"], ["run", "run"], ["attack", "attack"]]:
+		var a := str(pair[0])
+		var src := str(pair[1])
+		if not frames.has(src): src = "walk" if frames.has("walk") else "run"
+		anims[a] = [int(frames[src]), float(rate.get(src, 12.0 if src == "run" else 7.0))]
+		_pet_files[a] = PET_DIR + str(files[src]) + ".png"
+		if d.has("rows"): _pet_rows[a] = int((d["rows"] as Dictionary)[src])
+	if not frames.has("attack"): anims.erase("attack")
+	pet_look = look
+	mob_def = {"fw": d["fw"], "fh": d["fh"], "cx": float(d["fw"]) * 0.5, "fy": float(d["fh"]) + float(d.get("lift", 0.0)) / sc, "s": sc, "anims": anims}
+	face_left = bool(d.get("left", false))
+	fake_death = false
+	fly = false
+	grade = {"scale": 1.0, "tint": null, "nameColor": "#ffe9a8", "barW": 36}
+	_tint = Color.WHITE
+
+func setup(u: int, id: String, look: String, sprite_override: String = "", as_pet: bool = false) -> void:
 	uid = u
 	mob_id = id
 	var def: Dictionary = Data.monster(id)
@@ -66,12 +106,15 @@ func setup(u: int, id: String, look: String, sprite_override: String = "") -> vo
 	def_stat = int(def.get("def", 0))
 	mob_style = str(def.get("style", ""))
 	resist = float(def.get("resist", 0.0))
+	if as_pet and PET_DEF.has(look): _use_pet(look)
 	_build()
 
 var mob_level := 1
 var def_stat := 0            # phòng thủ của quái (trừ vào sát thương người chơi gây ra)
 var mob_style := ""          # kiểu đòn đặc biệt của trùm (water/ice/void/...)
 var resist := 0.0            # kháng đòn đánh thường (def.resist)
+var shred := 0.0             # % sát thương chịu thêm do Tên Phá Giáp
+var shred_until := 0
 var flags := 0               # cờ từ server: 1 chậm, 2 đóng băng, 4 phẫn nộ
 var enraged := false         # cờ phẫn nộ từ server (fl & 4): đòn đánh nặng hơn 25%
 
@@ -82,7 +125,7 @@ func _build() -> void:
 	_height = fy * _scale + 6.0
 	var anims: Dictionary = def.get("anims", {})
 	for anim in anims.keys():
-		var path := "%s/%s/%s.png" % [MOB_DIR, sheet, anim]
+		var path := str(_pet_files.get(anim, "")) if pet_look != "" else "%s/%s/%s.png" % [MOB_DIR, sheet, anim]
 		if not ResourceLoader.exists(path): continue
 		var tex := load(path) as Texture2D
 		if tex == null: continue
@@ -97,7 +140,7 @@ func _build() -> void:
 		for i in range(n):
 			var at := AtlasTexture.new()
 			at.atlas = tex
-			at.region = Rect2(i * fw, 0, fw, fh)
+			at.region = Rect2(i * fw, int(_pet_rows.get(anim, 0)) * fh, fw, fh)
 			sf.add_frame(anim, at)
 		_sprites[anim] = sf
 	if _sprites.is_empty() or not _sprites.has("idle"):

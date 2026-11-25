@@ -211,7 +211,7 @@ func _rebuild_options() -> void:
 				_opt("Nhiệm vụ: %s" % qname, "quest", true, func(): Net.action("quest_accept", {}))
 		elif Data.quest_ready(pl):
 			var gm := str(q.get("map", ""))
-			if gm != "" and gm != map_id and not Data.map_def(gm).is_empty():
+			if gm != "" and gm != map_id and not Data.map_def(gm).is_empty() and Data.npc_here(pl, gm, id):
 				_opt("Hãy quay về %s để trả nhiệm vụ" % str(Data.map_def(gm).get("name", gm)), "quest", false, Callable(), true)
 			elif typeof(cur.get("choices", null)) == TYPE_ARRAY:
 				for ch in cur["choices"]:
@@ -241,7 +241,12 @@ func _rebuild_options() -> void:
 		var sid := str(sq.get("id", ""))
 		if Data.side_done(pl, sid): continue
 		if Data.side_active(pl, sid):
-			if Data.side_ready(pl, sid): _opt("Trả phụ tuyến: %s" % str(sq.get("name", sid)), "quest", true, func(): Net.action("side_complete", {"id": sid}))
+			if Data.side_ready(pl, sid):
+				var sgm := str(((Data.side_state(pl).get("active", {}) as Dictionary).get(sid, {}) as Dictionary).get("map", ""))
+				if sgm != "" and sgm != map_id and not Data.map_def(sgm).is_empty() and Data.npc_here(pl, sgm, id):
+					_opt("Hãy quay về %s để trả phụ tuyến" % str(Data.map_def(sgm).get("name", sgm)), "quest", false, Callable(), true)
+				else:
+					_opt("Trả phụ tuyến: %s" % str(sq.get("name", sid)), "quest", true, func(): Net.action("side_complete", {"id": sid}))
 			else: _opt("Phụ tuyến: %s (đang làm)" % str(sq.get("name", sid)), "quest", false, func(): _panel("quest"))
 		elif Data.side_available(pl, sq):
 			_opt("Nhận phụ tuyến: %s" % str(sq.get("name", sid)), "quest", false, func(): Net.action("side_accept", {"id": sid}))

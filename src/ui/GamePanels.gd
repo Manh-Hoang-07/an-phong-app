@@ -4,6 +4,7 @@ extends RefCounted
 
 const T := preload("res://src/ui/UITheme.gd")
 const TouchScroll := preload("res://src/ui/TouchScroll.gd")
+const MobSpriteCls := preload("res://src/world/MobSprite.gd")
 const W := preload("res://src/ui/PanelWidgets.gd")
 
 # Trạng thái UI cục bộ (tương đương S của web)
@@ -122,7 +123,7 @@ func _bag_match(iid: String) -> bool:
 	var d: Dictionary = Data.item(iid)
 	var is_gear := not str(d.get("slot", "")).is_empty()
 	var kind := str(d.get("kind", ""))
-	var is_use := kind in ["potion", "boost", "book", "skill_book", "ult_book", "transform_book", "slot_book", "erase_book"]
+	var is_use := kind in ["potion", "boost", "book", "potential_book", "skill_book", "ult_book", "transform_book", "slot_book", "erase_book"]
 	match bag_filter:
 		"gear": return is_gear
 		"use": return is_use and not is_gear
@@ -146,7 +147,7 @@ func _nhiem_block(parent: Control, entry: Dictionary, params: Dictionary) -> voi
 func _bag_detail(e: Dictionary) -> Control:
 	var iid := str(e.get("id", ""))
 	var d: Dictionary = Data.item(iid)
-	var box := W.item_detail(iid, int(e.get("plus", 0)))
+	var box := W.item_detail(iid, int(e.get("plus", 0)), true, e)
 	var body := W.box_body(box)
 	var uidn := int(e.get("uid", 0))
 	var qty := int(e.get("n", e.get("qty", 1)))
@@ -154,7 +155,12 @@ func _bag_detail(e: Dictionary) -> Control:
 	if not str(d.get("slot", "")).is_empty():
 		body.add_child(W.action_button("Trang bị", func(): act("equip", {"uid": uidn}); _deselect()))
 		_nhiem_block(body, e, {"uid": uidn})
-	if d.has("kind") and str(d.get("kind", "")) in ["potion", "book", "transform_book", "buff", "box", "food", "consumable"]:
+	var dkind := str(d.get("kind", ""))
+	if dkind in ["book", "potential_book", "skill_book", "ult_book", "slot_book", "erase_book", "transform_book"]:
+		body.add_child(W.action_button("Đọc sách", func(): act("use", {"item": iid})))
+	elif dkind == "boost":
+		body.add_child(W.action_button("Sử dụng", func(): act("use_boost", {"item": iid})))
+	elif dkind in ["potion", "buff", "box", "food", "consumable"]:
 		body.add_child(W.action_button("Sử dụng", func(): act("use", {"item": iid})))
 	elif d.has("hp") or d.has("mp"):
 		body.add_child(W.action_button("Sử dụng", func(): act("use", {"item": iid})))
@@ -298,7 +304,7 @@ func _equip_popup(slot: String, eq: Dictionary) -> Control:
 		sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		var det := W.item_detail(iid, plus, false)
+		var det := W.item_detail(iid, plus, false, (eq.get(slot, {}) as Dictionary) if typeof(eq.get(slot, null)) == TYPE_DICTIONARY else {})
 		det.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sc.add_child(det)
 		v.add_child(sc)
@@ -725,7 +731,8 @@ func _skill_detail(sid: String, learned: Dictionary, pl: Dictionary) -> Control:
 		row.add_theme_constant_override("separation", 4)
 		var slots: Array = pl.get("skillSlots", [])
 		var is_ult := bool(d.get("ult", false)) or bool(d.get("superUlt", false))
-		var targets: Array = [5, 6] if is_ult else [0, 1, 2, 3]
+		var tn := str(Data.school(str(pl.get("school", ""))).get("base", str(pl.get("school", "")))) == "toan_nang"
+		var targets: Array = ([5, 6, 7] if tn else [5, 6]) if is_ult else ([0, 1, 2, 3, 4] if tn else [0, 1, 2, 3])
 		for i in targets:
 			var idx: int = i
 			var here := idx < slots.size() and str(slots[idx]) == sid
@@ -992,10 +999,14 @@ func build_quest() -> Control:
 		for sid in active.keys():
 			var sq: Dictionary = Data.quest_by_id(str(sid))
 			var inner2 := _vb(4)
-			inner2.add_child(T.label(str(sq.get("name", _prettify(str(sid)))), T.FS_M, T.C_TEXT, true))
+			var s_ready := Data.side_ready(pl, str(sid))
+			inner2.add_child(T.label(("✔ " if s_ready else "") + str(sq.get("name", _prettify(str(sid)))), T.FS_M, T.C_GREEN if s_ready else T.C_TEXT, true))
 			if sq.has("npc"): inner2.add_child(T.label("Gặp %s" % W.npc_name(str(sq["npc"])), T.FS_S, T.C_MUTED))
 			var sp: Dictionary = active[sid] if typeof(active[sid]) == TYPE_DICTIONARY else {}
 			_objective_rows(sq.get("obj", {}), sp, inner2)
+			if s_ready and sq.has("npc"):
+				var swhere := _npc_places(str(sq["npc"]))
+				inner2.add_child(T.label("Về gặp %s%s để trả" % [W.npc_name(str(sq["npc"])), (" · " + swhere) if swhere != "" else ""], T.FS_S, T.C_GREEN))
 			vb.add_child(W.card_row(inner2))
 	# Nhiệm vụ ngày chỉ hiển thị ở NPC/bảng nhiệm vụ, không đưa vào tab Nhiệm vụ.
 	return vb
@@ -1166,7 +1177,7 @@ func build_shop() -> Control:
 		if selected_where == "sell":
 			var e3 := _bag_entry(selected_key)
 			if not e3.is_empty():
-				var box2 := W.item_detail(str(e3.get("id", "")), int(e3.get("plus", 0)))
+				var box2 := W.item_detail(str(e3.get("id", "")), int(e3.get("plus", 0)), true, e3)
 				var uidn := int(e3.get("uid", 0))
 				var n := int(e3.get("n", 1))
 				W.box_body(box2).add_child(W.action_button("Bán 1", func(): act("sell", {"uid": uidn, "qty": 1})))
@@ -1209,17 +1220,18 @@ func build_smith() -> Control:
 		var params: Dictionary = {}
 		var iid3 := ""
 		var plus := 0
+		var sm_entry: Dictionary = {}
 		if selected_key.begins_with("u"):
 			var e2 := _bag_entry(selected_key.substr(1))
-			iid3 = str(e2.get("id", "")); plus = int(e2.get("plus", 0))
+			iid3 = str(e2.get("id", "")); plus = int(e2.get("plus", 0)); sm_entry = e2
 			params = {"uid": int(e2.get("uid", 0))}
 		else:
 			var slot := selected_key.substr(1)
 			var it: Dictionary = eq.get(slot, {}) if typeof(eq.get(slot, null)) == TYPE_DICTIONARY else {}
-			iid3 = str(it.get("id", "")); plus = int(it.get("plus", 0))
+			iid3 = str(it.get("id", "")); plus = int(it.get("plus", 0)); sm_entry = it
 			params = {"slot": slot}
 		if not iid3.is_empty():
-			var box := W.item_detail(iid3, plus)
+			var box := W.item_detail(iid3, plus, true, sm_entry)
 			var names := {"upgrade": "Cường hóa lên +%d" % (plus + 1), "reforge": "Tẩy luyện", "salvage": "Phân rã lấy đá", "seal": "Khắc ấn"}
 			var tab := smith_tab
 			W.box_body(box).add_child(W.action_button(str(names.get(tab, tab)), func(): act(tab, params)))
@@ -1248,7 +1260,7 @@ func build_storage() -> Control:
 		for e2 in src:
 			if typeof(e2) == TYPE_DICTIONARY and str(e2.get("uid", 0)) == selected_key: sel = e2; break
 		if not sel.is_empty():
-			var box := W.item_detail(str(sel.get("id", "")), int(sel.get("plus", 0)))
+			var box := W.item_detail(str(sel.get("id", "")), int(sel.get("plus", 0)), true, sel)
 			var uidn := int(sel.get("uid", 0))
 			var act_type := "store" if storage_tab == "store" else "retrieve"
 			W.box_body(box).add_child(W.action_button("Gửi vào kho" if storage_tab == "store" else "Lấy ra", func(): act(act_type, {"uid": uidn}); _deselect()))
@@ -1524,33 +1536,31 @@ func build_companion() -> Control:
 func _pet_avatar(mid: String, px: int) -> Control:
 	var m := Data.mount(mid)
 	var look := str(m.get("look", "wolf"))
-	if m.is_empty(): look = "wolf"
-	var sheet := str((Data.mob_art.get("LOOK", {}) as Dictionary).get(look, "goblin"))
-	var path := "res://assets/mobs/%s/idle.png" % sheet
+	if not MobSpriteCls.PET_DEF.has(look): look = "wolf"
+	var pd: Dictionary = MobSpriteCls.PET_DEF[look]
+	var files: Dictionary = pd["files"]
+	var src := "walk" if (pd["frames"] as Dictionary).has("walk") else "run"
+	var path := MobSpriteCls.PET_DIR + str(files[src]) + ".png"
 	var fr := PanelContainer.new()
 	fr.add_theme_stylebox_override("panel", T.UISkin.slot(0, false))
 	fr.custom_minimum_size = Vector2(px, px)
 	fr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	if ResourceLoader.exists(path):
-		var md: Dictionary = (Data.mob_art.get("MOBS", {}) as Dictionary).get(sheet, {})
-		var fw := int(md.get("fw", 0))
-		var fh := int(md.get("fh", 0))
 		var tex := load(path) as Texture2D
+		var fw := int(pd["fw"])
+		var fh := int(pd["fh"])
+		var at := AtlasTexture.new()
+		at.atlas = tex
+		at.region = Rect2(0, int((pd.get("rows", {}) as Dictionary).get(src, 0)) * fh, fw, fh)
 		var r := TextureRect.new()
-		# Cat khung hinh dau tien cua sprite sheet (sheet gom nhieu frame ngang).
-		if fw > 0 and fh > 0:
-			var at := AtlasTexture.new()
-			at.atlas = tex
-			at.region = Rect2(0, 0, fw, fh)
-			r.texture = at
-		else:
-			r.texture = tex
+		r.texture = at
 		r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		r.custom_minimum_size = Vector2(px - 8, px - 8)
-		r.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		r.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		r.flip_h = bool(pd.get("left", false))
 		var tint_v: Variant = m.get("tint", null)
-		if tint_v != null: r.modulate = Color.hex(0x1000000 + int(tint_v))
+		if tint_v != null: r.modulate = Color.hex((int(tint_v) << 8) | 0xff)
 		fr.add_child(r)
 	return fr
 

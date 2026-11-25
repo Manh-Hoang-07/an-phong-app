@@ -25,7 +25,8 @@ func _wanted() -> Dictionary:
 	if p.is_empty(): return out
 	for id in w._companion_ids():
 		var d: Dictionary = Data.monster(str(id))
-		out["c:%s" % id] = {"kind": "pet", "id": str(id), "look": str(d.get("look", "")), "mob": str(id), "sprite": str(d.get("sprite", ""))}
+		var md: Dictionary = Data.mount(str(id))
+		out["c:%s" % id] = {"kind": "pet", "id": str(id), "look": str(md.get("look", d.get("look", ""))), "mob": str(id), "sprite": str(d.get("sprite", "")), "tint": md.get("tint", null)}
 	var sm: Dictionary = Game._as_dict(p.get("summons", {}))
 	var skills: Dictionary = Game._as_dict(p.get("skills", {}))
 	if bool(sm.get("enabled", false)) and int(skills.get("th5", 0)) >= 1:
@@ -60,7 +61,8 @@ func sync() -> void:
 		var spec: Dictionary = want[key]
 		var node: Node2D = MobScript.new()
 		_next_uid += 1
-		node.setup(_next_uid, str(spec["mob"]), str(spec["look"]), str(spec["sprite"]))
+		node.setup(_next_uid, str(spec["mob"]), str(spec["look"]), str(spec["sprite"]), str(spec["kind"]) != "shadow")
+		if spec.get("tint", null) != null: node.set("_tint", Color.hex((int(spec["tint"]) << 8) | 0xff))
 		node.set_process(true)
 		node.set_physics_process(false)
 		node.z_index = 3
@@ -140,6 +142,13 @@ func tick(delta: float) -> void:
 				tpos = Vector2(atk_target.position.x - signf(dx) * 48.0, atk_target.position.y)
 			elif now >= int(u["next_attack"]):
 				_attack(u, state, atk_target, dx, now)
+		# Quay mặt: đang đánh thì hướng về quái, đang đuổi theo chủ thì hướng đang đi, đứng yên thì cùng hướng chủ
+		var face := facing
+		if atk_target != null and absf(atk_target.position.x - node.position.x) > 4.0:
+			face = 1 if atk_target.position.x > node.position.x else -1
+		elif absf(tpos.x - node.position.x) > 8.0:
+			face = 1 if tpos.x > node.position.x else -1
+		node.set_facing(face)
 		node.set_target(tpos)
 	if _batch.size() > 0 and now >= _flush_at: _flush()
 

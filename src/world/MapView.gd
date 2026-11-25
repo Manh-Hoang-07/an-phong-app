@@ -713,7 +713,6 @@ func _decorate(chunks: Array[Image], earth: Color = Color(0.4, 0.28, 0.16), plan
 		unders.append(_make_under(i, earth))
 	for i in range(2): plank_faces.append(_make_plank_face(plank_h, i))
 	var sh_solid := _make_shadow(14, 0.5)
-	var sh_plank := _make_shadow(9, 0.35)
 	var lip := _make_lip()
 	var bevel := _make_bevel()
 	var cover: float = float(pal["cover"])
@@ -761,8 +760,7 @@ func _decorate(chunks: Array[Image], earth: Color = Color(0.4, 0.28, 0.16), plan
 			elif ch == "=":
 				if h % 4 == 0: _blit(chunks, dark_b[(h >> 3) % dark_b.size()], x, y)
 				_blit(chunks, plank_faces[(h >> 2) % plank_faces.size()], x, y)
-				if not _stand(r + 1, c):
-					_blit(chunks, sh_plank, x, y + TILE)
+				# Bậc gỗ lơ lửng không đổ bóng xuống bên dưới (nhìn vô lý).
 
 func _is_deep(r: int, c: int) -> bool:
 	for dr in range(-2, 3):

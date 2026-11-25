@@ -49,6 +49,8 @@ const MENU_MAIN := ["bag", "equip", "char", "skills", "quest", "map", "social", 
 const MENU_MORE := []
 const MENU_SERVICES := ["shop", "smith", "storage", "teleport", "npc", "code", "gate"]
 
+const MENU_TILE_H := 76.0   # chiều cao ô menu dưới đáy
+const MENU_TILE_W := 100.0
 const JOY_R := 54.0
 const SKILL_R := 25.0      # 4 kỹ năng thường (hàng ngang dưới màn)
 const ULT_R := 29.0        # kỹ năng đặc biệt (cạnh nút Đánh)
@@ -107,11 +109,15 @@ class ActionButton extends Control:
 	func set_badge(text: String) -> void:
 		if _badge == null:
 			_badge = Label.new()
-			_badge.add_theme_font_size_override("font_size", 12)
+			_badge.add_theme_font_size_override("font_size", 13)
 			_badge.add_theme_color_override("font_color", Color.WHITE)
 			_badge.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 			_badge.add_theme_constant_override("outline_size", 4)
-			_badge.position = Vector2(radius * 1.15, radius * 1.15)
+			_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			_badge.autowrap_mode = TextServer.AUTOWRAP_OFF
+			_badge.size = Vector2(radius * 2.0, 16.0)
+			_badge.position = Vector2(0.0, radius * 2.0 - 17.0)   # căn giữa, sát đáy nút
 			_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			add_child(_badge)
 		_badge.text = text
@@ -290,6 +296,7 @@ var _vignette: TextureRect = null
 var _low_hp_tween: Tween = null
 # menu + panel
 var _menu_layer: Control = null
+var _menu_scroll: TouchScroll = null
 var _panel_layer: Control = null
 var _panel: PanelContainer = null
 var _panel_scroll: ScrollContainer = null
@@ -321,7 +328,7 @@ func _process(_delta: float) -> void:
 
 # ---------------------------------------------------------------- Dựng giao diện
 func _build() -> void:
-	_inset = T.safe_insets(get_viewport(), 14.0)
+	_inset = _calc_inset()
 	_root = Control.new()
 	_root.name = "Root"
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -332,6 +339,7 @@ func _build() -> void:
 
 	_build_joystick()
 	_build_top_left()
+	_build_buffs()
 	_build_top_right()
 	_build_actions()
 	_build_log_and_chat()
@@ -350,6 +358,11 @@ func _build() -> void:
 	Social.changed.connect(_on_social_changed)
 	Social.invited.connect(_on_invited)
 	Social.trade_ended.connect(_on_trade_ended)
+
+## Khoảng cách tới mép màn hình: sát góc, chỉ chừa một phần nhỏ vùng an toàn (tai thỏ / bo góc).
+func _calc_inset() -> Vector4:
+	var s := T.safe_insets(get_viewport(), 0.0)
+	return Vector4(maxf(3.0, s.x * 0.35), maxf(3.0, s.y * 0.5), maxf(3.0, s.z * 0.35), maxf(3.0, s.w * 0.4))
 
 func _anchor_rect(c: Control, preset: int, x: float, y: float, w: float, h: float) -> void:
 	## Đặt control theo góc (preset) với vị trí x,y tính từ góc đó (x,y dương = vào trong).
@@ -423,13 +436,13 @@ func _build_top_left() -> void:
 	_exp_bar.add_theme_stylebox_override("fill", T.sb(T.C_GOLD, Color(0, 0, 0, 0), 0, 2, 0))
 	_exp_bar.add_theme_stylebox_override("background", T.sb(Color(0, 0, 0, 0.45), Color(0, 0, 0, 0), 0, 2, 0))
 	rows.add_child(_exp_bar)
-	var hp_row := _stat_row("heart", T.C_RED, 10.0)
+	var hp_row := _stat_row("heart", T.C_RED, 15.0)
 	_hp_bar = hp_row[0]; _hp_text = hp_row[1]
 	rows.add_child(hp_row[2])
-	var mp_row := _stat_row("drop", T.C_BLUE, 9.0)
+	var mp_row := _stat_row("drop", T.C_BLUE, 14.0)
 	_mp_bar = mp_row[0]; _mp_text = mp_row[1]
 	rows.add_child(mp_row[2])
-	var sta_row := _stat_row("skills", Color(0.30, 0.92, 0.50), 8.0)
+	var sta_row := _stat_row("skills", Color(0.30, 0.92, 0.50), 14.0)
 	_sta_bar = sta_row[0]; _sta_text = sta_row[1]
 	rows.add_child(sta_row[2])
 	# dòng nhiệm vụ: một dòng nhỏ dưới khung chỉ số
@@ -563,9 +576,9 @@ func accept_event_safe() -> void:
 	if _joy_zone: _joy_zone.accept_event()
 
 func _build_actions() -> void:
-	# Tâm nút Đánh (tính từ góc phải-dưới): ATTACK_R + lề.
-	var cx := -(_inset.z + ATTACK_R + 6.0)
-	var cy := -(_inset.w + ATTACK_R + 6.0)
+	# Bố cục góc phải-dưới, tâm nút Đánh (A) sát góc; các nút còn lại xếp cung tròn quanh A, không chồng nhau.
+	var cx := -(_inset.z + ATTACK_R + 2.0)
+	var cy := -(_inset.w + ATTACK_R + 2.0)
 	_attack_btn = ActionButton.new()
 	_attack_btn.setup(ATTACK_R, Color(1.0, 0.82, 0.36))
 	_attack_btn.big = true
@@ -578,41 +591,31 @@ func _build_actions() -> void:
 	_place_br(_attack_btn, cx, cy, ATTACK_R)
 	_root.add_child(_attack_btn)
 
-	# Nhảy: chếch xuống bên trái nút Đánh
-	_jump_btn = ActionButton.new()
-	_jump_btn.setup(JUMP_R, Color(0.62, 0.74, 0.96))
-	_jump_btn.fill = Color(0.10, 0.16, 0.28, 1.0)
-	_jump_btn.icon.texture = T.icon("jump")
-	_jump_btn.icon.modulate = T.C_TEXT
-	_jump_btn.pressed.connect(func(): jump_pressed.emit())
-	_place_br(_jump_btn, cx - 84.0, cy + 26.0, JUMP_R)
-	_root.add_child(_jump_btn)
+	# Nhảy: dùng cần di chuyển (kéo lên), không còn nút riêng. Giữ biến để tương thích.
+	_jump_btn = null
 
-	# 4 kỹ năng thường: hàng ngang giữa-dưới màn hình
-	var row_y := -(_inset.w + SKILL_R + 4.0)
-	for i in range(4):
+	# 5 kỹ năng thường (ô 0-4 của server): hàng ngang giữa-dưới, sát đáy màn hình
+	var row_y := -(_inset.w + SKILL_R + 1.0)
+	for i in range(5):
 		var b := _make_skill_button(i, SKILL_R, false)
-		_place_bc(b, (float(i) - 1.5) * (SKILL_R * 2.0 + 10.0), row_y, SKILL_R)
+		_place_bc(b, (float(i) - 2.0) * (SKILL_R * 2.0 + 10.0), row_y, SKILL_R)
 		_root.add_child(b)
 		_skill_buttons.append(b)
-	# Kỹ năng đặc biệt (ô 5): chếch lên bên trái nút Đánh
-	# 2 ô tuyệt kỹ / tuyệt phẩm (ô 5, 6 của server): chếch lên trái nút Đánh
-	var ult := _make_skill_button(4, ULT_R, true)
-	_place_br(ult, cx - 82.0, cy - 22.0, ULT_R)
-	_root.add_child(ult)
-	_skill_buttons.append(ult)
-	var ult2 := _make_skill_button(5, ULT_R, true)
-	_place_br(ult2, cx - 40.0, cy - 80.0, ULT_R)
-	_root.add_child(ult2)
-	_skill_buttons.append(ult2)
-	# Kỹ năng do trang bị cấp: nối tiếp hàng 4 kỹ năng, chỉ hiện khi đang mặc món có kỹ năng
-	var gear := _make_skill_button(6, SKILL_R, false)
+	# 3 ô tuyệt kỹ / tuyệt phẩm (ô 5, 6, 7 của server) xếp cung quanh nút Đánh
+	var ult_pos := [Vector2(-80.0, 8.0), Vector2(-58.0, -52.0), Vector2(0.0, -80.0)]
+	for k in range(3):
+		var u := _make_skill_button(5 + k, ULT_R, true)
+		_place_br(u, cx + (ult_pos[k] as Vector2).x, cy + (ult_pos[k] as Vector2).y, ULT_R)
+		_root.add_child(u)
+		_skill_buttons.append(u)
+	# Kỹ năng do trang bị cấp (ô 8): nối tiếp hàng kỹ năng thường, chỉ hiện khi đang mặc món có kỹ năng
+	var gear := _make_skill_button(8, SKILL_R, false)
 	gear.ring = Color(0.45, 0.92, 0.7)
-	_place_bc(gear, 2.5 * (SKILL_R * 2.0 + 10.0) + 6.0, row_y, SKILL_R)
+	_place_bc(gear, 3.0 * (SKILL_R * 2.0 + 10.0), row_y, SKILL_R)
 	gear.visible = false
 	_root.add_child(gear)
 	_skill_buttons.append(gear)
-	# Biến hình (chỉ hiện khi đã mở khóa Ấn) và nút đổi ấn nhỏ ở góc
+	# Biến hình (chỉ hiện khi đã mở khóa Ấn) và nút đổi ấn nhỏ phía trên
 	_form_btn = ActionButton.new()
 	_form_btn.setup(26.0, Color(1.0, 0.62, 0.25))
 	_form_btn.fill = Color(0.30, 0.12, 0.06, 1.0)
@@ -620,7 +623,7 @@ func _build_actions() -> void:
 	_form_btn.icon.modulate = Color(1.0, 0.85, 0.5)
 	_form_btn.visible = false
 	_form_btn.pressed.connect(func(): form_pressed.emit())
-	_place_br(_form_btn, cx - 4.0, cy - 118.0, 26.0)
+	_place_br(_form_btn, cx - 112.0, cy - 72.0, 26.0)
 	_root.add_child(_form_btn)
 	_seal_btn = ActionButton.new()
 	_seal_btn.setup(14.0, Color(0.8, 0.7, 1.0))
@@ -630,11 +633,11 @@ func _build_actions() -> void:
 	_seal_btn.glyph.add_theme_font_size_override("font_size", 12)
 	_seal_btn.visible = false
 	_seal_btn.pressed.connect(func(): seal_pressed.emit())
-	_place_br(_seal_btn, cx - 40.0, cy - 146.0, 14.0)
+	_place_br(_seal_btn, cx - 118.0, cy - 116.0, 14.0)
 	_root.add_child(_seal_btn)
-	# Bình máu / MP nhanh: bên trái nút Nhảy
-	_potion_hp = _make_potion_button("hp", Color(0.94, 0.34, 0.38), cx - 134.0, cy + 32.0)
-	_potion_mp = _make_potion_button("mp", Color(0.38, 0.66, 1.0), cx - 180.0, cy + 32.0)
+	# Bình máu / MP nhanh: hàng dưới, bên trái các nút tuyệt kỹ
+	_potion_hp = _make_potion_button("hp", Color(0.94, 0.34, 0.38), cx - 140.0, cy + 22.0)
+	_potion_mp = _make_potion_button("mp", Color(0.38, 0.66, 1.0), cx - 186.0, cy + 22.0)
 
 func _make_skill_button(i: int, r: float, special: bool) -> ActionButton:
 	var b := ActionButton.new()
@@ -671,7 +674,7 @@ func _build_log_and_chat() -> void:
 	_log.add_theme_constant_override("outline_size", 4)
 	_log.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.75))
 	# Nằm DƯỚI thẻ HP/MP (trước đây y=82 bị thẻ che nên tin chat mới không thấy).
-	_anchor_rect(_log, Control.PRESET_TOP_LEFT, _inset.x + 4, _inset.y + 118, 300, 120)
+	_anchor_rect(_log, Control.PRESET_TOP_LEFT, _inset.x + 4, _inset.y + 156, 300, 120)
 	_root.add_child(_log)
 
 	# Thanh chat: bật bằng nút chat, hiện ở giữa-trên.
@@ -736,16 +739,21 @@ func _build_menu() -> void:
 	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_menu_layer.add_child(scrim)
 
-	# Thanh menu nằm sát đáy màn hình; mỗi ô có nền riêng (thanh không có nền chung).
+	# Thanh menu nằm sát đáy màn hình; vuốt ngang khi không đủ chỗ (không hiện thanh cuộn).
+	_menu_scroll = TouchScroll.new()
+	_menu_scroll.horizontal = true
+	_menu_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	_menu_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_menu_scroll.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_menu_scroll.offset_left = _inset.x + 4.0; _menu_scroll.offset_right = -(_inset.z + 4.0)
+	_menu_scroll.offset_bottom = -(_inset.w + 4.0); _menu_scroll.offset_top = -(_inset.w + 4.0 + MENU_TILE_H)
+	_menu_scroll.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_menu_layer.add_child(_menu_scroll)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.mouse_filter = Control.MOUSE_FILTER_PASS
-	row.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	row.offset_left = _inset.x + 8.0; row.offset_right = -(_inset.z + 8.0)
-	row.offset_bottom = -(_inset.w + 6.0); row.offset_top = -(_inset.w + 6.0 + 58.0)
-	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_menu_layer.add_child(row)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_menu_scroll.add_child(row)
 	for tab in _menu_tabs():
 		row.add_child(_menu_tile(tab))
 
@@ -760,7 +768,7 @@ func _menu_tabs() -> Array:
 	return out
 
 func _menu_tile(tab: String) -> Button:
-	var b := T.button(str(RAIL_SHORT.get(tab, TAB_LABELS.get(tab, tab))), Vector2(0, 58))
+	var b := T.button(str(RAIL_SHORT.get(tab, TAB_LABELS.get(tab, tab))), Vector2(MENU_TILE_W, MENU_TILE_H))
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	b.add_theme_stylebox_override("normal", T.UISkin.tab(false))
@@ -769,13 +777,13 @@ func _menu_tile(tab: String) -> Button:
 	b.add_theme_color_override("font_color", T.C_TEXT)
 	b.add_theme_color_override("font_hover_color", T.C_GOLD)
 	b.add_theme_color_override("font_pressed_color", T.C_GOLD)
-	b.add_theme_font_size_override("font_size", 12)
+	b.add_theme_font_size_override("font_size", 15)
 	b.icon = T.icon(str(TAB_ICONS.get(tab, "menu")))
 	b.expand_icon = true
 	b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	b.add_theme_constant_override("icon_max_width", 22)
-	b.add_theme_constant_override("h_separation", 1)
+	b.add_theme_constant_override("icon_max_width", 32)
+	b.add_theme_constant_override("h_separation", 3)
 	b.add_theme_color_override("icon_normal_color", T.C_TEXT)
 	b.add_theme_color_override("icon_hover_color", T.C_GOLD)
 	b.add_theme_color_override("icon_pressed_color", T.C_GOLD)
@@ -887,7 +895,7 @@ func _build_panel() -> void:
 	corner.add_child(close)
 	_panel_scroll = TouchScroll.new()
 	_panel_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_panel_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_panel_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	pv.add_child(_panel_scroll)
 	_panel_body = VBoxContainer.new()
 	_panel_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -915,7 +923,7 @@ func _update_rail() -> void:
 		b.add_theme_color_override("icon_pressed_color", T.C_GOLD)
 
 func _layout() -> void:
-	_inset = T.safe_insets(get_viewport(), 14.0)
+	_inset = _calc_inset()
 	var vp := get_viewport().get_visible_rect().size
 	_panel_w = clampf(vp.x * 0.80, 480.0, 780.0)
 	if _panel:
@@ -1079,15 +1087,7 @@ func close_panel() -> void:
 
 # ---------------------------------------------------------------- Nút ngữ cảnh / chết / banner
 func _build_interact() -> void:
-	_interact_btn = T.button_primary("", Vector2(0, 46))
-	_interact_btn.visible = false
-	_interact_btn.add_theme_font_size_override("font_size", T.FS_M)
-	_interact_btn.pressed.connect(func(): interact_pressed.emit())
-	_anchor_rect(_interact_btn, Control.PRESET_CENTER_TOP, 0, 0, 240, 46)
-	_interact_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_interact_btn.offset_left = -120; _interact_btn.offset_right = 120
-	_interact_btn.offset_top = -(_inset.w + 124.0); _interact_btn.offset_bottom = -(_inset.w + 78.0)
-	_root.add_child(_interact_btn)
+	pass   # tương tác NPC / nhặt đồ / qua cổng dùng nút Đánh (mũi tên vàng chỉ đối tượng), không còn nút riêng
 
 ## label rỗng = ẩn nút.
 func set_interact(label: String) -> void:
@@ -1439,3 +1439,66 @@ func set_form_state(unlocked: int, tier: int, active: bool) -> void:
 	_form_btn.queue_redraw()
 	_seal_btn.set_glyph(str(Data.ROMAN[clampi(tier - 1, 0, 4)]))
 	_seal_btn.set_usable(not active)
+# ---------------------------------------------------------------- Hiệu ứng đang dùng (buff kỹ năng)
+var _buff_row: HBoxContainer = null
+var _buff_sig := ""
+var _buff_cells: Dictionary = {}   # id -> {t: Label, bar: ColorRect}
+
+func _build_buffs() -> void:
+	_buff_row = HBoxContainer.new()
+	_buff_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_buff_row.add_theme_constant_override("separation", 4)
+	_anchor_rect(_buff_row, Control.PRESET_TOP_LEFT, _inset.x + 2, _inset.y + 108, 320, 46)
+	_buff_row.visible = false
+	_root.add_child(_buff_row)
+
+## list: [{id, icon, label, left (ms), dur (ms)}]. Mỗi hiệu ứng một ô: biểu tượng, số giây còn lại, vạch thời gian chạy dần.
+func set_buffs(list: Array) -> void:
+	if _buff_row == null: return
+	var sig := ""
+	for b in list: sig += str((b as Dictionary)["id"]) + ","
+	if sig != _buff_sig:
+		_buff_sig = sig
+		_buff_cells.clear()
+		for c in _buff_row.get_children(): c.queue_free()
+		for b in list:
+			var d: Dictionary = b
+			var cell := Control.new()
+			cell.custom_minimum_size = Vector2(38, 46)
+			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var bg := Panel.new()
+			bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+			bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			bg.add_theme_stylebox_override("panel", T.sb(Color(0.03, 0.05, 0.1, 0.72), Color(T.C_GOLD, 0.6), 1, 6, 0))
+			cell.add_child(bg)
+			var ic := T.GlyphArt.make(str(d["icon"]), 26.0)
+			ic.position = Vector2(6, 2)
+			ic.size = Vector2(26, 26)
+			ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cell.add_child(ic)
+			var tl := T.hud_label("", 12, Color.WHITE, true)
+			tl.position = Vector2(0, 27)
+			tl.custom_minimum_size = Vector2(38, 0)
+			tl.size = Vector2(38, 14)
+			tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			tl.add_theme_constant_override("outline_size", 3)
+			cell.add_child(tl)
+			var bar := ColorRect.new()
+			bar.color = T.C_GOLD
+			bar.position = Vector2(3, 41)
+			bar.size = Vector2(32, 3)
+			bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cell.add_child(bar)
+			cell.tooltip_text = str(d["label"])
+			_buff_row.add_child(cell)
+			_buff_cells[str(d["id"])] = {"t": tl, "bar": bar}
+	_buff_row.visible = not list.is_empty()
+	for b in list:
+		var d2: Dictionary = b
+		var c: Dictionary = _buff_cells.get(str(d2["id"]), {})
+		if c.is_empty(): continue
+		var left := int(d2["left"])
+		var secs := int(ceil(float(left) / 1000.0))
+		(c["t"] as Label).text = str(secs)
+		(c["t"] as Label).add_theme_color_override("font_color", Color(1.0, 0.55, 0.5) if left <= 3000 else Color.WHITE)
+		(c["bar"] as ColorRect).size.x = 32.0 * clampf(float(left) / float(maxi(1, int(d2["dur"]))), 0.0, 1.0)

@@ -50,7 +50,8 @@ func build(grid: Array, tile: float, meta: Dictionary, ground_fn: Callable) -> v
 		_add_portal(str(key), str(d.get("to", "")), foot2, key == gate, portal_defs.size())
 	_build_zone_npcs(grid, tile, meta)
 
-## Người dẫn khu (khu_su): mỗi map 2 người, map rộng 3 người, đặt tự động — cùng thuật toán shared/logic/zone-npcs.js của web.
+## Người dẫn khu (khu_su): mỗi map 2 người ở ĐẦU và CUỐI map, map rộng (từ 156 cột) thêm 1 người ở giữa.
+## Cùng thuật toán shared/logic/zone-npcs.js của web/server (server coi các chỗ này như cổng để quái không tới sát).
 func _build_zone_npcs(grid: Array, tile: float, meta: Dictionary) -> void:
 	if Data.npc("khu_su").is_empty() or grid.is_empty(): return
 	var rows := grid.size()
@@ -63,28 +64,36 @@ func _build_zone_npcs(grid: Array, tile: float, meta: Dictionary) -> void:
 		for r in range(rows):
 			for c in range(cols):
 				if str((grid[r] as Array)[c]) == str(ch): spawn_x.append(float(c) * tile + tile * 0.5)
-	var marks: Array = [0.2, 0.5, 0.8] if cols >= 156 else [0.28, 0.72]
+	var marks: Array = [0.06, 0.5, 0.94] if cols >= 156 else [0.06, 0.94]
+	# từ chặt tới lỏng: [cách chỗ quái xuất hiện, đất bằng mỗi bên, cách cổng / NPC khác]
+	var tiers: Array = [[200.0, 2, 120.0], [120.0, 2, 120.0], [0.0, 2, 120.0], [0.0, 1, 80.0], [0.0, 0, 56.0]]
 	for f in marks:
 		var c0 := int(round(float(cols) * float(f)))
+		var edge: bool = float(f) != 0.5
+		var reach := maxi(12, int(round(float(cols) * 0.22))) if edge else 60
 		var done := false
-		for gap in [200.0, 120.0, 0.0]:
-			for d in range(60):
-				var cand: Array = [c0] if d == 0 else [c0 - d, c0 + d]
+		for tier in tiers:
+			for d in range(reach):
+				var cand: Array = [c0]
+				if d > 0:
+					cand = ([c0 + d] if float(f) < 0.5 else [c0 - d]) if edge else [c0 - d, c0 + d]
 				for c in cand:
 					if c < 5 or c > cols - 6: continue
 					var r := _zone_floor_row(grid, rows, cols, c)
 					if r < 0: continue
-					var flat := true
-					for k in [-2, -1, 1, 2]:
-						if _zone_floor_row(grid, rows, cols, c + k) != r: flat = false; break
-					if not flat: continue
+					var ok := true
+					for k in range(1, int(tier[1]) + 1):
+						if _zone_floor_row(grid, rows, cols, c - k) != r or _zone_floor_row(grid, rows, cols, c + k) != r:
+							ok = false
+							break
+					if not ok: continue
 					var x := float(c) * tile + tile * 0.5
 					var clash := false
 					for u in used:
-						if absf(float(u) - x) < 120.0: clash = true; break
+						if absf(float(u) - x) < float(tier[2]): clash = true; break
 					if clash: continue
 					for u2 in spawn_x:
-						if absf(float(u2) - x) < gap: clash = true; break
+						if absf(float(u2) - x) < float(tier[0]): clash = true; break
 					if clash: continue
 					used.append(x)
 					_add_npc("khu_su", Vector2(x, float(r) * tile))
@@ -247,12 +256,12 @@ func nearest(player_foot: Vector2) -> Dictionary:
 	for p in portals:
 		var d: float = absf(player_foot.x - (p["pos"] as Vector2).x)
 		if d < 46.0 and absf(player_foot.y - (p["pos"] as Vector2).y) < 70.0 and d < bd:
-			bd = d; best = {"type": "portal", "key": p["key"], "to": p["to"], "name": p["name"]}
+			bd = d; best = {"type": "portal", "key": p["key"], "to": p["to"], "name": p["name"], "pos": (p["pos"] as Vector2) + Vector2(0, -170)}
 	for n in npcs:
 		var d2: float = absf(player_foot.x - (n["pos"] as Vector2).x)
 		if not (n["node"] as Node2D).visible: continue
 		if d2 < 90.0 and absf(player_foot.y - (n["pos"] as Vector2).y) < 70.0 and d2 < bd:
-			bd = d2; best = {"type": "npc", "id": n["id"], "name": str(Data.npc(str(n["id"])).get("name", n["id"]))}
+			bd = d2; best = {"type": "npc", "id": n["id"], "name": str(Data.npc(str(n["id"])).get("name", n["id"])), "pos": (n["pos"] as Vector2) + Vector2(0, -122)}
 	return best
 
 class _Shadow extends Node2D:
