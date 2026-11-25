@@ -22,11 +22,12 @@ jobs:
           uname -a
 
   macos:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 10
     steps:
       - name: macOS runner OK
         run: |
-          echo "macos-15 acquired"
+          echo "macos-26 acquired"
           sw_vers
           xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos || true

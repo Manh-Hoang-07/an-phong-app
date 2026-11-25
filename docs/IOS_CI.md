@@ -50,6 +50,13 @@ Variable `IOS_EXPORT_METHOD`: `app-store` (mặc định) | `ad-hoc` | `developm
 Actions → iOS build → Run workflow → bật **sign**. Kết quả: `.ipa` ở mục Artifacts, và/hoặc build xuất hiện trên TestFlight.
 Cài qua TestFlight: tải app TestFlight trên iPhone, thêm email vào nhóm tester.
 
+## Chọn bản Xcode / runner (không cần sửa workflow)
+- Workflow chạy trên `macos-26` (image `macos-15` bị GitHub retire cuối 2027; Xcode 27, bắt buộc từ 04/2027, chỉ chạy trên macOS 26+).
+- Bản Xcode lấy từ GitHub Variable `IOS_XCODE_VERSION` (Settings → Secrets and variables → Actions → **Variables**), mặc định `26.3`. Đổi biến này để nâng Xcode mà không sửa file.
+- Hiện dùng `26.3` vì export template Godot 4.7.2 chứa `libgodot.a` build bằng Xcode 26 / iOS 26 SDK; Xcode 16.4 thì link fail.
+- **Trước 04/2027**, nếu còn upload lên App Store/TestFlight: đặt `IOS_XCODE_VERSION=27.2` (hoặc bản 27 GA mới hơn) rồi chạy thử workflow với `sign` tắt trước. Apple yêu cầu build bằng iOS 27 SDK trở lên từ tháng 4/2027; deployment target iOS 15 đã đúng trong preset (`min_ios_version="15.0"`). Nhánh sideload (IPA unsigned) không bị mốc này.
+- Nếu bước "Chọn Xcode" báo không tìm thấy bản: xem danh sách Xcode có sẵn trong file `images/macos/macos-26-Readme.md` của repo `actions/runner-images`.
+
 ## Lưu ý
 - Không bao giờ commit `ios.key`, `cert.p12`, `.mobileprovision`, `.p8` (chỉ để trong Secrets).
 - Nếu bước "Xuất dự án Xcode" báo thiếu template: kiểm tra `GODOT_VERSION` trong workflow có khớp bản Godot đã dùng để phát triển (hiện 4.7.2).

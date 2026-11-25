@@ -17,17 +17,35 @@ on:
 env:
   GODOT_VERSION: "4.7.2"
   GODOT_APP: /Applications/Godot.app/Contents/MacOS/Godot
-  # Template Godot 4.7.2 duoc build bang Xcode 26 / iOS 26 SDK (co cac symbol
-  # CADynamicRange*, MTLTensorDomain). Xcode 16.4 mac dinh tren runner khong co
-  # -> link that. Ep dung Xcode 26.3 co san tren macos-15.
-  DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
 
 jobs:
   ios:
-    runs-on: macos-15
+    # macos-15 bi GitHub retire cuoi 2027 -> dung macos-26 (GA tu 02/2026).
+    # Xcode 27, bat buoc cho App Store tu 04/2027, chi chay duoc tren macOS 26+.
+    runs-on: macos-26
     timeout-minutes: 60
+    env:
+      # Doi ban Xcode bang GitHub Variable IOS_XCODE_VERSION (Settings -> Secrets
+      # and variables -> Actions -> Variables), khong can sua workflow.
+      # Template Godot 4.7.2 build bang Xcode 26 / iOS 26 SDK (symbol
+      # CADynamicRange*, MTLTensorDomain) -> phai dung Xcode 26.x; Xcode 16.4
+      # mac dinh tren runner cu khong co -> link that.
+      XCODE_VERSION: ${{ vars.IOS_XCODE_VERSION || '26.3' }}
     steps:
       - uses: actions/checkout@v4
+
+      # Chon Xcode theo version thay vi tro cung vao /Applications/Xcode_*.app:
+      # path cung se gay khi image cap nhat va go bot ban Xcode cu.
+      - name: Chon Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+
+      - name: Xac nhan Xcode + iOS SDK
+        run: |
+          echo "XCODE_VERSION=${XCODE_VERSION}"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos || true
 
       - name: Cài Godot + export templates
         run: |
