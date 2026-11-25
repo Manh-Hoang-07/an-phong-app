@@ -1,5 +1,5 @@
 extends Node
-## Bạn đồng hành tự đánh quái, port từ web (WorldPlayer.companionUpdate / summonUpdate / shadowUpdate):
+## Bạn đồng hành đánh THEO chủ (chỉ đánh quái chủ vừa đánh, không tự tìm quái), port từ web (WorldPlayer.companionUpdate / summonUpdate / shadowUpdate):
 ##  - thú đồng hành (player.mounts.summoned)  -> src "pet"
 ##  - linh thú của Triệu Hồi Sư (player.summons) -> src "pet"
 ##  - bóng ma của Tử Linh Thuật Sư (player.shadows) -> src "shadow"
@@ -86,15 +86,15 @@ func clear() -> void:
 # ------------------------------------------------------------------ Mục tiêu
 func _target() -> Node2D:
 	var now := Time.get_ticks_msec()
-	# Ưu tiên quái người chơi vừa đánh, rồi đến quái gần nhất trong tầm
+	# Chỉ đánh quái chủ vừa đánh (trong ~2,5s); không tự tìm mục tiêu. Chủ ngừng đánh -> null -> thú quay về theo chủ.
 	var u := int(w._last_hit_uid)
-	if u != 0 and now - int(w._last_hit_at) < 5000 and w._mobs.has(u):
+	if u != 0 and now - int(w._last_hit_at) < 2500 and w._mobs.has(u):
 		var m: Node2D = w._mobs[u]
 		if is_instance_valid(m) and m.alive and not bool(m.passive): return m
-	return w._nearest_mob(420.0, 200.0)
+	return null
 
 func _focus() -> Node2D:
-	if int(w._shadow_focus) != 0 and Time.get_ticks_msec() < int(w._shadow_focus_until) and w._mobs.has(int(w._shadow_focus)):
+	if int(w._shadow_focus) != 0 and Time.get_ticks_msec() < int(w._shadow_focus_until) and Time.get_ticks_msec() - int(w._last_hit_at) < 2500 and w._mobs.has(int(w._shadow_focus)):
 		var m: Node2D = w._mobs[int(w._shadow_focus)]
 		if is_instance_valid(m) and m.alive: return m
 	return null

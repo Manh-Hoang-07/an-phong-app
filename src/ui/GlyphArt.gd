@@ -27,6 +27,8 @@ const FAMILY_COLOR := {
 	"orb": Color("7fa6ff"), "paw": Color("f0b27a"),
 }
 
+const SkillIcons = preload("res://src/ui/SkillIcons.gd")
+
 static var _lookup: Dictionary = {}
 
 ## Emoji (hoặc token đã có) -> token "@họ". Rỗng -> "".
@@ -60,6 +62,8 @@ static func _build_fam_idx() -> void:
 ## Số = thứ tự của kỹ năng trong họ -> mỗi kỹ năng một cặp (sắc độ, họa tiết viền) khác nhau, không trùng ảnh.
 static func skill_token(sid: String, icon_token: String) -> String:
 	if sid.is_empty(): return icon_token
+	var sk := SkillIcons.token_of_skill(sid)
+	if not sk.is_empty(): return sk
 	var fam := "star"
 	if icon_token.begins_with("@"):
 		var parts := icon_token.split(":")
@@ -135,7 +139,7 @@ func _draw() -> void:
 	if size.x < 4.0 or size.y < 4.0: return
 	var c := size * 0.5
 	var s := minf(size.x, size.y) * 0.5 * 0.86
-	var col: Color = tint if tint.a > 0.0 else FAMILY_COLOR.get(fam, Color.WHITE)
+	var col: Color = tint if tint.a > 0.0 else FAMILY_COLOR.get(fam, SkillIcons.COLORS.get(fam, Color.WHITE))
 	if variant > 0:
 		col.h = fposmod(col.h + (float(variant % 8) - 3.5) * 0.03, 1.0)
 	if framed:
@@ -153,6 +157,9 @@ func _draw() -> void:
 		s *= 0.78
 	var dark := Color(col.r * 0.35, col.g * 0.35, col.b * 0.4, 0.9)
 	var lw := maxf(1.5, s * 0.16)
+	if SkillIcons.COLORS.has(fam):
+		SkillIcons.draw(self, fam, c, s, col, lw)
+		return
 	rot = deg_to_rad(float(variant - 2) * 8.0) if variant > 0 else 0.0
 	rot_c = cos(rot)
 	rot_s = sin(rot)

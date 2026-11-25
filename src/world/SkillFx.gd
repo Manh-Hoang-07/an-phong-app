@@ -1,4 +1,5 @@
 extends Node2D
+const FxExt := preload("res://src/world/fx/FxExt.gd")
 ## Bộ vẽ hiệu ứng kỹ năng cho app: đọc CÙNG file JSON với web
 ## (shared/data/skillfx/<id>.json, đóng gói vào res://data/skillfx/).
 ##
@@ -339,10 +340,33 @@ func _swirl_step(u: float, node: Node2D, origin: Vector2, base: float, turns: fl
 const SIG_GROUND := ["trap", "quake", "thorn", "dawn", "garden", "summon", "fortress", "hell", "net", "miasma", "crystal", "hammer", "blizzard"]
 const SIG_BODY := ["shadow", "clones", "cloak", "veil", "smoke", "blink", "hop", "whirl", "orbit", "disc", "storm", "vortex", "spirit", "holy", "bless", "angel", "wings", "bird", "star", "moon", "rune", "dome", "shield", "rage", "awaken", "elem", "nova", "drain", "bloodlust", "judge"]
 const SIG_SKIP := ["manaburst", "execute", "allin", "fusion"]
+## Ghi đè biểu tượng theo id kỹ năng (khi sig chung chung không khớp tên).
+const SIG_BY_ID := {
+	"ks40": "swordrain", "ulKiem1": "swordrain",       # Vạn Kiếm Quy Tông / Kiếm Trận Hủy Diệt: kiếm từ trời đâm xuống
+	"ks30": "swordshield", "pa9": "swordshield",       # Kiếm Tâm Phản Kích / Kiếm Phản Kích: khiên kiếm + phản đòn
+	"ulChung1": "quake",                               # Thiên Địa Chấn Động: nứt đất, sóng xung kích, đá bay
+	"ks45": "swordawaken",                             # Chân Kiếm Thức Tỉnh: kiếm phóng to + hào quang
+	"tl1": "healplus", "ps38": "healplus", "tn2": "healplus",   # hồi máu: dấu cộng bay lên
+	"ps37": "lightball",                               # Lôi Cầu Xoáy: quả cầu sét xoáy
+	"st8": "poison",                                   # Phi Tiêu Độc: bọt độc + giọt độc
+}
+const SIG_NOPOP := ["swordrain", "quake", "swordawaken"]
+
+## Rung màn hình (camera offset), tự trả về 0.
+func _rumble(amount: float, dur: float) -> void:
+	var cam := get_viewport().get_camera_2d()
+	if cam == null: return
+	var tw := create_tween()
+	for i in range(8):
+		tw.tween_property(cam, "offset", Vector2(randf_range(-amount, amount), randf_range(-amount, amount)) * (1.0 - float(i) / 8.0), dur / 8.0)
+	tw.tween_property(cam, "offset", Vector2.ZERO, 0.05)
 
 ## Biểu tượng đặc trưng của kỹ năng (theo `sig` trong công thức): mỗi kiểu một hình riêng, thêm biến thể theo id.
 func _paint_sig(r: Dictionary, origin: Vector2, facing: int, ctx: Dictionary, colors: Array) -> void:
-	var sg := str(r.get("sig", ""))
+	var sg := str(SIG_BY_ID.get(str(r.get("id", "")), r.get("sig", "")))
+	var ext_sg := FxExt.sig_for(str(r.get("id", "")))
+	if ext_sg != "": sg = ext_sg
+	var xc := FxExt.cfg_for(sg)
 	if sg == "" or sg in SIG_SKIP: return
 	var f := float(facing) if facing != 0 else 1.0
 	var color := _color("main", colors)
@@ -350,22 +374,44 @@ func _paint_sig(r: Dictionary, origin: Vector2, facing: int, ctx: Dictionary, co
 	var key := "sig|%s|%d" % [str(ctx.get("theme", "")), 1 if ctx.get("dark", false) else 0]
 	var node := _take(key, color, core, ctx, {})
 	node.sig = sg
+	node._lowq = Settings.quality_low
 	node.vs = str(r.get("id", sg)).hash() + int(ctx.get("variant", 0)) * 7919
 	node.prog = 0.0
 	node.z_index = 9
 	var big := 1.4 if str(r.get("tier", "")) == "ult" else 1.0
 	var pos := origin + Vector2(f * 58.0, -4.0)
 	var sx := f
-	if sg in SIG_GROUND:
+	if sg == "swordrain":
+		pos = origin + Vector2(f * 70.0, GROUND - 4.0)
+		sx = 1.0
+	elif sg == "quake":
+		pos = origin + Vector2(f * 20.0, GROUND - 2.0)
+		sx = 1.0
+	elif sg in SIG_GROUND:
 		pos = origin + Vector2(f * 30.0, GROUND - 4.0)
 	elif sg in SIG_BODY:
 		pos = origin + Vector2(0, -4.0)
 		sx = 1.0
+	if not xc.is_empty():
+		match str(xc.get("place", "front")):
+			"ground": pos = origin + Vector2(f * 30.0, GROUND - 4.0)
+			"body": pos = origin + Vector2(0, -4.0); sx = 1.0
+			"far": pos = origin + Vector2(f * 90.0, GROUND - 4.0); sx = 1.0
+		if xc.get("rumble", 0.0) > 0.0: _rumble(float(xc["rumble"]) * big, 0.7)
 	node.position = pos
-	node.scale = Vector2(sx, 1.0) * 0.6 * big
 	var dur := 0.9 if big > 1.0 else 0.7
+	if not xc.is_empty() and xc.has("dur"): dur = float(xc["dur"])
+	if sg == "swordrain": dur = 1.4
+	elif sg == "quake": dur = 1.2
+	elif sg == "swordawaken": dur = 1.3
 	var tw := create_tween().set_parallel(true)
-	tw.tween_property(node, "scale", Vector2(sx, 1.0) * big, dur * 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if sg in SIG_NOPOP or bool(xc.get("nopop", false)):
+		node.scale = Vector2(sx, 1.0) * big
+	else:
+		node.scale = Vector2(sx, 1.0) * 0.6 * big
+		tw.tween_property(node, "scale", Vector2(sx, 1.0) * big, dur * 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if sg == "quake":
+		_rumble(10.0 * big, 0.7)
 	tw.tween_property(node, "prog", 1.0, dur * 0.75)
 	_fade(node, key, dur, 0.0, 0.5)
 
@@ -692,6 +738,7 @@ class _FxShape extends Node2D:
 	# ================= BIỂU TƯỢNG ĐẶC TRƯNG (mỗi `sig` của kỹ năng một hình riêng) =================
 	var sig := "nova"
 	var vs := 0
+	var _lowq := false
 	var prog := 0.0:
 		set(v):
 			prog = v
@@ -732,8 +779,191 @@ class _FxShape extends Node2D:
 		draw_line(Vector2(x - 3, 6), Vector2(x - 6, 24), _a(al), 4.0)
 		draw_line(Vector2(x + 3, 6), Vector2(x + 6, 24), _a(al), 4.0)
 
+	## Kiếm cắm xuống: mũi ở gốc toạ độ, thân hướng lên.
+	func _sword_down(pos: Vector2, ln: float, lean: float, al: float) -> void:
+		draw_set_transform(pos, lean, Vector2.ONE)
+		draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(-5, -ln * 0.8), Vector2(0, -ln), Vector2(5, -ln * 0.8)]), PackedColorArray([_a(al), _a(al), _a(al), _a(al)]))
+		draw_line(Vector2(0, -2), Vector2(0, -ln * 0.9), _k(al), 1.4)
+		draw_rect(Rect2(-9, -ln - 4, 18, 4), _a(al))
+		draw_rect(Rect2(-2, -ln - 22, 4, 18), _a(al * 0.9))
+		draw_circle(Vector2(0, -ln - 24), 3.0, _k(al))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+	func _plus(c: Vector2, sz: float, c1: Color, c2: Color) -> void:
+		draw_rect(Rect2(c.x - sz, c.y - sz * 0.32, sz * 2.0, sz * 0.64), c1)
+		draw_rect(Rect2(c.x - sz * 0.32, c.y - sz, sz * 0.64, sz * 2.0), c1)
+		draw_rect(Rect2(c.x - sz * 0.6, c.y - sz * 0.12, sz * 1.2, sz * 0.24), c2)
+		draw_rect(Rect2(c.x - sz * 0.12, c.y - sz * 0.6, sz * 0.24, sz * 1.2), c2)
+
+	func _d_sig_new() -> bool:
+		var t := prog
+		if FxExt.draw_sig(self, sig, t, _lowq): return true
+		match sig:
+			"swordrain":
+				# vùng sáng dưới đất + nhiều kiếm từ trên trời rơi xuống, cắm vào khu vực
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.3))
+				draw_circle(Vector2.ZERO, 96.0, _a(0.14 * minf(1.0, t * 2.0)))
+				draw_arc(Vector2.ZERO, 96.0, 0.0, TAU, 48, _a(0.55 * minf(1.0, t * 2.0)), 3.0)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+				var n := 5 if _lowq else 11
+				for k in range(n):
+					var x := -86.0 + 172.0 * float(k) / float(n - 1) + _rng.randf_range(-6.0, 6.0)
+					var d := fposmod(float(k) * 0.382, 1.0) * 0.5
+					var gy := _rng.randf_range(-4.0, 14.0)
+					var q := clampf((t - d) / 0.26, 0.0, 1.0)
+					if q <= 0.0: continue
+					var y := lerpf(-230.0, gy, q * q)
+					var lean := -x / 420.0
+					if q < 1.0:
+						draw_line(Vector2(x, y - 90.0), Vector2(x, y - 30.0), _a(0.3), 6.0)
+					_sword_down(Vector2(x, y), 44.0, lean, 0.95)
+					if q >= 1.0:
+						var r := minf(1.0, (t - d - 0.26) * 5.0)
+						draw_set_transform(Vector2(x, gy), 0.0, Vector2(1.0, 0.35))
+						draw_arc(Vector2.ZERO, 8.0 + 22.0 * r, 0.0, TAU, 20, _k(0.8 * (1.0 - r)), 2.0)
+						draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+				return true
+			"swordshield":
+				# khiên kiếm phát sáng trước người; nửa sau: phản đòn
+				var form := minf(1.0, t * 2.2)
+				var pulse := 1.0 + 0.06 * sin(t * 28.0)
+				for i in range(6):
+					var u := float(i) / 5.0
+					draw_circle(Vector2(-6, -6), (48.0 - 26.0 * u) * pulse * form, _mix(u, 0.07 + 0.07 * u))
+				draw_arc(Vector2(-6, -6), 40.0 * form, 0.0, TAU, 40, _a(0.9), 3.5)
+				draw_arc(Vector2(-6, -6), 33.0 * form, 0.0, TAU, 40, _k(0.8), 1.5)
+				for sgn in [-1.0, 1.0]:
+					var dir := Vector2(1.0, sgn).normalized()
+					var nr := dir.orthogonal()
+					var a := Vector2(-6, -6) - dir * 38.0 * form
+					var b := Vector2(-6, -6) + dir * 38.0 * form
+					draw_colored_polygon(PackedVector2Array([a, a.lerp(b, 0.15) + nr * 3.5, b, a.lerp(b, 0.15) - nr * 3.5]), _a(0.92))
+					draw_line(a, b, _k(0.95), 1.4)
+					draw_line(a.lerp(b, 0.12) + nr * 8.0, a.lerp(b, 0.12) - nr * 8.0, _a(0.95), 3.0)
+				if t > 0.5:
+					var c := (t - 0.5) * 2.0
+					_starpoly(8, 10.0 + 44.0 * c, 4.0, _k(0.85 * (1.0 - c)))
+					draw_arc(Vector2(-6, -6), 40.0 + 40.0 * c, 0.0, TAU, 40, _k(0.9 * (1.0 - c)), 4.0)
+					_streak(Vector2(10, -6), Vector2(10 + 90.0 * c, -6), 12.0 * (1.0 - c * 0.5))
+				return true
+			"quake":
+				# sóng xung kích lan trên mặt đất, nứt đất, đá văng
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.32))
+				for k in range(3):
+					var q := t * 1.5 - 0.15 * k
+					if q <= 0.0: continue
+					var rr := 18.0 + 130.0 * minf(1.0, q)
+					var al := clampf(1.0 - q * 0.8, 0.0, 1.0)
+					draw_arc(Vector2.ZERO, rr, 0.0, TAU, 48, _a(0.3 * al), 12.0)
+					draw_arc(Vector2.ZERO, rr, 0.0, TAU, 48, _a(0.9 * al), 4.0)
+					draw_arc(Vector2.ZERO, rr, 0.0, TAU, 48, _k(0.8 * al), 1.4)
+				draw_circle(Vector2.ZERO, 30.0 * minf(1.0, t * 3.0), _a(0.25))
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+				var nc := 7 if _lowq else 11
+				for k in range(nc):
+					var a := TAU * float(k) / float(nc) + _rng.randf_range(-0.2, 0.2)
+					var L := _rng.randf_range(70.0, 130.0) * minf(1.0, t * 2.5)
+					var pts := PackedVector2Array([Vector2.ZERO])
+					var cur := Vector2.ZERO
+					for s2 in range(5):
+						var aa := a + _rng.randf_range(-0.3, 0.3)
+						cur += Vector2(cos(aa), sin(aa) * 0.34) * L / 5.0
+						pts.append(cur)
+					draw_polyline(pts, _a(0.3), 6.0)
+					draw_polyline(pts, _a(0.95), 2.4)
+				var nr2 := 6 if _lowq else 12
+				for k in range(nr2):
+					var ang := _rng.randf_range(-2.6, -0.5)
+					var spd := _rng.randf_range(60.0, 120.0)
+					var life := minf(1.0, t * 1.3)
+					var px := cos(ang) * spd * life * 1.1 * (1.0 if k % 2 == 0 else -1.0)
+					var py := sin(ang) * spd * life + 150.0 * life * life
+					var sz := _rng.randf_range(3.0, 7.0)
+					draw_set_transform(Vector2(px, py), life * 6.0 + k, Vector2.ONE)
+					draw_colored_polygon(PackedVector2Array([Vector2(-sz, -sz * 0.6), Vector2(sz * 0.8, -sz), Vector2(sz, sz * 0.5), Vector2(-sz * 0.3, sz)]), Color(core.r * 0.5 + col.r * 0.4, core.g * 0.5 + col.g * 0.4, core.b * 0.5 + col.b * 0.4, 0.95))
+					draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+				return true
+			"swordawaken":
+				# thanh kiếm lớn dần, hào quang toả quanh người
+				var g := minf(1.0, t * 1.4)
+				var pulse2 := 1.0 + 0.08 * sin(t * 20.0)
+				for i in range(8):
+					var u := float(i) / 7.0
+					draw_circle(Vector2(0, -6), (76.0 * g * pulse2) * (1.0 - u * 0.85), _mix(u, 0.05 + 0.07 * u))
+				for k in range(14):
+					var a := TAU * float(k) / 14.0 + t * 1.2
+					var d := Vector2(cos(a), sin(a))
+					var ln := (50.0 + (k % 2) * 26.0) * g
+					draw_colored_polygon(PackedVector2Array([d * 30.0 + d.orthogonal() * 3.5, d * (30.0 + ln), d * 30.0 - d.orthogonal() * 3.5]), _a(0.55))
+				draw_arc(Vector2(0, -6), 52.0 * g, 0.0, TAU, 40, _k(0.75), 2.5)
+				var s := 0.35 + 0.95 * g
+				var bl := 62.0 * s
+				var cy := 14.0
+				draw_colored_polygon(PackedVector2Array([Vector2(0, cy - bl - 16.0 * s), Vector2(-9.0 * s, cy - bl), Vector2(-8.0 * s, cy), Vector2(8.0 * s, cy), Vector2(9.0 * s, cy - bl)]), _a(0.78))
+				draw_line(Vector2(0, cy), Vector2(0, cy - bl - 10.0 * s), _k(0.95), 2.0 * s)
+				draw_rect(Rect2(-18.0 * s, cy, 36.0 * s, 5.0 * s), _a(0.9))
+				draw_rect(Rect2(-3.0 * s, cy + 5.0 * s, 6.0 * s, 20.0 * s), _a(0.85))
+				draw_circle(Vector2(0, cy + 28.0 * s), 4.0 * s, _k(0.95))
+				_starpoly(4, 20.0 * g, 3.0, _k(0.9 * g), -PI * 0.5)
+				return true
+			"healplus":
+				for i in range(6):
+					var u := float(i) / 5.0
+					draw_circle(Vector2(0, 4), 36.0 * (1.0 - u * 0.8), _mix(u, 0.05 + 0.06 * u))
+				var nn := 4 if _lowq else 7
+				for k in range(nn):
+					var x := -34.0 + 68.0 * float(k) / float(nn - 1) + sin(t * 6.0 + k) * 5.0
+					var q := fposmod(t * 1.1 + float(k) * 0.19, 1.0)
+					var y := 24.0 - 78.0 * q
+					var al := sin(q * PI)
+					_plus(Vector2(x, y), 6.0 + float(k % 3) * 2.0, _a(0.9 * al), _k(al))
+				draw_set_transform(Vector2(0, 26), 0.0, Vector2(1.0, 0.32))
+				draw_arc(Vector2.ZERO, 14.0 + 30.0 * t, 0.0, TAU, 32, _a(0.8 * (1.0 - t)), 3.0)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+				return true
+			"lightball":
+				var cx := -24.0 + 60.0 * t
+				_rng.seed = vs + int(t * 18.0) * 31
+				for i in range(6):
+					var u := float(i) / 5.0
+					draw_circle(Vector2(cx, 0), 26.0 * (1.0 - u * 0.8), _mix(u, 0.12 + 0.1 * u))
+				for k in range(8):
+					var a := TAU * float(k) / 8.0 + t * 9.0
+					var d := Vector2(cos(a), sin(a))
+					var pts := PackedVector2Array([Vector2(cx, 0) + d * 8.0])
+					for j in range(1, 4):
+						pts.append(Vector2(cx, 0) + d * (8.0 + 9.0 * j) + d.orthogonal() * _rng.randf_range(-6.0, 6.0))
+					draw_polyline(pts, _a(0.9), 3.0)
+					draw_polyline(pts, _k(1.0), 1.2)
+				draw_circle(Vector2(cx, 0), 7.0, _k(1.0))
+				for k in range(3):
+					var a2 := -t * 12.0 + TAU * k / 3.0
+					draw_circle(Vector2(cx, 0) + Vector2(cos(a2), sin(a2) * 0.6) * 30.0, 3.0, _k(0.95))
+				return true
+			"poison":
+				var gc := Color(0.55, 0.92, 0.2)
+				var gd := Color(0.25, 0.55, 0.1)
+				for k in range(6):
+					var x := _rng.randf_range(-36.0, 36.0)
+					draw_circle(Vector2(x, 6.0 - 6.0 * t), 12.0 + 8.0 * t, Color(gd.r, gd.g, gd.b, 0.3))
+				for k in range(7):
+					var x2 := _rng.randf_range(-34.0, 34.0)
+					var q := fposmod(t * 1.2 + float(k) * 0.16, 1.0)
+					var y := 16.0 - 50.0 * q
+					var r := 3.0 + _rng.randf() * 4.0
+					draw_arc(Vector2(x2, y), r, 0.0, TAU, 12, Color(gc.r, gc.g, gc.b, 0.9 * (1.0 - q)), 1.6)
+					draw_circle(Vector2(x2 - r * 0.3, y - r * 0.3), r * 0.25, Color(1, 1, 1, 0.7 * (1.0 - q)))
+				for k in range(4):
+					var x3 := -24.0 + 16.0 * k
+					var y3 := -30.0 + 56.0 * minf(1.0, t * 1.3 + k * 0.04)
+					draw_circle(Vector2(x3, y3), 5.0, Color(gc.r, gc.g, gc.b, 0.95))
+					draw_colored_polygon(PackedVector2Array([Vector2(x3 - 3.5, y3 - 2), Vector2(x3 + 3.5, y3 - 2), Vector2(x3, y3 - 14)]), Color(gc.r, gc.g, gc.b, 0.95))
+				return true
+		return false
+
 	func _d_sig() -> void:
 		_rng.seed = vs
+		if _d_sig_new(): return
 		var t := prog
 		var flip := 1.0 if (vs % 2 == 0) else -1.0
 		match sig:

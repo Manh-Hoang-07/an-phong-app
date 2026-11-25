@@ -44,7 +44,40 @@ func setup(data: Dictionary) -> void:
 	tw.tween_property(self, "position:y", position.y + 40.0, 0.45).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	tw.tween_property(self, "scale", Vector2.ONE, 0.3)
 
+## Đồ rơi tự biến mất: mặc định 60s, nhấp nháy 10s cuối, rồi mờ dần và giải phóng.
+## Nếu server gửi `until` (ms epoch) còn hợp lý thì theo server.
+signal expired(lid: String)
+const TTL_MS := 60000
+const BLINK_MS := 10000
+const FADE_MS := 600
+var _expire_at := 0       # Time.get_ticks_msec() lúc hết hạn
+var _gone := false
+
+func init_expiry(fresh: bool) -> bool:
+	var ttl := TTL_MS
+	if until > 0:
+		var rem := until - int(Time.get_unix_time_from_system() * 1000.0)
+		if rem > 1000 and rem <= TTL_MS * 2: ttl = rem
+		elif rem <= 1000 and not fresh: return false   # đã hết hạn khi nạp lại
+	_expire_at = Time.get_ticks_msec() + ttl
+	return true
+
+func is_gone() -> bool:
+	return _gone or Time.get_ticks_msec() >= _expire_at
+
 func _process(delta: float) -> void:
+	if _gone: return
+	var left := _expire_at - Time.get_ticks_msec()
+	if _expire_at > 0:
+		if left <= 0:
+			_gone = true
+			expired.emit(lid)
+			var tw := create_tween()
+			tw.tween_property(self, "modulate:a", 0.0, FADE_MS / 1000.0)
+			tw.tween_callback(queue_free)
+			return
+		if left <= BLINK_MS:
+			modulate.a = 0.35 + 0.65 * absf(sin(float(left) / 1000.0 * (6.0 if left > 3000 else 12.0)))
 	_t += delta
 	if _icon: _icon.position.y = sin(_t * 4.0) * 3.0 - 2.0
 	queue_redraw()
@@ -57,6 +90,7 @@ func _draw() -> void:
 		draw_rect(Rect2(-4, -90, 8, 90), Color(c, 0.18 + 0.08 * sin(_t * 3.0)), true)
 
 func fly_to(target: Vector2) -> void:
+	_gone = true
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "global_position", target, 0.22)
 	tw.tween_property(self, "scale", Vector2(0.3, 0.3), 0.22)

@@ -316,7 +316,7 @@ func _load_player_map(arrive: String) -> void:
 		_cam.limit_left = 0
 		_cam.limit_right = int(float(_cols) * TILE)
 		_cam.limit_top = 0
-		_cam.limit_bottom = int(float(_rows) * TILE)
+		_cam.limit_bottom = _cam_limit_bottom()
 		_cam.global_position = _player.position
 		_cam.make_current()
 		_cam.reset_smoothing()
@@ -374,6 +374,19 @@ func _ground_y(x: float, foot_y: float) -> float:
 	for rr in range(maxi(0, r), _rows):
 		if _is_stand(rr, c): return float(rr) * TILE
 	return float(_rows) * TILE
+
+## Đáy camera: chỉ chừa ~1.5 ô dưới mặt đất thấp nhất có thể đứng, để lớp đất sâu không chiếm cả màn hình.
+const CAM_BELOW_GROUND := 64.0
+func _cam_limit_bottom() -> int:
+	var full := int(float(_rows) * TILE)
+	var low := -1
+	for c in range(_cols):
+		for r in range(_rows - 1, -1, -1):
+			if _is_stand(r, c) and (r == 0 or not _is_stand(r - 1, c)):
+				low = maxi(low, r)
+				break
+	if low < 0: return full
+	return mini(full, int(float(low) * TILE + CAM_BELOW_GROUND))
 
 func _snap_to_ground() -> void:
 	if _grid.is_empty(): return
@@ -527,7 +540,8 @@ func _move_step(delta: float) -> void:
 				_hurt_player(m)
 
 	if _cam:
-		_cam.position = _player.position
+		# Lệch camera lên trên một chút: nhân vật nằm thấp hơn giữa màn hình, thấy nhiều trời/map phía trên hơn.
+		_cam.position = _player.position + Vector2(0, -24.0)
 
 	# Lưu định kỳ
 	_save_acc += delta
@@ -1479,9 +1493,15 @@ func _add_loot(data: Dictionary, animate: bool) -> void:
 	var n: LootNode = LootNode.new()
 	_loot_layer.add_child(n)
 	n.setup(data)
+	if not n.init_expiry(animate):   # đồ đã hết hạn từ trước thì bỏ
+		n.queue_free()
+		return
 	if not animate:
 		n.scale = Vector2.ONE
 	_loots[lid] = n
+	n.expired.connect(func(l: String) -> void:
+		_loots.erase(l)
+		_pickup_pending.erase(l))
 
 # ------------------------------------------------------------------ Chat
 func _on_chat(text: String) -> void:
@@ -1496,7 +1516,8 @@ func _on_chat(text: String) -> void:
 	if t.begins_with("/w "): Socket.send_chat(t.substr(3), "world"); return
 	if t.begins_with("/t ") or t.begins_with("/ds "):
 		Socket.send_chat(t.substr(t.find(" ") + 1), "party"); return
-	Socket.send_chat(t, "map")
+	if not Socket.send_chat(t, "map"):
+		_hud_node.log("Chưa kết nối máy chủ, tin nhắn sẽ gửi khi có mạng.", Color(1.0, 0.7, 0.5))
 
 func _on_chat_recv(msg: Dictionary) -> void:
 	var who := str(msg.get("name", "?"))
@@ -1514,7 +1535,7 @@ func _nearest_shop_npc() -> String:
 	var npcs: Dictionary = _meta.get("npcs", {})
 	for k in npcs.keys():
 		var nd: Dictionary = Data.npc(str(npcs[k]))
-		if not str(nd.get("shop", "")).is_empty() or not str(nd.get("ngocShop", "")).is_empty():
+		if not str(nd.get("shop", "")).is_empty() or bool(nd.get("ngocShop", false)):
 			return str(npcs[k])
 	return ""
 

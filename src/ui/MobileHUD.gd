@@ -314,7 +314,7 @@ func _process(_delta: float) -> void:
 	if _log_lines.is_empty(): return
 	var now := Time.get_ticks_msec()
 	var changed := false
-	while not _log_lines.is_empty() and now - int(_log_lines[0]["at"]) > 9000:
+	while not _log_lines.is_empty() and now - int(_log_lines[0]["at"]) > 14000:
 		_log_lines.pop_front()
 		changed = true
 	if changed: _render_log()
@@ -670,7 +670,8 @@ func _build_log_and_chat() -> void:
 	_log.add_theme_font_override("bold_font", T.font(true))
 	_log.add_theme_constant_override("outline_size", 4)
 	_log.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.75))
-	_anchor_rect(_log, Control.PRESET_TOP_LEFT, _inset.x, 82, 300, 120)
+	# Nằm DƯỚI thẻ HP/MP (trước đây y=82 bị thẻ che nên tin chat mới không thấy).
+	_anchor_rect(_log, Control.PRESET_TOP_LEFT, _inset.x + 4, _inset.y + 118, 300, 120)
 	_root.add_child(_log)
 
 	# Thanh chat: bật bằng nút chat, hiện ở giữa-trên.

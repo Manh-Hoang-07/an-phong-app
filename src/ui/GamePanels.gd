@@ -828,15 +828,18 @@ func build_skills() -> Control:
 
 # ============================================================ QUEST
 func _npc_places(npc_id: String) -> String:
-	var out: Array = []
+	# Ưu tiên map NPC đang thật sự xuất hiện ở tiến độ hiện tại (appear); không có thì liệt kê mọi map chứa NPC.
+	var now: Array = []
+	var any: Array = []
 	for mid in Data.MAPS.keys():
 		var npcs: Dictionary = (Data.MAPS[mid] as Dictionary).get("npcs", {})
 		for k in npcs.keys():
 			if str(npcs[k]) == npc_id:
-				out.append(W.map_name(str(mid)))
+				any.append(W.map_name(str(mid)))
+				if Data.npc_here(p(), str(mid), npc_id): now.append(W.map_name(str(mid)))
 				break
-		if out.size() >= 2: break
-	return " · ".join(out)
+	var out: Array = now if not now.is_empty() else any
+	return " · ".join(out.slice(0, 2))
 
 ## Dòng mục tiêu có tiến độ. prog: tiến độ lưu trong player.quest.progress (hình dạng linh hoạt).
 ## Map có quái này (tối đa 3 tên map).
@@ -1063,6 +1066,27 @@ func _dict_values(d: Dictionary) -> Array:
 	return a
 
 # ============================================================ SHOP
+const NGOC_GROUP_NAMES := {"ky_nguyen": "Kỳ Nguyên", "util": "Tiện ích", "book": "Sách", "ult": "Tuyệt kỹ", "superult": "Tuyệt Phẩm"}
+const NGOC_GROUP_ORDER := ["ky_nguyen", "util", "book", "ult", "superult"]
+
+## Lầu Trân Bảo: như web (ngocShopItems) - mọi món có priceNgoc (món trong shop + Kỳ Nguyên + sách tuyệt kỹ), xếp theo nhóm/cấp/tên.
+func _ngoc_shop_items(base: Array) -> Array:
+	var list: Array = []
+	for id in base:
+		if int(Data.item(str(id)).get("priceNgoc", 0)) > 0 and not list.has(str(id)): list.append(str(id))
+	for id in Data.ITEMS.keys():
+		if int((Data.ITEMS[id] as Dictionary).get("priceNgoc", 0)) > 0 and not list.has(str(id)): list.append(str(id))
+	var rank := func(id: String) -> int: return maxi(0, NGOC_GROUP_ORDER.find(str(Data.item(id).get("ngocGroup", "util"))))
+	list.sort_custom(func(a, b):
+		var ra: int = rank.call(a)
+		var rb: int = rank.call(b)
+		if ra != rb: return ra < rb
+		var la := int(Data.item(a).get("level", 0))
+		var lb := int(Data.item(b).get("level", 0))
+		if la != lb: return la < lb
+		return str(Data.item(a).get("name", "")) < str(Data.item(b).get("name", "")))
+	return list
+
 func build_shop() -> Control:
 	var vb := _vb()
 	var pl := p()
@@ -1080,15 +1104,23 @@ func build_shop() -> Control:
 	var right: Control = W.empty_detail()
 	if shop_tab == "buy":
 		var items: Array = nd.get("shop", [])
-		if items.is_empty(): items = nd.get("ngocShop", [])
+		var is_ngoc: bool = bool(nd.get("ngocShop", false))
+		if is_ngoc: items = _ngoc_shop_items(items)
+		else: items = items.filter(func(x): return int(Data.item(str(x)).get("priceNgoc", 0)) <= 0)
+		var last_grp := ""
 		var lv := _vb(6)
 		for iid in items:
 			var sid := str(iid)
 			var d0: Dictionary = Data.item(sid)
-			var price := int(d0.get("price", 0))
+			if is_ngoc:
+				var grp := str(d0.get("ngocGroup", "util"))
+				if grp != last_grp:
+					last_grp = grp
+					lv.add_child(W.section_label(str(NGOC_GROUP_NAMES.get(grp, "Tiện ích"))))
+			var price_txt := ("%s ngọc" % W.fmt_num(int(d0.get("priceNgoc", 0)))) if is_ngoc else ("%s xu" % W.fmt_num(int(d0.get("price", 0))))
 			var sub_parts: Array = W.item_stat_lines(d0)
 			var sub := ", ".join(sub_parts.slice(0, 2)) if not sub_parts.is_empty() else str(d0.get("desc", ""))
-			lv.add_child(W.shop_row(sid, sub, "%s xu" % W.fmt_num(price), selected_where == "shop" and selected_key == sid, func(): _select("shop", sid)))
+			lv.add_child(W.shop_row(sid, sub, price_txt, selected_where == "shop" and selected_key == sid, func(): _select("shop", sid)))
 		left = lv if not items.is_empty() else _empty("Cửa hàng chưa mở. Hãy lại gần NPC bán hàng.")
 		if selected_where == "shop":
 			var box := W.item_detail(selected_key)
@@ -1107,17 +1139,16 @@ func build_shop() -> Control:
 			qty_row.add_child(plus)
 			body.add_child(qty_row)
 			var key := npc + ":" + selected_key
-			var total := int(Data.item(selected_key).get("price", 0)) * shop_qty
-			var buy := W.action_button(("Chạm lần nữa: mua %d (%s xu)" if confirm_buy == key else "Mua %d · %s xu") % [shop_qty, W.fmt_num(total)], func():
+			var total := int(Data.item(selected_key).get("priceNgoc" if is_ngoc else "price", 0)) * shop_qty
+			var cur_unit := "ngọc" if is_ngoc else "xu"
+			var buy := W.action_button(("Chạm lần nữa: mua %d (%s %s)" if confirm_buy == key else "Mua %d · %s %s") % [shop_qty, W.fmt_num(total), cur_unit], func():
 				if confirm_buy == key:
-					act("buy", {"npc": npc, "item": selected_key, "qty": shop_qty})
+					act("buy_ngoc" if is_ngoc else "buy", {"npc": npc, "item": selected_key, "qty": shop_qty})
 					confirm_buy = ""; refresh()
 				else:
 					confirm_buy = key; refresh())
 			if confirm_buy == key: buy.add_theme_color_override("font_color", T.C_GOLD)
 			body.add_child(buy)
-			if not nd.get("ngocShop", []).is_empty():
-				body.add_child(W.action_button("Mua bằng Linh Ngọc", func(): act("buy_ngoc", {"npc": npc, "item": selected_key, "qty": shop_qty})))
 			right = box
 	else:
 		var bag: Array = pl.get("bag", [])
