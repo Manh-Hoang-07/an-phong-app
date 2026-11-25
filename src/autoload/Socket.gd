@@ -28,6 +28,8 @@ var mobs_received: bool = false
 var _outbox: Array[String] = []
 var _heartbeat_at: int = 0
 var _pos_state: Dictionary = {}
+const POS_MIN_MS := 66
+var _pos_sent_at := 0
 var my_id: int = 0
 var channel: int = 1
 var online: bool = false
@@ -61,7 +63,6 @@ func _connect() -> void:
 	_connect_started = Time.get_ticks_msec()
 	_close_handled = false
 	connect_attempts += 1
-	print("[WS] noi ", Settings.ws_url())
 	var err := _peer.connect_to_url(url)
 	set_process(true)
 	if err != OK:
@@ -79,7 +80,6 @@ func _process(_delta: float) -> void:
 	if state == WebSocketPeer.STATE_OPEN:
 		if not online:
 			online = true
-			print("[WS] MO ket noi")
 			_retry = 0
 			_pos_state.clear()   # vào lại phòng ở gói pos kế tiếp
 			connected_to_server.emit()
@@ -97,7 +97,6 @@ func _process(_delta: float) -> void:
 		if online:
 			online = false
 			disconnected_from_server.emit(code)
-		if last_close_code != code or online == false and _close_handled == false: print("[WS] DONG code=", code, " reason=", _peer.get_close_reason())
 		last_close_code = code
 		if not _close_handled:
 			_close_handled = true
@@ -115,7 +114,6 @@ func _process(_delta: float) -> void:
 
 func _dispatch(m: Dictionary) -> void:
 	var t := str(m.get("t", ""))
-	if rx_count < 12 or t == "mobs" or t == "room": print("[WS] nhan t=", t, " size=", str(m).length())
 	message_received.emit(m)
 	# 'batch': server gộp nhiều gói quái cùng nhịp — mở ra theo đúng thứ tự
 	if t == "batch":
@@ -168,10 +166,15 @@ func _heartbeat() -> void:
 ## Gửi vị trí; có đổi thì gửi ngay, không đổi thì để heartbeat lo.
 func send_pos(map_id: String, x: float, y: float, facing: int, anim: String, enter: bool = false, hp_pct: int = -1) -> bool:
 	var ix := roundi(x); var iy := roundi(y)
-	var same: bool = _pos_state.get("map") == map_id and _pos_state.get("x") == ix \
-		and _pos_state.get("y") == iy and _pos_state.get("f") == facing \
+	var same_meta: bool = _pos_state.get("map") == map_id and _pos_state.get("f") == facing \
 		and _pos_state.get("a") == anim and _pos_state.get("h") == hp_pct
+	var same: bool = same_meta and _pos_state.get("x") == ix and _pos_state.get("y") == iy
 	if same and not enter: return false
+	# Chỉ tọa độ đổi: giới hạn ~15 gói/giây (server chỉ phát lại 10 lần/giây). Đổi hướng / hoạt ảnh / map / máu
+	# vẫn gửi ngay. Khung bị bỏ qua không cập nhật _pos_state nên sẽ gửi ở khung sau khi đủ 66 ms.
+	var now := Time.get_ticks_msec()
+	if same_meta and not enter and now - _pos_sent_at < POS_MIN_MS: return false
+	_pos_sent_at = now
 	var m: Dictionary = {"t": "pos", "map": map_id, "x": ix, "y": iy, "f": facing, "a": anim}
 	if hp_pct >= 0: m["h"] = hp_pct
 	if enter: m["r"] = 1

@@ -115,6 +115,9 @@ var _pending_kills: Array = []
 var _kill_timer: SceneTreeTimer = null
 var _save_acc := 0.0
 var _last_saved := Vector2(-1, -1)
+var _last_saved_sig := 0
+var _save_idle := 0.0
+const SAVE_IDLE_MAX := 30.0
 var _regen_acc := 0.0
 var _hud_dirty := true
 var _hud_acc := 0.0
@@ -425,6 +428,7 @@ func _process(delta: float) -> void:
 	if Socket.online and not Socket.mobs_received and Time.get_ticks_msec() - _enter_try > 3000:
 		_on_socket_connected()
 	_update_interact()
+	_update_target(delta)
 	_regen(delta)
 	_update_projectiles(delta)
 	_stamina_tick(delta)
@@ -434,6 +438,57 @@ func _process(delta: float) -> void:
 ## KHÔNG chia cho content_scale_factor như cũ — chính phép chia đó triệt tiêu hoàn tác dụng của
 ## tỉ lệ hiển thị (đổi 75/85/115% nhưng tầm nhìn thế giới y hệt). HUD nằm ở lớp canvas riêng nên
 ## content_scale_factor vẫn chỉnh cỡ chữ/nút bình thường, không ảnh hưởng tầm nhìn map.
+## ---- Mục tiêu quái (mũi tên tam giác như web): quái gần nhất trong tầm được chỉ định, chỉ quái đó hiện tên.
+## Chọn lại 5 lần/giây (không phải mỗi khung) với cùng tầm + cách tính điểm như web (target.js).
+const TARGET_RX := 520.0
+const TARGET_RY := 260.0
+var _target_mob: Node2D = null
+var _target_mark: Node2D = null
+var _target_acc := 0.0
+var _target_t := 0.0
+
+func _update_target(delta: float) -> void:
+	_target_t += delta
+	_target_acc += delta
+	if _target_acc >= 0.2:
+		_target_acc = 0.0
+		_pick_target()
+	var ok: bool = _target_mob != null and is_instance_valid(_target_mob) and _target_mob.alive
+	if not ok:
+		if _target_mark != null: _target_mark.visible = false
+		return
+	if _target_mark == null or not is_instance_valid(_target_mark):
+		_target_mark = _TargetMark.new()
+		_target_mark.z_index = 50
+		_mob_layer.add_child(_target_mark)
+	# Đặt trên đầu quái (cùng mốc với dòng tên), nhấp nhô nhẹ
+	_target_mark.visible = true
+	_target_mark.position = _target_mob.position + Vector2(0, -_target_mob._height - 44.0 + sin(_target_t * 7.7) * 4.0)
+
+func _pick_target() -> void:
+	var best: Node2D = null
+	var best_score := 1e9
+	for u in _mobs.keys():
+		var m: Node2D = _mobs[u]
+		if not is_instance_valid(m) or not m.alive: continue
+		var dx := absf(m.position.x - _player.position.x)
+		var dy := absf(m.position.y - _player.position.y)
+		if dx >= TARGET_RX or dy >= TARGET_RY: continue
+		var score := dx + dy * 0.5
+		if score < best_score:
+			best_score = score
+			best = m
+	if best == _target_mob: return
+	if _target_mob != null and is_instance_valid(_target_mob): _target_mob.show_name(false)
+	_target_mob = best
+	if best != null: best.show_name(true)
+
+class _TargetMark extends Node2D:
+	func _draw() -> void:
+		var pts := PackedVector2Array([Vector2(-9, 0), Vector2(9, 0), Vector2(0, 14)])
+		draw_colored_polygon(pts, Color(1.0, 0.32, 0.32))
+		draw_polyline(PackedVector2Array([pts[0], pts[1], pts[2], pts[0]]), Color(0, 0, 0, 0.8), 2.0)
+
 func _apply_zoom() -> void:
 	if _cam == null: return
 	_cam.zoom = Vector2.ONE * Settings.world_zoom
@@ -529,7 +584,6 @@ func _move_step(delta: float) -> void:
 	for u in _mobs.keys():
 		var m: Node2D = _mobs[u]
 		if not is_instance_valid(m) or not m.alive: continue
-		m.show_name(absf(m.position.x - _player.position.x) < 380.0 and absf(m.position.y - _player.position.y) < 240.0)
 		if m.state == 2 and not m.lunge_hit and m.atk > 0 and not _dead:
 			var br: Rect2 = m.body_rect().grow(-4.0)
 			if br.intersects(prect):
@@ -544,9 +598,15 @@ func _move_step(delta: float) -> void:
 	_save_acc += delta
 	if _save_acc >= SAVE_EVERY and not _dead and not _changing:
 		_save_acc = 0.0
+		# Chỉ lưu khi vị trí / máu / mana / thú đổi so với lần lưu trước; đứng yên không đổi gì thì cứ 30 giây
+		# mới lưu một lần (giữ nhịp sống). Rời map / mua bán / thoát đã có đường lưu riêng nên không phụ thuộc chỗ này.
 		var p := Vector2(roundf(_player.position.x), roundf(_player.position.y))
-		if p != _last_saved or true:
+		var sig := hash([p, Game.hp, Game.mp, _pets_payload()])
+		_save_idle += SAVE_EVERY
+		if p != _last_saved or sig != _last_saved_sig or _save_idle >= SAVE_IDLE_MAX:
 			_last_saved = p
+			_last_saved_sig = sig
+			_save_idle = 0.0
 			_save_state()
 
 func _server_anim(a: String) -> String:
@@ -1572,9 +1632,15 @@ func _on_players(msg: Dictionary) -> void:
 				Social.nearby.erase(id2)
 		"snap":
 			for e in msg.get("p", []):
-				if typeof(e) != TYPE_ARRAY or (e as Array).size() < 5: continue
+				# Mục ngắn [id,x,y] = hướng và hoạt ảnh không đổi; mục đủ [id,x,y,f,a] khi có đổi
+				if typeof(e) != TYPE_ARRAY or (e as Array).size() < 3: continue
 				var rp: RemotePlayer = _players.get(int(e[0]), null)
-				if rp: rp.apply_state({"x": e[1], "y": e[2], "f": e[3], "a": e[4]})
+				if rp:
+					var st := {"x": e[1], "y": e[2]}
+					if (e as Array).size() >= 5:
+						st["f"] = e[3]
+						st["a"] = e[4]
+					rp.apply_state(st)
 		"look":
 			var p2: Dictionary = msg.get("p", {})
 			var rp2: RemotePlayer = _players.get(int(p2.get("id", 0)), null)
@@ -1592,7 +1658,6 @@ func _add_remote(info: Dictionary) -> void:
 	Social.nearby[id] = {"name": str(info.get("name", "?")), "lv": int(info.get("lv", 1)), "sc": str(info.get("sc", ""))}
 
 func _on_mobs(msg: Dictionary) -> void:
-	print("[MOB] nhan danh sach: ", (msg.get("list", []) as Array).size(), " map=", msg.get("map", "?"))
 	# Gói đầy đủ khi vào map: dựng lại toàn bộ quái.
 	for u in _mobs.keys():
 		var n: Node = _mobs[u]

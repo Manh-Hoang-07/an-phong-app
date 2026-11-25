@@ -137,7 +137,7 @@ func _build() -> void:
 	_name.position = Vector2(-70, -_height - 28.0)
 	_name.custom_minimum_size = Vector2(140, 0)
 	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_name.visible = true   # web luôn hiện tên + cấp trên đầu quái
+	_name.visible = is_boss   # quái thường chỉ hiện tên khi là mục tiêu (World bật qua show_name); trùm luôn hiện
 	add_child(_name)
 
 func _process(delta: float) -> void:
@@ -194,8 +194,9 @@ func hit_flash() -> void:
 		_hit_until = Time.get_ticks_msec() + 220
 		play("hit")
 
-func show_name(_on: bool) -> void:
-	pass   # tên + cấp luôn hiện (giống web)
+## Bật/tắt tên + cấp trên đầu quái. Quái thường chỉ hiện khi là mục tiêu; trùm luôn hiện.
+func show_name(on: bool) -> void:
+	if _name: _name.visible = alive and (on or is_boss)
 
 ## Hộp va chạm xấp xỉ (toạ độ thế giới) để kiểm đòn lao.
 func body_rect() -> Rect2:
@@ -207,7 +208,7 @@ func body_rect() -> Rect2:
 func revive() -> void:
 	alive = true
 	if _bar: _bar.visible = is_boss
-	if _name: _name.visible = true
+	if _name: _name.visible = is_boss
 	modulate.a = 1.0
 	if _anim: _anim.rotation = 0.0
 	state = 0

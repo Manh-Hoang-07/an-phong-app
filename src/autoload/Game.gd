@@ -25,8 +25,6 @@ func has_player() -> bool:
 
 ## `reset_vitals`: true khi vào game (lấy hp/mp server); false khi đồng bộ lại giữa chừng — như web, máu tức thời do client giữ.
 func set_player(p: Variant, reset_vitals: bool = true) -> void:
-	if typeof(p) == TYPE_DICTIONARY and OS.is_debug_build():
-		print("[PLAYER] school=", p.get("school"), " skills=", JSON.stringify(p.get("skills")).left(200), " slots=", JSON.stringify(p.get("skillSlots")), " supers=", JSON.stringify(p.get("superUlts")), " mounts=", JSON.stringify(p.get("mounts")).left(200))
 	# Chặn payload sai kiểu tu /api/me: gan Dictionary khong dung kieu vao bien
 	# typed Dictionary gay EXC_BAD_ACCESS ngay khi goi .is_empty() tren iOS/arm64.
 	if typeof(p) != TYPE_DICTIONARY:

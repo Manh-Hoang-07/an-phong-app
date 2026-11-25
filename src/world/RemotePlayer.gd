@@ -57,10 +57,12 @@ func apply_state(info: Dictionary) -> void:
 		position = p
 		_has_target = true
 	target = p
+	# Gói vị trí rút gọn không có f/a: giữ nguyên hướng và hoạt ảnh hiện tại
 	if _sprite:
-		_sprite.set_facing(int(info.get("f", 1)))
-		var a := str(ANIM_MAP.get(str(info.get("a", "idle")), "idle"))
-		_sprite.play(a)
+		if info.has("f"): _sprite.set_facing(int(info["f"]))
+		if info.has("a"):
+			var a := str(ANIM_MAP.get(str(info.get("a", "idle")), "idle"))
+			_sprite.play(a)
 
 func say(text: String) -> void:
 	_bubble.text = text
