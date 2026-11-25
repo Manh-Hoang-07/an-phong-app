@@ -1714,8 +1714,15 @@ func build_config() -> Control:
 	var scale_cur := "0.85"
 	for o in scale_opts:
 		if absf(float(o[0]) - Settings.ui_scale) < 0.01: scale_cur = str(o[0])
-	vb.add_child(T.label("Tỉ lệ hiển thị toàn bộ game (nhỏ hơn = nhìn rộng hơn)", T.FS_S, T.C_MUTED))
+	vb.add_child(T.label("Cỡ chữ & nút HUD (không đổi tầm nhìn map)", T.FS_S, T.C_MUTED))
 	vb.add_child(W.segmented(scale_opts, scale_cur, func(v): Settings.set_ui_scale(float(v)); refresh()))
+	# Tầm nhìn thế giới: đổi zoom camera thật, khác với content_scale_factor ở trên.
+	var zoom_opts := [["0.75", "Rất rộng"], ["0.85", "Rộng"], ["0.95", "Vừa"], ["1.15", "Gần"], ["1.3", "Rất gần"]]
+	var zoom_cur := "0.95"
+	for o in zoom_opts:
+		if absf(float(o[0]) - Settings.world_zoom) < 0.01: zoom_cur = str(o[0])
+	vb.add_child(T.label("Tầm nhìn thế giới (nhỏ hơn = thấy nhiều map hơn)", T.FS_S, T.C_MUTED))
+	vb.add_child(W.segmented(zoom_opts, zoom_cur, func(v): Settings.set_world_zoom(float(v)); refresh()))
 	vb.add_child(_toggle("Đồ họa thấp", "Bớt hạt, tắt lớp nền giữa và thời tiết — nhẹ máy hơn", Settings.quality_low, func(v): Settings.set_quality_low(v)))
 	vb.add_child(_toggle("Giới hạn 30 FPS", "Tiết kiệm pin, máy ít nóng", Settings.fps_cap == 30, func(v): Settings.set_fps_cap(30 if v else 60)))
 	vb.add_child(_toggle("Hiện số sát thương", "Chữ nổi trên đầu quái khi đánh", Settings.show_damage, func(v): Settings.set_show_damage(v)))

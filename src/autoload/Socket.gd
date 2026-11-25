@@ -48,20 +48,20 @@ func stop() -> void:
 
 func _connect() -> void:
 	if not _running: return
+	# Không đưa token vào query string (lọt vào log Nginx/proxy/history).
+	# Server nhận phiên qua Cookie header ở handshake — giữ nguyên bên dưới.
 	var url: String = Settings.ws_url()
-	if not Settings.session.is_empty():
-		url += "?token=" + Settings.session.uri_encode()
 	_peer = WebSocketPeer.new()
 	_peer.inbound_buffer_size = 1 << 20
 	_peer.outbound_buffer_size = 1 << 18
 	_peer.max_queued_packets = 4096
-	# Server cũ chỉ đọc cookie ap_session lúc bắt tay WS (chưa có ?token=): gửi cả hai cách.
+	# Cookie header lúc handshake: đây là đường xác thực WS chính thức.
 	if not Settings.session.is_empty():
 		_peer.handshake_headers = PackedStringArray(["Cookie: " + Settings.cookie_header()])
 	_connect_started = Time.get_ticks_msec()
 	_close_handled = false
 	connect_attempts += 1
-	print("[WS] noi ", Settings.ws_url(), " token_len=", Settings.session.length())
+	print("[WS] noi ", Settings.ws_url())
 	var err := _peer.connect_to_url(url)
 	set_process(true)
 	if err != OK:

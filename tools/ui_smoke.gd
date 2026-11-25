@@ -26,6 +26,8 @@ func _block_net() -> void:
 	if not OS.get_environment("SMOKE_SCALE").is_empty():
 		st.ui_scale = float(OS.get_environment("SMOKE_SCALE"))
 		st._apply_display()
+	if not OS.get_environment("SMOKE_WORLD_ZOOM").is_empty():
+		st.world_zoom = float(OS.get_environment("SMOKE_WORLD_ZOOM"))
 
 var _began := false
 

@@ -129,7 +129,7 @@ func _ready() -> void:
 	_char_script = load("res://src/world/CharSprite.gd")
 	_mob_script = load("res://src/world/MobSprite.gd")
 	get_viewport().size_changed.connect(_apply_zoom)
-	Settings.changed.connect(func(k, _v): if k == "ui_scale": _apply_zoom.call_deferred())
+	Settings.changed.connect(func(k, _v): if k == "world_zoom": _apply_zoom.call_deferred())
 	_assist = AssistScript.new()
 	add_child(_assist)
 	_assist.setup(self)
@@ -430,16 +430,13 @@ func _process(delta: float) -> void:
 	_stamina_tick(delta)
 	_form_tick(delta)
 
-## Thu phóng camera: cỡ ban đầu 1.3 nhưng làm tròn để mỗi điểm ảnh gốc ứng với SỐ NGUYÊN điểm ảnh màn hình
-## (zoom lẻ + lọc nearest làm pixel art vỡ, kém nét). Gọi lại khi đổi kích thước cửa sổ / tỉ lệ hiển thị.
-const BASE_ZOOM := 1.3
+## Độ phóng camera = Settings.world_zoom (nhỏ hơn = thấy rộng hơn). CHỈ phụ thuộc world_zoom,
+## KHÔNG chia cho content_scale_factor như cũ — chính phép chia đó triệt tiêu hoàn tác dụng của
+## tỉ lệ hiển thị (đổi 75/85/115% nhưng tầm nhìn thế giới y hệt). HUD nằm ở lớp canvas riêng nên
+## content_scale_factor vẫn chỉnh cỡ chữ/nút bình thường, không ảnh hưởng tầm nhìn map.
 func _apply_zoom() -> void:
 	if _cam == null: return
-	var vis := get_viewport().get_visible_rect().size
-	var win := get_window().size
-	var ratio := float(win.y) / maxf(1.0, vis.y)     # điểm ảnh màn hình trên 1 đơn vị logic
-	var n := maxf(1.0, roundf(BASE_ZOOM * ratio))
-	_cam.zoom = Vector2.ONE * (n / ratio)
+	_cam.zoom = Vector2.ONE * Settings.world_zoom
 	# Nền tính _view theo zoom của camera -> báo nó tính lại sau khi zoom đổi.
 	if _bg_node != null and _bg_node.has_method("refresh_view"):
 		_bg_node.refresh_view.call_deferred()

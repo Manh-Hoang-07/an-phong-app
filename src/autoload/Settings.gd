@@ -5,7 +5,12 @@ extends Node
 signal changed(key: String, value: Variant)
 
 const CFG_PATH := "user://settings.cfg"
+## Token/phien luu RIENG, khong nam trong settings.cfg (file config de doc/sua).
+const SECURE_PATH := "user://.ap_secure.cfg"
 const DEFAULT_SERVER := "https://monmon.io.vn"
+## Pin URL server vao binary: thay doi tu UI/gia ma config khong co tac dung.
+## Muon doi server hop le phai cap nhat const nay va phat lai app.
+const SERVER_PIN := "monmon.io.vn"
 const DEFAULT_PROTO := 1
 
 var server_url: String = DEFAULT_SERVER
@@ -14,7 +19,10 @@ var token: String = ""
 var session: String = ""  ## ap_session cookie lấy từ Set-Cookie của /api/login
 var fps_cap: int = 60          # 60 hoặc 30
 const DEFAULT_UI_SCALE := 0.85
-var ui_scale: float = DEFAULT_UI_SCALE   # tỉ lệ hiển thị toàn bộ game (0.75..1.25): nhỏ hơn = thấy nhiều hơn
+var ui_scale: float = DEFAULT_UI_SCALE   # cỡ HUD (0.75..1.15): nhỏ hơn = chữ/nút nhỏ lại, KHÔNG đổi tầm nhìn thế giới
+## Độ phóng thế giới (camera). Nhỏ hơn = thấy nhiều map hơn. Tách riêng ui_scale để không bị content_scale_factor triệt tiêu.
+const DEFAULT_WORLD_ZOOM := 0.95
+var world_zoom: float = DEFAULT_WORLD_ZOOM
 var quality_low: bool = false  # giảm hạt / hiệu ứng khi máy yếu
 var debug_stats: bool = false
 var hints_seen: Dictionary = {}     ## gợi ý lần đầu đã hiện (id -> true)
@@ -34,6 +42,7 @@ func _ready() -> void:
 		session = str(_cfg.get_value("net", "session", ""))
 		fps_cap = int(_cfg.get_value("game", "fps_cap", 60))
 		ui_scale = clampf(float(_cfg.get_value("game", "ui_scale", DEFAULT_UI_SCALE)), 0.6, 1.5)
+		world_zoom = clampf(float(_cfg.get_value("game", "world_zoom", DEFAULT_WORLD_ZOOM)), 0.6, 2.0)
 		quality_low = bool(_cfg.get_value("game", "quality_low", false))
 		debug_stats = bool(_cfg.get_value("game", "debug_stats", false))
 		last_user = str(_cfg.get_value("net", "last_user", ""))
@@ -41,10 +50,12 @@ func _ready() -> void:
 		show_damage = bool(_cfg.get_value("game", "show_damage", true))
 		hints_seen = _cfg.get_value("ux", "hints_seen", {})
 		volume = float(_cfg.get_value("game", "volume", 0.7))
+	_load_secure()
+	_enforce_server_pin()
 	_apply_fps()
 	_apply_display()
 
-## Tỉ lệ hiển thị toàn bộ game (HUD + thế giới). 0.85 = mọi thứ nhỏ lại 15%, nhìn được rộng hơn.
+## Cỡ HUD. Thay đổi content_scale_factor; KHÔNG đụng vào camera (thế giới có world_zoom riêng).
 func _apply_display() -> void:
 	var w := get_window()
 	if w != null: w.content_scale_factor = ui_scale
@@ -52,6 +63,11 @@ func _apply_display() -> void:
 func set_ui_scale(value: float) -> void:
 	ui_scale = clampf(value, 0.6, 1.5)
 	_apply_display(); _save(); changed.emit("ui_scale", ui_scale)
+
+## Độ phóng thế giới: nhỏ hơn = nhìn rộng hơn (xem nhiều map hơn). Ảnh hưởng trực tiếp camera.
+func set_world_zoom(value: float) -> void:
+	world_zoom = clampf(value, 0.6, 2.0)
+	_save(); changed.emit("world_zoom", world_zoom)
 
 func _apply_fps() -> void:
 	# 30 FPS: cố định 30. Còn lại: để màn hình quyết định nhịp (vsync) — đặt trần 60 trên màn 90/120Hz làm
@@ -62,16 +78,18 @@ func _apply_fps() -> void:
 	Engine.physics_ticks_per_second = 60
 
 func set_server_url(url: String) -> void:
-	server_url = url.trim_suffix("/")
+	var u := url.trim_suffix("/")
+	if not _url_matches_pin(u): return   ## khong cho tro app sang server khac
+	server_url = u
 	_save(); changed.emit("server_url", server_url)
 
 func set_token(value: String) -> void:
 	token = value
-	_save(); changed.emit("token", "<ẩn>")
+	_save_secure(); changed.emit("token", "<ẩn>")
 
 func set_session(value: String) -> void:
 	session = value
-	_save(); changed.emit("session", "<ẩn>")
+	_save_secure(); changed.emit("session", "<ẩn>")
 
 ## Header Cookie gửi kèm mọi request HTTP.
 func cookie_header() -> String:
@@ -96,8 +114,6 @@ func set_debug_stats(value: bool) -> void:
 func _save() -> void:
 	_cfg.set_value("net", "server_url", server_url)
 	_cfg.set_value("net", "proto", proto)
-	_cfg.set_value("net", "token", token)
-	_cfg.set_value("net", "session", session)
 	_cfg.set_value("net", "last_user", last_user)
 	_cfg.set_value("game", "haptics", haptics)
 	_cfg.set_value("game", "show_damage", show_damage)
@@ -105,9 +121,46 @@ func _save() -> void:
 	_cfg.set_value("game", "volume", volume)
 	_cfg.set_value("game", "fps_cap", fps_cap)
 	_cfg.set_value("game", "ui_scale", ui_scale)
+	_cfg.set_value("game", "world_zoom", world_zoom)
 	_cfg.set_value("game", "quality_low", quality_low)
 	_cfg.set_value("game", "debug_stats", debug_stats)
 	_cfg.save(CFG_PATH)
+
+## --- Lưu phiên riêng (không lẫn vào settings.cfg) ---
+func _load_secure() -> void:
+	var f := ConfigFile.new()
+	if f.load(SECURE_PATH) == OK:
+		token = str(f.get_value("net", "token", ""))
+		session = str(f.get_value("net", "session", ""))
+	# Migrate 1 lần: bản cũ lưu token/session ngay trong settings.cfg.
+	var old_token := str(_cfg.get_value("net", "token", ""))
+	var old_session := str(_cfg.get_value("net", "session", ""))
+	if token.is_empty() and not old_token.is_empty(): token = old_token
+	if session.is_empty() and not old_session.is_empty(): session = old_session
+	if not old_token.is_empty() or not old_session.is_empty():
+		# Godot 4.3 không có erase_section_field: ghi đè thành rỗng (giá trị thật đã ở file riêng).
+		_cfg.set_value("net", "token", "")
+		_cfg.set_value("net", "session", "")
+		_cfg.save(CFG_PATH)
+		_save_secure()
+
+func _save_secure() -> void:
+	var f := ConfigFile.new()
+	f.set_value("net", "token", token)
+	f.set_value("net", "session", session)
+	f.save(SECURE_PATH)
+
+func _url_matches_pin(u: String) -> bool:
+	var host := u
+	if host.begins_with("https://"): host = host.substr(8)
+	elif host.begins_with("http://"): host = host.substr(7)
+	host = host.split("/")[0].split(":")[0].to_lower()
+	return host == SERVER_PIN
+
+func _enforce_server_pin() -> void:
+	if not _url_matches_pin(server_url):
+		server_url = DEFAULT_SERVER
+		_save()
 
 ## Chuyển URL server thành URL WebSocket /ws (wss khi https)
 func ws_url() -> String:
