@@ -305,7 +305,6 @@ func _load_player_map(arrive: String) -> void:
 	var t_bake := Time.get_ticks_msec()
 	if _map_view and _map_view.has_method("build_grid"):
 		_map_view.build_grid(_grid, theme_id, TILE, _map_id)
-	if Settings.debug_stats: print("Dựng map ", _map_id, " mất ", Time.get_ticks_msec() - t_bake, "ms")
 	_entities.build(_grid, TILE, _meta, func(r: int, c: int) -> float:
 		return float(_ground_y(float(c) * TILE + TILE * 0.5, float(r) * TILE)))
 	_entities.refresh_visibility(Game.player, _map_id)

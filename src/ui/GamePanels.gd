@@ -1897,13 +1897,13 @@ func build_kynguyen() -> Control:
 
 # ============================================================ SOCIAL (đội, khu, chợ) + TRADE
 var social_tab := "near"
+var _social_data_requested := false   # chợ/khu: gửi request đúng 1 lần mỗi lần mở từ NPC
 var market_tab := "buy"
 var market_sel_uid := ""
 var market_confirm := 0
 var market_q := ""
 var market_sort := "price_asc"
 var market_page := 0
-var _market_loaded := false
 
 func _class_name(sc: String) -> String:
 	var d: Dictionary = Data.school(sc)
@@ -1935,11 +1935,30 @@ func _market_refresh() -> void:
 
 func build_social() -> Control:
 	var vb := _vb(8)
+	# Chợ / chọn khu chỉ mở từ NPC (NpcDialog truyền tab qua ctx_extra). Menu Xã hội
+	# tự nó chỉ có Quanh đây / Đội, nên mọi refresh không có extra thì về lại "near".
 	if ctx_extra.has("tab"):
-		social_tab = str(ctx_extra["tab"])
+		var wanted := str(ctx_extra["tab"])
 		ctx_extra.erase("tab")
-	# Chọn khu và chợ không còn nằm trong menu Xã hội (chỉ còn Quanh đây / Đội).
-	if social_tab != "near" and social_tab != "party": social_tab = "near"
+		social_tab = wanted if wanted in ["near", "party", "khu", "market"] else "near"
+		_social_data_requested = false   # NPC vừa mở panel: cho gửi request dữ liệu lần đầu
+	else:
+		if social_tab not in ["near", "party"]: social_tab = "near"
+	# Tab khu/chợ là NPC-only: hiện nội dung tương ứng nhưng không đưa vào thanh segmented.
+	if social_tab == "khu":
+		if not _social_data_requested:
+			Socket.send_chlist()
+			_social_data_requested = true
+		vb.add_child(T.heading("Chọn khu", T.C_GOLD))
+		_social_khu(vb)
+		return W.fill(vb)
+	if social_tab == "market":
+		if not _social_data_requested:
+			_market_refresh()
+			_social_data_requested = true
+		vb.add_child(T.heading("Chợ người chơi", T.C_GOLD))
+		_social_market(vb)
+		return W.fill(vb)
 	vb.add_child(W.segmented([["near", "Quanh đây"], ["party", "Đội"]], social_tab, _soc_tab))
 	if social_tab == "party": _social_party(vb)
 	else: _social_near(vb)
