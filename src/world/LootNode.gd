@@ -10,6 +10,7 @@ var item_id := ""
 var item_name := ""
 var quality := 0
 var _t := 0.0
+var _redraw_acc := 0.0
 var _icon: Sprite2D
 
 func setup(data: Dictionary) -> void:
@@ -80,7 +81,10 @@ func _process(delta: float) -> void:
 			modulate.a = 0.35 + 0.65 * absf(sin(float(left) / 1000.0 * (6.0 if left > 3000 else 12.0)))
 	_t += delta
 	if _icon: _icon.position.y = sin(_t * 4.0) * 3.0 - 2.0
-	queue_redraw()
+	_redraw_acc += delta
+	if _redraw_acc >= 1.0 / 30.0:
+		_redraw_acc = 0.0
+		queue_redraw()
 
 func _draw() -> void:
 	var c: Color = QCOL[quality]

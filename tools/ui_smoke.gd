@@ -73,6 +73,12 @@ func _process(_d: float) -> bool:
 		gg.sta = 90
 		current_scene._toggle_form()
 		print("form_active ", gg.form_active, " maxHp ", gg.stats.get("maxHp"), " atk ", gg.stats.get("atk"))
+	if _frames == 20 and _what == "buffs":
+		# SMOKE_BUFFS=ks45,ks30 : bật các buff rồi chụp sau SMOKE_FRAME khung hình (vòng vật thể xoay quanh người)
+		var wb := current_scene
+		var dd = root.get_node("Data")
+		for bid in OS.get_environment("SMOKE_BUFFS").split(","):
+			wb._add_buff(bid, dd.skill(bid), str(dd.skill(bid).get("type", "buff")))
 	if _frames == 20 and _what == "skillfx":
 		var sw := current_scene
 		var sid := OS.get_environment("SMOKE_SKILL")
@@ -199,7 +205,7 @@ func _process(_d: float) -> bool:
 		var pet_id := "ky_lan" if OS.get_environment("SMOKE_PET").is_empty() else OS.get_environment("SMOKE_PET")
 		root.get_node("Game").player["mounts"] = {"owned": [pet_id], "summoned": [pet_id], "skill": "bite", "skills": {pet_id: "bite"}}
 		current_scene._sync_pet()
-	if _frames == (260 if _what == "combat" else (25 if _what == "fx" else (20 + int(OS.get_environment("SMOKE_FRAME")) if _what == "skillfx" else (120 if _what.begins_with("npc") else 60)))):
+	if _frames == (260 if _what == "combat" else (25 if _what == "fx" else (20 + int(OS.get_environment("SMOKE_FRAME")) if _what in ["skillfx", "buffs"] else (120 if _what.begins_with("npc") else 60)))):
 		var img := root.get_texture().get_image()
 		img.save_png(_out)
 		print("saved ", _out, " ", img.get_size())

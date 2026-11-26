@@ -36,6 +36,7 @@ var music_volume: float = 0.6  ## âm lượng nhạc nền 0..1
 var last_user: String = ""     ## tên đăng nhập gần nhất (điền sẵn ở màn Login)
 
 var _cfg := ConfigFile.new()
+var _save_timer: Timer = null      # debounce ghi đĩa khi kéo slider/đổi zoom
 
 func _ready() -> void:
 	var err := _cfg.load(CFG_PATH)
@@ -120,6 +121,22 @@ func set_debug_stats(value: bool) -> void:
 	_save(); changed.emit("debug_stats", debug_stats)
 
 func _save() -> void:
+	# Gộp các setter liên tiếp (kéo slider) thành 1 lần ghi sau 250ms.
+	if _save_timer == null:
+		_save_timer = Timer.new()
+		_save_timer.one_shot = true
+		_save_timer.wait_time = 0.25
+		_save_timer.timeout.connect(_save_now)
+		add_child(_save_timer)
+	_save_timer.start(0.25)
+
+func _notification(what: int) -> void:
+	# Đảm bảo ghi phần đang chờ debounce khi thoát app (Android/iOS gửi NOTIFICATION_WM_CLOSE_REQUEST / PAUSE).
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+		if _save_timer != null and not _save_timer.is_stopped(): _save_now()
+
+func _save_now() -> void:
+	if _save_timer != null and not _save_timer.is_stopped(): _save_timer.stop()
 	_cfg.set_value("net", "server_url", server_url)
 	_cfg.set_value("net", "proto", proto)
 	_cfg.set_value("net", "last_user", last_user)

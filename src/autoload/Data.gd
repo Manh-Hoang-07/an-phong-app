@@ -29,6 +29,9 @@ func _ready() -> void:
 	load_local()
 
 func load_local() -> bool:
+	# Autoload _ready() đã nạp một lần; Boot/Boot lại gọi thêm. Tránh parse lại ~581 KB JSON.
+	# Nếu lần trước thất bại (raw rỗng) thì vẫn cho retry ở đây.
+	if not raw.is_empty(): return true
 	if not FileAccess.file_exists(DATA_PATH):
 		loaded.emit(false, "Thiếu data/gamedata.json — chạy node server/tools/export-gamedata.js")
 		return false

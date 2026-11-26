@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://eo50y3tsmn68"
-path="res://.godot/imported/far.png-ca07d930428bd4526b0ad134622ca99c.ctex"
+path.s3tc="res://.godot/imported/far.png-ca07d930428bd4526b0ad134622ca99c.s3tc.ctex"
+path.etc2="res://.godot/imported/far.png-ca07d930428bd4526b0ad134622ca99c.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/bg/win1/far.png"
-dest_files=["res://.godot/imported/far.png-ca07d930428bd4526b0ad134622ca99c.ctex"]
+dest_files=["res://.godot/imported/far.png-ca07d930428bd4526b0ad134622ca99c.s3tc.ctex", "res://.godot/imported/far.png-ca07d930428bd4526b0ad134622ca99c.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

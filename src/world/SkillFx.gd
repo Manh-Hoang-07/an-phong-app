@@ -2,6 +2,7 @@ extends Node2D
 const FxExt := preload("res://src/world/fx/FxExt.gd")
 const FxProj := preload("res://src/world/fx/FxProj.gd")
 const FxCreature := preload("res://src/world/fx/FxCreature.gd")
+const AuraOrbit := preload("res://src/world/fx/AuraOrbit.gd")
 ## Bộ vẽ hiệu ứng kỹ năng cho app: đọc CÙNG file JSON với web
 ## (shared/data/skillfx/<id>.json, đóng gói vào res://data/skillfx/).
 ##
@@ -482,7 +483,9 @@ var _auras: Dictionary = {}   # id kỹ năng -> Node2D hào quang đang gắn v
 
 ## Gọi định kỳ từ World: buffs = {id: {until(ms), ...}}; target = node nhân vật.
 func sync_auras(buffs: Dictionary, target: Node2D, facing: int) -> void:
-	if _manifest.is_empty() or target == null: return
+	if target == null: return
+	_sync_orbits(buffs, target)
+	if _manifest.is_empty(): return
 	var now := Time.get_ticks_msec()
 	for id in buffs.keys():
 		var b: Dictionary = buffs[id]
@@ -532,9 +535,72 @@ func _start_aura(id: String, target: Node2D, facing: int) -> void:
 	n.modulate = Color(1, 1, 1, 0.0)
 	target.add_child(n)
 	_auras[id] = n
+	# Hào quang riêng của chiêu (kiếm khổng lồ, cột sáng…) chỉ là phần mở màn: hiện, giữ ~1,5 giây rồi tan hẳn.
+	# Sau đó vòng vật thể xoay quanh người (AuraOrbit, xem _sync_orbits) ở lại suốt thời gian buff.
 	var tw := n.create_tween()
-	tw.tween_interval(0.9)   # chờ hiệu ứng tung chiêu ban đầu tan bớt rồi mới hiện hào quang
-	tw.tween_property(n, "modulate:a", 0.8, 0.5)
+	tw.tween_interval(0.3)
+	tw.tween_property(n, "modulate:a", 0.8, 0.4)
+	tw.tween_interval(1.3)
+	tw.tween_property(n, "modulate:a", 0.0, 0.6)
+	tw.tween_callback(func():
+		if is_instance_valid(n):
+			n.visible = false
+			n.set_process(false))
+
+## ---------------------------------------------------------------- Vòng vật thể xoay quanh người (kiếm / khiên / … theo class)
+var _orbits: Dictionary = {}   # id kỹ năng -> [node nửa sau, node nửa trước]
+
+func _sync_orbits(buffs: Dictionary, target: Node2D) -> void:
+	var now := Time.get_ticks_msec()
+	for id in buffs.keys():
+		var b: Dictionary = buffs[id]
+		var until := int(b.get("until", 0))
+		var cur: Array = _orbits.get(id, [])
+		var alive := not cur.is_empty() and is_instance_valid(cur[0]) and is_instance_valid(cur[1])
+		if now >= until:
+			if alive: _end_orbit(str(id))
+			continue
+		if alive:
+			for n in cur: (n as Node2D).set("until_ms", until)   # dùng lại kỹ năng: gia hạn
+		else:
+			_start_orbit(str(id), b, target)
+	for id in _orbits.keys():
+		if not buffs.has(id): _end_orbit(str(id))
+
+func _start_orbit(id: String, b: Dictionary, target: Node2D) -> void:
+	var atk := float(b.get("atk", 0.0)) > 0.0 or float(b.get("crit", 0.0)) > 0.0 or float(b.get("speed", 0.0)) > 0.0 or b.get("exec", null) != null
+	var defn := str(b.get("name", "")) in ["guard", "manashield"] or float(b.get("reduce", 0.0)) > 0.0 or float(b.get("absorb", 0.0)) > 0.0
+	var heal := float(b.get("regen", 0.0)) > 0.0
+	if not (atk or defn or heal): return
+	# Class của kỹ năng; kỹ năng dùng chung ("chung") thì lấy class của người chơi
+	var sch := str(Data.skill(id).get("school", ""))
+	if not AuraOrbit.RINGS.has(sch):
+		var ps := str(Game.player.get("school", ""))
+		sch = str(Data.school(ps).get("base", ps))
+	var colors: Array = recipe(id).get("colors", ["0xffffff", "0xffe9a0", "0xffc23c"])
+	var pair: Array = []
+	for layer in range(2):
+		var n := AuraOrbit.new()
+		n.layer = layer
+		if not n.setup(sch, atk, defn, heal): return
+		n.col = _color("main", colors)
+		n.core = _color("core", colors)
+		n.dark_col = _color("dark", colors).lightened(0.25)
+		n.until_ms = int(b.get("until", 0))
+		n.delay = 2.0   # sau khi hiệu ứng mở màn tan
+		n.lowq = Settings.quality_low
+		n.z_index = -1 if layer == 0 else 2
+		n.position = Vector2(0, 0)
+		n.material = _additive()
+		target.add_child(n)
+		pair.append(n)
+	_orbits[id] = pair
+
+func _end_orbit(id: String) -> void:
+	var pair: Array = _orbits.get(id, [])
+	_orbits.erase(id)
+	for n in pair:
+		if is_instance_valid(n): (n as Node2D).set("until_ms", Time.get_ticks_msec() + 350)   # mờ dần rồi tự xoá
 
 func _end_aura(id: String) -> void:
 	var n: Variant = _auras.get(id, null)
@@ -619,6 +685,7 @@ class _FxShape extends Node2D:
 			phase = v
 			queue_redraw()
 	var _rng := RandomNumberGenerator.new()
+	var _redraw_acc := 0.0
 
 	func _a(a: float) -> Color:
 		return Color(col.r, col.g, col.b, a)
@@ -939,7 +1006,13 @@ class _FxShape extends Node2D:
 		draw_rect(Rect2(c.x - sz * 0.12, c.y - sz * 0.6, sz * 0.24, sz * 1.2), c2)
 
 	func _process(delta: float) -> void:
-		if auto: prog += delta
+		if auto:
+			prog += delta
+			# Hào quang buff kéo dài: không cần vẽ 60 lần/giây, 30 lần đã mượt.
+			_redraw_acc += delta
+			if _redraw_acc >= 1.0 / 30.0:
+				_redraw_acc = 0.0
+				queue_redraw()
 
 	func _d_sig_new() -> bool:
 		var t := prog

@@ -13,6 +13,7 @@ var _rng := RandomNumberGenerator.new()
 var big := 1.0
 var arrow := false
 var _t := 0.0
+var _redraw_acc := 0.0
 
 func setup(c: Color, angle: float, facing: int, size: float = 1.0, is_arrow: bool = false) -> void:
 	color = c
@@ -98,7 +99,10 @@ func _update_sprite() -> void:
 func _process(delta: float) -> void:
 	_t += delta
 	_update_sprite()
-	queue_redraw()
+	_redraw_acc += delta
+	if _redraw_acc >= 1.0 / 30.0:
+		_redraw_acc = 0.0
+		queue_redraw()
 
 func _draw() -> void:
 	if sid != "":

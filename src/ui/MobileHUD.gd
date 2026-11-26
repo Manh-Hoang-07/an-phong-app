@@ -74,6 +74,7 @@ class ActionButton extends Control:
 	var _cd_total := 0.0
 	var _cd_end := 0
 	var _cd: Control
+	var _redraw_acc := 0.0
 
 	func setup(r: float, ring_color: Color) -> void:
 		radius = r
@@ -161,10 +162,14 @@ class ActionButton extends Control:
 			_ready_until = now + 450
 		if glow:
 			_glow_t += _d
-			queue_redraw()
 		elif _cd_total <= 0.0 and now >= _ready_until:
 			set_process(false)
-		_cd.queue_redraw()
+		# 30 lần/giây là đủ cho vòng quét cooldown; thời gian vẫn đếm bằng msec nên số hiển thị đúng.
+		_redraw_acc += _d
+		if _redraw_acc >= 1.0 / 30.0:
+			_redraw_acc = 0.0
+			queue_redraw()
+			_cd.queue_redraw()
 
 	func set_usable(v: bool) -> void:
 		if usable == v: return
@@ -316,7 +321,15 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	set_process(true)
 
+var _panel_rebuild_pending := false
+var _panel_rebuild_at := 0
+
 func _process(_delta: float) -> void:
+	# Rebuild panel bị dồn lại tối đa ~6.7 lần/giây (mỗi action_done gọi refresh_panel).
+	if _panel_rebuild_pending and Time.get_ticks_msec() - _panel_rebuild_at >= 150:
+		_panel_rebuild_pending = false
+		_panel_rebuild_at = Time.get_ticks_msec()
+		_do_refresh_panel(_panel_rebuild_extra)
 	# Dòng log tự mờ/biến mất sau 9 giây.
 	if _log_lines.is_empty(): return
 	var now := Time.get_ticks_msec()
@@ -881,7 +894,7 @@ func _build_panel() -> void:
 	_busy_bar.add_theme_stylebox_override("background", StyleBoxEmpty.new())
 	_busy_bar.add_theme_stylebox_override("fill", T.sb(T.C_GOLD, Color(0, 0, 0, 0), 0, 2, 0))
 	pv.add_child(_busy_bar)
-	Net.busy_changed.connect(func(b): if _busy_bar: create_tween().tween_property(_busy_bar, "modulate:a", 1.0 if b else 0.0, 0.15))
+	Net.busy_changed.connect(func(b): _tween_busy(1.0 if b else 0.0))
 	# Nút X nằm đè lên góc viền phải-trên của khung, không chiếm chỗ của nội dung.
 	var corner := Control.new()
 	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1037,7 +1050,13 @@ func open_panel(tab: String, extra: Dictionary = {}) -> void:
 	_open_tab = tab
 	_open_extra = extra
 	_update_rail()
-	refresh_panel(extra)
+	# Đổi tab thì dựng ngay (bỏ qua throttle); cùng tab mới dồn các gói liên tiếp.
+	if tab_changed:
+		_panel_rebuild_pending = false
+		_panel_rebuild_at = Time.get_ticks_msec()
+		_do_refresh_panel(extra)
+	else:
+		refresh_panel(extra)
 	if not _panel_layer.visible:
 		_panel_layer.visible = true
 		_layout()
@@ -1056,9 +1075,21 @@ func open_panel(tab: String, extra: Dictionary = {}) -> void:
 		tw2.tween_property(_panel_scroll, "modulate:a", 1.0, 0.18)
 	menu_pressed.emit(tab)
 
+var _panel_rebuild_extra: Dictionary = {}
+
 func refresh_panel(extra: Dictionary = {}) -> void:
+	# Dồn các gói liên tiếp: rebuild ngay nếu chưa từng rebuild, nếu không đợi tới khung _process.
 	if not _panel_body or _open_tab.is_empty(): return
-	if extra.is_empty(): extra = _open_extra
+	_panel_rebuild_extra = extra if not extra.is_empty() else _open_extra
+	if _panel_rebuild_at <= 0 or Time.get_ticks_msec() - _panel_rebuild_at >= 150:
+		_panel_rebuild_pending = false
+		_panel_rebuild_at = Time.get_ticks_msec()
+		_do_refresh_panel(_panel_rebuild_extra)
+	else:
+		_panel_rebuild_pending = true
+
+func _do_refresh_panel(extra: Dictionary) -> void:
+	if not _panel_body or _open_tab.is_empty(): return
 	var keep: int = _panel_scroll.scroll_vertical
 	for c in _panel_body.get_children(): c.queue_free()
 	for c2 in _panel_fixed.get_children(): c2.queue_free()
@@ -1251,11 +1282,22 @@ func _build_screen_fx() -> void:
 	_vignette.modulate.a = 0.0
 	_root.add_child(_vignette)
 
+var _busy_tween: Tween = null
+var _flash_tween: Tween = null
+
+func _tween_busy(alpha: float) -> void:
+	if _busy_bar == null: return
+	if _busy_tween != null and _busy_tween.is_valid(): _busy_tween.kill()
+	_busy_tween = create_tween()
+	_busy_tween.tween_property(_busy_bar, "modulate:a", alpha, 0.15)
+
 ## Nháy toàn màn hình một màu (bị đánh, thăng cấp).
 func flash(color: Color, strength: float = 0.3) -> void:
 	if _flash == null: return
+	if _flash_tween != null and _flash_tween.is_valid(): _flash_tween.kill()
 	_flash.color = Color(color, strength)
-	create_tween().tween_property(_flash, "color:a", 0.0, 0.25)
+	_flash_tween = create_tween()
+	_flash_tween.tween_property(_flash, "color:a", 0.0, 0.25)
 
 func _update_low_hp(ratio: float) -> void:
 	if _vignette == null: return

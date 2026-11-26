@@ -28,6 +28,7 @@ var lunge_hit := false      # đã gây sát thương trong lần lao này chưa
 var target := Vector2.ZERO
 var _has_target := false
 var _sprites: Dictionary = {}
+static var _frames_cache: Dictionary = {}   # "sheet|pet_look" -> {anim: SpriteFrames}
 var _anim: AnimatedSprite2D = null
 var _bar: Control = null
 var _bar_fill: ColorRect = null
@@ -123,26 +124,32 @@ func _build() -> void:
 	_scale = float(def.get("s", 1.0)) * float(grade.get("scale", 1.0))
 	var fy := float(def.get("cy", def.get("fy", 0.0))) if fly else float(def.get("fy", 0.0))
 	_height = fy * _scale + 6.0
-	var anims: Dictionary = def.get("anims", {})
-	for anim in anims.keys():
-		var path := str(_pet_files.get(anim, "")) if pet_look != "" else "%s/%s/%s.png" % [MOB_DIR, sheet, anim]
-		if not ResourceLoader.exists(path): continue
-		var tex := load(path) as Texture2D
-		if tex == null: continue
-		var sf := SpriteFrames.new()
-		if sf.has_animation("default"): sf.remove_animation("default")
-		var info: Array = anims[anim]
-		var n := int(info[0])
-		sf.add_animation(anim)
-		sf.set_animation_speed(anim, float(info[1]))
-		sf.set_animation_loop(anim, anim == "idle" or anim == "run")
-		var fw := int(def["fw"]); var fh := int(def["fh"])
-		for i in range(n):
-			var at := AtlasTexture.new()
-			at.atlas = tex
-			at.region = Rect2(i * fw, int(_pet_rows.get(anim, 0)) * fh, fw, fh)
-			sf.add_frame(anim, at)
-		_sprites[anim] = sf
+	# SpriteFrames chỉ đọc nên dùng chung cho mọi con cùng loại (trạng thái phát nằm ở AnimatedSprite2D).
+	var ckey := "%s|%s" % [sheet, pet_look]
+	if _frames_cache.has(ckey):
+		_sprites = _frames_cache[ckey]
+	else:
+		var anims: Dictionary = def.get("anims", {})
+		for anim in anims.keys():
+			var path := str(_pet_files.get(anim, "")) if pet_look != "" else "%s/%s/%s.png" % [MOB_DIR, sheet, anim]
+			if not ResourceLoader.exists(path): continue
+			var tex := load(path) as Texture2D
+			if tex == null: continue
+			var sf := SpriteFrames.new()
+			if sf.has_animation("default"): sf.remove_animation("default")
+			var info: Array = anims[anim]
+			var n := int(info[0])
+			sf.add_animation(anim)
+			sf.set_animation_speed(anim, float(info[1]))
+			sf.set_animation_loop(anim, anim == "idle" or anim == "run")
+			var fw := int(def["fw"]); var fh := int(def["fh"])
+			for i in range(n):
+				var at := AtlasTexture.new()
+				at.atlas = tex
+				at.region = Rect2(i * fw, int(_pet_rows.get(anim, 0)) * fh, fw, fh)
+				sf.add_frame(anim, at)
+			_sprites[anim] = sf
+		_frames_cache[ckey] = _sprites
 	if _sprites.is_empty() or not _sprites.has("idle"):
 		var cr := ColorRect.new()
 		cr.color = Color(0.8, 0.3, 0.35)
@@ -160,7 +167,13 @@ func _build() -> void:
 		_anim.flip_h = face_left
 		add_child(_anim)
 		_anim.play("idle")
-	# Thanh máu (chỉ hiện sau khi bị đánh; trùm luôn hiện), bề rộng theo hạng
+	# Thanh máu + tên dựng lười: quái thường chỉ cần khi bị đánh / được chọn (đỡ ~6 node mỗi con); trùm dựng ngay.
+	if is_boss:
+		_ensure_bar()
+		_ensure_name()
+
+func _ensure_bar() -> void:
+	if _bar != null: return
 	var w := float(grade.get("barW", 36))
 	_bar = Control.new()
 	_bar.position = Vector2(-w * 0.5, -_height - 8.0)
@@ -175,7 +188,12 @@ func _build() -> void:
 	_bar_fill.position = Vector2(1, 1)
 	_bar_fill.size = Vector2(w - 2.0, 4)
 	_bar.add_child(_bar_fill)
-	# Tên + cấp (chỉ hiện khi người chơi ở gần; World bật/tắt)
+	if max_hp > 0:
+		_bar_fill.size.x = (w - 2.0) * clampf(float(hp) / float(maxi(1, max_hp)), 0.0, 1.0)
+
+# Tên + cấp (chỉ hiện khi là mục tiêu; World bật/tắt)
+func _ensure_name() -> void:
+	if _name != null: return
 	_name = T.hud_label("%s Lv%d" % [mob_name, mob_level], 12, Color(str(grade.get("nameColor", "#ffcdd2"))), true)
 	_name.position = Vector2(-70, -_height - 28.0)
 	_name.custom_minimum_size = Vector2(140, 0)
@@ -231,6 +249,7 @@ func set_hp(h: int, mh: int) -> void:
 		_bar_fill.size.x = w * clampf(ratio, 0.0, 1.0)
 
 func hit_flash() -> void:
+	if alive: _ensure_bar()
 	_flash_until = Time.get_ticks_msec() + 90
 	_bar_until = Time.get_ticks_msec() + 4000
 	if state == 0 and _sprites.has("hit"):
@@ -239,6 +258,7 @@ func hit_flash() -> void:
 
 ## Bật/tắt tên + cấp trên đầu quái. Quái thường chỉ hiện khi là mục tiêu; trùm luôn hiện.
 func show_name(on: bool) -> void:
+	if on and alive: _ensure_name()
 	if _name: _name.visible = alive and (on or is_boss)
 
 ## Hộp va chạm xấp xỉ (toạ độ thế giới) để kiểm đòn lao.
@@ -250,6 +270,7 @@ func body_rect() -> Rect2:
 
 func revive() -> void:
 	alive = true
+	set_process(true)   # die() đã tắt: quái sống lại cần chạy lại nội suy
 	if _bar: _bar.visible = is_boss
 	if _name: _name.visible = is_boss
 	modulate.a = 1.0
@@ -260,6 +281,7 @@ func revive() -> void:
 func die() -> void:
 	if not alive: return
 	alive = false
+	set_process(false)   # chết rồi: không cần nội suy/đổi màu mỗi khung trong lúc tween tan
 	play("death")
 	if fake_death and _anim:
 		# Bộ hình không có hoạt ảnh chết thật: cho ngã xuống như web

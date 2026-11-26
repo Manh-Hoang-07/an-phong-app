@@ -10,6 +10,7 @@ const MIX_RATE := 22050
 var _players: Array[AudioStreamPlayer] = []       # 8 player cho SFX
 var _music_players: Array[AudioStreamPlayer] = [] # 2 player cho nhạc (crossfade)
 var _cache: Dictionary = {}
+var _bar_cache: Dictionary = {}                    # key "song|bar_idx" -> AudioStreamWAV (mỗi bài chỉ 4 bar)
 var volume: float = 0.7                            # alias SFX (tương thích code cũ)
 var sfx_enabled: bool = true
 var music_enabled: bool = true
@@ -75,14 +76,15 @@ func _ready() -> void:
 	for i in 2:
 		var p := AudioStreamPlayer.new()
 		p.bus = "Master"
-		p.loop = false
-		add_child(p)
+		add_child(p)   # AudioStreamPlayer không có thuộc tính loop (lặp do stream quyết định)
 		_music_players.append(p)
 	_apply_gain()
 	_song_timer = Timer.new()
 	_song_timer.wait_time = 0.25
 	_song_timer.timeout.connect(_on_song_tick)
 	add_child(_song_timer)
+	# Warm-up SFX một lần lúc boot: tránh synth (tới ~15k sample/âm) đúng lúc đang đánh.
+	for name in SYNTH.keys(): _stream(str(name))
 
 func _apply_gain() -> void:
 	# SFX_BASE 0.5 / MUSIC_BASE 0.16 như web, nhân âm lượng người chọn; tắt = -80 dB.
@@ -246,7 +248,14 @@ func _on_song_tick() -> void:
 		for q in _music_players:
 			if not q.playing: p = q; break
 		if p == null: break
-		p.stream = _make_bar(song, _song_bar)
+		var chords: Array = song.get("chords", [[57, 60, 64]])
+		var bar_slot := _song_bar % chords.size()
+		var ck := "%s|%d" % [_song_key, bar_slot]
+		var stream: AudioStreamWAV = _bar_cache.get(ck, null)
+		if stream == null:
+			stream = _make_bar(song, bar_slot)
+			_bar_cache[ck] = stream
+		p.stream = stream
 		p.play()
 		_song_bar += 1
 		_song_next += bar_len

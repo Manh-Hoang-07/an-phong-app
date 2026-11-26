@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bt1nouajawx2o"
-path="res://.godot/imported/near.png-dce081207293706fd7694dbdf631a24f.ctex"
+path.s3tc="res://.godot/imported/near.png-dce081207293706fd7694dbdf631a24f.s3tc.ctex"
+path.etc2="res://.godot/imported/near.png-dce081207293706fd7694dbdf631a24f.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/bg/fai3/near.png"
-dest_files=["res://.godot/imported/near.png-dce081207293706fd7694dbdf631a24f.ctex"]
+dest_files=["res://.godot/imported/near.png-dce081207293706fd7694dbdf631a24f.s3tc.ctex", "res://.godot/imported/near.png-dce081207293706fd7694dbdf631a24f.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

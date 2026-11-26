@@ -1141,21 +1141,8 @@ func build_map() -> Control:
 	mapbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mapbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	mapbox.add_child(view)
-	# Cột chi tiết: chạm một khu để hiện quái/NPC/đường nối/trạng thái mở (khớp web).
-	var detail := PanelContainer.new()
-	detail.add_theme_stylebox_override("panel", T.UISkin.inset(3))
-	detail.custom_minimum_size = Vector2(300, 0)
-	var dbox := _vb(8)
-	detail.add_child(dbox)
-	_map_info(dbox, str(p().get("map", "lang")))
-	view.selected.connect(func(id: String): _map_info(dbox, id))
-	var split := HSplitContainer.new()
-	split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	split.add_child(mapbox)
-	split.add_child(detail)
-	split.split_offset = 720
-	vb.add_child(split)
+	# Chỉ hiện bản đồ: bỏ cột chi tiết bên phải để bản đồ lấp đầy khung.
+	vb.add_child(mapbox)
 	return W.fill(vb)
 
 func _dict_values(d: Dictionary) -> Array:
@@ -1826,43 +1813,80 @@ func build_companion() -> Control:
 		var st := _companion_stats(pl, sid)
 		var card := _vb(6)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		card.custom_minimum_size = Vector2(520, 0)
+		card.custom_minimum_size = Vector2(0, 0)
 		var head := HBoxContainer.new()
 		head.add_theme_constant_override("separation", 10)
 		head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		head.custom_minimum_size = Vector2(500, 58)
+		head.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		head.custom_minimum_size = Vector2(0, 58)
 		head.add_child(_pet_avatar(sid, 56))
 		var tc := _vb(2)
 		tc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tc.custom_minimum_size = Vector2(240, 0)
+		tc.custom_minimum_size = Vector2(120, 0)
 		tc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		tc.add_child(T.label(Data.mount_name(sid) + (" · đã triệu hồi" if active else ""), T.FS_L, T.C_GOLD if active else T.C_TEXT, true))
 		if not m.is_empty(): tc.add_child(T.label(str(m.get("desc", "")), T.FS_S, T.C_MUTED))
 		tc.add_child(T.label("HP %d · Công %d · Thủ %d · MP %d" % [int(st["maxHp"]), int(st["atk"]), int(st["def"]), int(st["maxMp"])], T.FS_S, T.C_TEXT))
 		head.add_child(tc)
+		# Nút phải có min-width + tắt autowrap: nếu không, tc (EXPAND_FILL) ép nút về ~20px
+		# rồi chữ "Triệu hồi · 10 MP" xuống dòng thành cột cao -> card phình, nội dung bị đẩy xuống.
+		var pb: Button
 		if active:
-			head.add_child(W.action_button("Thu hồi", func(): act("mount_set", {"id": sid})))
+			pb = W.action_button("Thu hồi", func(): act("mount_set", {"id": sid}))
 		else:
 			var can := int(pl.get("mp", 0)) >= 10 and int(pl.get("level", 1)) >= int(m.get("level", 1))
-			var tb := W.action_button("Triệu hồi · 10 MP", func(): act("mount_set", {"id": sid}), not can)
-			if not can: tb.tooltip_text = "Cần 10 MP và cấp %d." % int(m.get("level", 1))
-			head.add_child(tb)
+			pb = W.action_button("Triệu hồi · 10 MP", func(): act("mount_set", {"id": sid}), not can)
+			if not can: pb.tooltip_text = "Cần 10 MP và cấp %d." % int(m.get("level", 1))
+		pb.custom_minimum_size = Vector2(132, 40)
+		pb.autowrap_mode = TextServer.AUTOWRAP_OFF
+		pb.clip_text = true
+		pb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		head.add_child(pb)
 		card.add_child(head)
 		if active:
 			var cur: Dictionary = pets.get(sid, {}) if typeof(pets.get(sid, null)) == TYPE_DICTIONARY else {}
 			card.add_child(W.bar("HP", int(cur.get("hp", st["maxHp"])), int(st["maxHp"]), T.C_GREEN))
 			card.add_child(W.bar("MP", int(cur.get("mp", st["maxMp"])), int(st["maxMp"]), T.C_BLUE))
 			card.add_child(W.bar("Thể lực", int(cur.get("sta", st["maxSta"])), int(st["maxSta"]), T.C_GOLD))
-			# Ô chọn kỹ năng thú (khớp pet_skill của web).
+			# Kỹ năng thú: ô vuông theo phong cách app, ô đang dùng nổi bật (không disable).
 			var skill_id := str(skill_map.get(sid, mounts.get("skill", "bite")))
+			if not pet_skills.has(skill_id): skill_id = "bite"
+			card.add_child(W.section_label("Kỹ năng thú"))
+			card.add_child(T.label("Chạm ô để chọn chiêu thú dùng. Mỗi lần dùng tốn MP và thể lực.", T.FS_S, Color(T.C_MUTED, 0.85)))
 			var sg := _grid(3)
 			for skid in pet_skills.keys():
 				var skill: Dictionary = pet_skills[skid] if typeof(pet_skills[skid]) == TYPE_DICTIONARY else {}
 				var skid_s := str(skid)
-				var sb := W.action_button("%s %s · %d MP / %d STA" % [str(skill.get("icon", "")), str(skill.get("name", skid_s)), int(skill.get("mp", 0)), int(skill.get("sta", 0))], func(): act("pet_skill_set", {"id": sid, "skill": skid_s}), skid_s == skill_id)
-				sb.tooltip_text = str(skill.get("desc", ""))
-				sg.add_child(sb)
-			card.add_child(W.section_label("Ô kỹ năng"))
+				var chosen := skid_s == skill_id
+				var glyph := T.GlyphArt.token_of(str(skill.get("icon", "")))
+				if glyph.is_empty(): glyph = "@paw"
+				# Kích thước CỐ ĐỊNH (giống ô trang bị 46x46): Button thường không lấy min size từ con,
+				# để width 0 là grid ép cột về 0 -> chữ tràn xuống dòng khác.
+				var cell := T.button("", Vector2(150, 84))
+				cell.focus_mode = Control.FOCUS_NONE
+				cell.add_theme_stylebox_override("normal", T.UISkin.slot(0, chosen, false))
+				cell.add_theme_stylebox_override("hover", T.UISkin.slot(0, true, false))
+				cell.add_theme_stylebox_override("pressed", T.UISkin.slot(0, true, false))
+				cell.tooltip_text = "%s\n%d MP · %d STA\n%s" % [str(skill.get("name", skid_s)), int(skill.get("mp", 0)), int(skill.get("sta", 0)), str(skill.get("desc", ""))]
+				var inner := _vb(2)
+				inner.set_anchors_preset(Control.PRESET_FULL_RECT)
+				inner.offset_left = 6; inner.offset_right = -6; inner.offset_top = 6; inner.offset_bottom = -6
+				inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				var ic := T.GlyphArt.make(glyph, 28.0, T.C_GOLD if chosen else T.C_TEXT)
+				ic.set_anchors_preset(Control.PRESET_TOP_WIDE)
+				ic.custom_minimum_size = Vector2(0, 30)
+				inner.add_child(ic)
+				var nm := T.label(str(skill.get("name", skid_s)), T.FS_S, T.C_GOLD if chosen else T.C_TEXT, chosen)
+				nm.autowrap_mode = TextServer.AUTOWRAP_OFF
+				nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+				nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				nm.custom_minimum_size = Vector2(0, 22)
+				nm.size_flags_vertical = Control.SIZE_EXPAND_FILL
+				inner.add_child(nm)
+				cell.add_child(inner)
+				cell.pressed.connect(func(): act("pet_skill_set", {"id": sid, "skill": skid_s}))
+				sg.add_child(cell)
 			card.add_child(sg)
 		card.add_child(_pet_gear_section(pl, sid))
 		vb.add_child(W.card_row(card))

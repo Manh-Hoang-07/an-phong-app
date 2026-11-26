@@ -41,6 +41,10 @@ var _haze: TextureRect = null
 var _theme := "city"
 var _map_id := ""
 var _low_quality := false
+## set_camera được gọi mỗi khung từ World._process. Nếu camera không dịch thì bỏ qua:
+## gán size/position trên TextureRect (Control) invalidate layout dù giá trị không đổi.
+var _last_cam := Vector2.ZERO
+var _cam_valid := false
 
 ## Kích thước vùng THẾ GIỚI mà camera nhìn thấy (đơn vị của MapView/Player), KHÔNG phải cỡ màn hình.
 ## Node2D nền nằm trong không gian thế giới, nên phải chia cho zoom của camera; nếu dùng thẳng
@@ -102,8 +106,21 @@ func _grade_material(d: Dictionary) -> ShaderMaterial:
 	mat.set_shader_parameter("gamma", float(d.get("gamma", 1.0)))
 	return mat
 
+# Ảnh đã lật/ghép đôi dựng bằng CPU khá tốn (tới ~16MB/lớp): chỉ dựng một lần cho mỗi (ảnh gốc, cờ), quay lại map cũ dùng lại.
+static var _prep_cache: Dictionary = {}
+
 func _prep_texture(tex: Texture2D, d: Dictionary) -> Texture2D:
 	if not (bool(d.get("mirror", false)) or bool(d.get("flip", false))): return tex
+	var key := "%s|%d|%d" % [tex.resource_path, 1 if bool(d.get("mirror", false)) else 0, 1 if bool(d.get("flip", false)) else 0]
+	if tex.resource_path != "" and _prep_cache.has(key): return _prep_cache[key]
+	var out_tex := _prep_texture_build(tex, d)
+	if tex.resource_path != "":
+		# Giữ tối đa 3 ảnh đã dựng để không phình RAM khi đi qua nhiều map.
+		if _prep_cache.size() >= 3: _prep_cache.erase(_prep_cache.keys()[0])
+		_prep_cache[key] = out_tex
+	return out_tex
+
+func _prep_texture_build(tex: Texture2D, d: Dictionary) -> Texture2D:
 	var im := tex.get_image()
 	if im.is_compressed(): im.decompress()
 	im.convert(Image.FORMAT_RGBA8)
@@ -217,10 +234,13 @@ func _build_haze(look: Dictionary) -> void:
 	add_child(_haze)
 
 func set_camera(pos: Vector2) -> void:
+	if _cam_valid and pos.is_equal_approx(_last_cam): return
 	_cam = pos
 	_apply()
 
 func _apply() -> void:
+	_last_cam = _cam
+	_cam_valid = true
 	var tl := _cam - _view * 0.5
 	if _flat:
 		_flat.size = _view

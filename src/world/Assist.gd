@@ -14,6 +14,8 @@ var _batch: Dictionary = {}    # "uid|src" -> {u, src, dmg, slow, dir}
 var _flush_at := 0
 var _next_uid := 910000
 var _sync_at := 0
+## Chỉ số pet/summon được tính lại từ đầu mỗi khung trong tick(); cache theo đầu vào (đổi rất hiếm).
+var _stats_cache: Dictionary = {}
 
 func setup(world: Node2D) -> void:
 	w = world
@@ -152,10 +154,20 @@ func tick(delta: float) -> void:
 		node.set_target(tpos)
 	if _batch.size() > 0 and now >= _flush_at: _flush()
 
+## Cache chỉ số theo id + các đầu vào hiếm đổi. Tránh tạo Dictionary + duyệt gear.keys() 60 lần/giây cho mỗi unit.
+func _cached_stats(kind: String, id: String) -> Dictionary:
+	var key := "%s|%s|%s|%s|%s|%s" % [kind, id, str(Game.player.get("petGear", {})), str(Game.player.get("level", 1)),
+		str(Game._as_dict(Game.player.get("skills", {})).get("th5", 1)), str(Game._as_dict(Game.player.get("summons", {})).get("units", {}))]
+	if _stats_cache.has(key): return _stats_cache[key]
+	var st: Dictionary = w._companion_stats(id) if kind == "pet" else summon_stats(id)
+	if _stats_cache.size() > 64: _stats_cache.clear()
+	_stats_cache[key] = st
+	return st
+
 func _state_of(u: Dictionary) -> Dictionary:
 	var id := str(u["id"])
 	match str(u["kind"]):
-		"pet": return w._pet_state(id, w._companion_stats(id))
+		"pet": return w._pet_state(id, _cached_stats("pet", id))
 		"summon":
 			var sm: Dictionary = Game._as_dict(Game.player.get("summons", {}))
 			if typeof(sm.get("states", null)) != TYPE_DICTIONARY:
@@ -169,7 +181,7 @@ func _state_of(u: Dictionary) -> Dictionary:
 	return {}
 
 func _summon_regen(u: Dictionary, state: Dictionary, delta: float, now: int) -> void:
-	var ss := summon_stats(str(u["id"]))
+	var ss := _cached_stats("summon", str(u["id"]))
 	if float(state.get("hp", 0)) <= 0.0:
 		state["hp"] = maxf(1.0, roundf(float(ss["maxHp"]) * 0.5)); state["mp"] = ss["maxMp"]; state["sta"] = ss["maxSta"]
 	if now - int(u["last_combat"]) >= 3000:

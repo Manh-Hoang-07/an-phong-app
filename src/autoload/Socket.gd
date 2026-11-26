@@ -14,6 +14,10 @@ signal players(msg: Dictionary)
 signal message_received(msg: Dictionary)
 
 const MAX_QUEUE := 256
+## Giới hạn xử lý gói mỗi khung: phần dư nằm lại trong hàng đợi WebSocket cho khung sau.
+## Không đọc hết hàng đợi trong một _process (có thể tới 4096 gói) nên không gây đứng khung.
+const MAX_PACKETS_PER_FRAME := 24
+const PACKET_BUDGET_MS := 3.0
 
 var _peer := WebSocketPeer.new()
 var _running: bool = false
@@ -30,6 +34,10 @@ var _heartbeat_at: int = 0
 var _pos_state: Dictionary = {}
 const POS_MIN_MS := 66
 var _pos_sent_at := 0
+## Gom các gói msnap liên tiếp: server gửi mỗi nhịp, không cần xử lý từng gói một.
+var _pending_msnap: Dictionary = {}
+## Gom patch: burst tới 24 gói/khung, áp từng cái ngay gây duplicate(true)+recalc_stats lặp.
+var _pending_patches: Array[Dictionary] = []
 var my_id: int = 0
 var channel: int = 1
 var online: bool = false
@@ -46,6 +54,8 @@ func stop() -> void:
 	online = false
 	_peer.close(1000, "thoát app")
 	mobs_received = false
+	_pending_msnap.clear()
+	_pending_patches.clear()
 	set_process(false)
 
 func _connect() -> void:
@@ -82,16 +92,25 @@ func _process(_delta: float) -> void:
 			online = true
 			_retry = 0
 			_pos_state.clear()   # vào lại phòng ở gói pos kế tiếp
+			_pending_msnap.clear()  # bỏ snapshot của phiên/phòng cũ
+			_pending_patches.clear()
 			connected_to_server.emit()
 		_flush()
 		_heartbeat()
-		while _peer.get_available_packet_count() > 0:
+		var budget_from := Time.get_ticks_msec()
+		var processed := 0
+		while processed < MAX_PACKETS_PER_FRAME and _peer.get_available_packet_count() > 0:
 			var raw := _peer.get_packet()
 			var text := raw.get_string_from_utf8()
 			var parsed: Variant = JSON.parse_string(text)
+			processed += 1
 			if typeof(parsed) != TYPE_DICTIONARY: continue
 			rx_count += 1
 			_dispatch(parsed)
+			if processed % 4 == 0 and float(Time.get_ticks_msec() - budget_from) >= PACKET_BUDGET_MS:
+				break
+		_flush_pending_msnap()
+		_flush_pending_patches()
 	elif state == WebSocketPeer.STATE_CLOSED:
 		var code := _peer.get_close_code()
 		if online:
@@ -112,9 +131,33 @@ func _process(_delta: float) -> void:
 			_peer.close()
 			_schedule_reconnect()
 
+## Gom nhiều msnap thành một: mỗi gói chỉ chứa vị trí/trạng thái mới nhất của từng mob.
+## Nếu không gom, giới hạn packet/frame làm mob nhận snapshot trễ và giật.
+func _queue_msnap(m: Dictionary) -> void:
+	for e in m.get("p", []):
+		if typeof(e) == TYPE_ARRAY and (e as Array).size() >= 5:
+			_pending_msnap[int((e as Array)[0])] = e
+
+func _flush_pending_msnap() -> void:
+	if _pending_msnap.is_empty(): return
+	var batch: Dictionary = _pending_msnap
+	_pending_msnap = {}
+	players.emit({"t": "msnap", "p": batch.values()})
+
+## Áp tất cả patch nhận được trong khung một lần: Game gộp set/del rồi duplicate+recalc một lần.
+func _flush_pending_patches() -> void:
+	if _pending_patches.is_empty(): return
+	var batch := _pending_patches
+	_pending_patches = []
+	Game.apply_push_patch_batch(batch)
+	for m in batch: patch.emit(m)
+
 func _dispatch(m: Dictionary) -> void:
 	var t := str(m.get("t", ""))
 	message_received.emit(m)
+	if t == "msnap":
+		_queue_msnap(m)
+		return
 	# 'batch': server gộp nhiều gói quái cùng nhịp — mở ra theo đúng thứ tự
 	if t == "batch":
 		var list: Array = m.get("l", [])
@@ -131,8 +174,7 @@ func _dispatch(m: Dictionary) -> void:
 			mobs_received = true
 			mobs.emit(m)
 		"patch":
-			Game.apply_push_patch(m)
-			patch.emit(m)
+			_pending_patches.append(m)
 		"chat": chat.emit(m)
 		"who", "join", "leave", "snap", "look", "msnap", "mspawn", "mhit", "mhp", "mdie", "mdel", "mresp", "mact", "sys", "chlist": players.emit(m)
 		"party", "party_inv", "trade", "trade_inv", "trade_end": players.emit(m)

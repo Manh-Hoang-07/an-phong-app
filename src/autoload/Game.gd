@@ -293,7 +293,9 @@ func patch_is_quiet(patch: Dictionary) -> bool:
 		return false
 	return true
 
-func apply_patch(patch: Dictionary, quiet: bool = false) -> void:
+const PATCH_STAT_KEYS := ["points", "equip", "level", "school", "formChoice", "formActive", "fusion", "perks", "kyNguyen"]
+
+func apply_patch(patch: Dictionary, quiet: bool = false, defer: bool = false) -> void:
 	if player.is_empty(): return
 	var p := player.duplicate(true)
 	for k in patch.get("del", []):
@@ -306,12 +308,36 @@ func apply_patch(patch: Dictionary, quiet: bool = false) -> void:
 	# KHÔNG chép hp/mp từ bản vá: server chỉ biết giá trị lưu lần cuối (cũ hơn máu tức thời của client).
 	# Web cũng vậy; hp/mp chỉ lấy từ server qua các sự kiện levelup / school / awaken / heal.
 	# Điểm/đồ/cấp đổi thì tính lại chỉ số (panel Nhân vật không còn hiện toàn 0).
-	var stat_keys := ["points", "equip", "level", "school", "formChoice", "formActive", "fusion", "perks", "kyNguyen"]
-	for k in set_map.keys():
-		if k in stat_keys:
-			recalc_stats()
-			break
-	player_changed.emit(was_quiet)
+	if defer:
+		if not _stats_dirty:
+			for k in set_map.keys():
+				if k in PATCH_STAT_KEYS: _stats_dirty = true; break
+		if was_quiet: _patch_quiet = true
+	else:
+		for k in set_map.keys():
+			if k in PATCH_STAT_KEYS: recalc_stats(); break
+		player_changed.emit(was_quiet)
+
+var _stats_dirty := false
+var _patch_quiet := false
+
+## Gom nhiều patch trong cùng khung: duplicate/recalc/emit chỉ một lần thay vì mỗi gói.
+func apply_push_patch_batch(batch: Array[Dictionary]) -> void:
+	if player.is_empty() or batch.is_empty(): return
+	_stats_dirty = false
+	_patch_quiet = false
+	for m in batch:
+		if int(m.get("base", -1)) == rev and m.has("patch"):
+			rev = int(m.get("rev", rev))
+			apply_patch(m["patch"], false, true)
+		elif int(m.get("base", -2)) != rev:
+			rev_mismatch.emit()
+		for ev in m.get("ev", []):
+			if typeof(ev) == TYPE_DICTIONARY: handle_event(ev, true)
+	if _stats_dirty: recalc_stats()
+	player_changed.emit(_patch_quiet)
+	_stats_dirty = false
+	_patch_quiet = false
 
 ## Bản vá đẩy qua WebSocket: cùng luật base/rev với HTTP (xem public/js/core/net.js pushPatch)
 func apply_push_patch(m: Dictionary) -> void:
@@ -324,7 +350,7 @@ func apply_push_patch(m: Dictionary) -> void:
 	for ev in m.get("ev", []):
 		if typeof(ev) == TYPE_DICTIONARY: handle_event(ev)
 
-func handle_event(ev: Dictionary) -> void:
+func handle_event(ev: Dictionary, defer: bool = false) -> void:
 	event_received.emit(ev)
 	var t := str(ev.get("t", ""))
 	match t:
@@ -336,7 +362,8 @@ func handle_event(ev: Dictionary) -> void:
 			mp = mini(mp + int(ev.get("mp", 0)), int(stats.get("maxMp", mp)))
 		"form":
 			form_active = bool(ev.get("active", false))
-			recalc_stats()
+			if defer: _stats_dirty = true
+			else: recalc_stats()
 		"school", "awaken":
 			hp = int(player.get("hp", hp))
 			mp = int(player.get("mp", mp))

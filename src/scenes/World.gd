@@ -54,6 +54,9 @@ var _meta: Dictionary = {}
 var _grid: Array = []
 var _cols := 0
 var _rows := 0
+# Bake va chạm/mặt đất theo cột khi load map: _move_step gọi _ground_y 4 lần + _walkable 2 lần mỗi khung.
+var _stand_rows: Array = []          # _stand_rows[c] = mảng các hàng đứng (#/=) đã sort tăng dần
+var _walk_cache: Array[bool] = []    # index = row * _cols + col
 
 # nhân vật
 var _facing := 1
@@ -116,6 +119,7 @@ const SAVE_IDLE_MAX := 30.0
 var _regen_acc := 0.0
 var _hud_dirty := true
 var _hud_acc := 0.0
+var _interact_acc := 0.0
 var _pickup_pending: Dictionary = {}
 var _pickup_lid := ""
 var _interact: Dictionary = {}
@@ -215,13 +219,16 @@ func _fade_in() -> void:
 	_fade.modulate.a = 1.0
 	create_tween().tween_property(_fade, "modulate:a", 0.0, 0.3)
 
+var _player_sprite: Node2D = null   # reference trực tiếp, tránh get_children() mỗi khung trong _set_facing/_play_anim
 func _setup_player_sprite() -> void:
 	var school := str(Game.player.get("school", "kiem_si"))
 	for c in _player.get_children(): c.queue_free()
+	_player_sprite = null
 	if _char_script:
 		var sprite: Node2D = _char_script.new()
 		_player.add_child(sprite)
 		sprite.setup(school)
+		_player_sprite = sprite
 	_aura = null
 	_player.modulate = Color.WHITE
 	if Game.form_active: _apply_form_visual(true, true)
@@ -271,6 +278,7 @@ func _load_player_map(arrive: String) -> void:
 		for c in range(_cols):
 			if str((_grid[r] as Array)[c]) == "=" and str((_grid[r + 1] as Array)[c]) == "#":
 				(_grid[r] as Array)[c] = "."
+	_bake_collision_cache()
 
 	# Vị trí xuất hiện: toạ độ đã lưu (nếu hợp lệ) hoặc điểm tới (arrive / S).
 	var px = Game.player.get("x", null)
@@ -315,7 +323,8 @@ func _load_player_map(arrive: String) -> void:
 		_cam.limit_right = int(float(_cols) * TILE)
 		_cam.limit_top = 0
 		_cam.limit_bottom = _cam_limit_bottom()
-		_cam.global_position = _player.position
+		_cam.global_position = _player.position + Vector2(0, -24.0)
+		_cam.position = _cam.global_position
 		_cam.make_current()
 		_cam.reset_smoothing()
 	_changing = false
@@ -356,9 +365,24 @@ func _cell(x: float, y: float) -> String:
 	if r < 0 or c < 0 or c >= _cols or r >= _grid.size(): return "."
 	return str((_grid[r] as Array)[c])
 
+## Bake cache sau khi _grid/_cols/_rows sẵn sàng (gọi ở cuối _load_player_map).
+func _bake_collision_cache() -> void:
+	_stand_rows = []
+	_stand_rows.resize(_cols)
+	_walk_cache = []
+	_walk_cache.resize(_rows * _cols)
+	for c in range(_cols):
+		_stand_rows[c] = []
+		for r in range(_rows):
+			var ch := str((_grid[r] as Array)[c])
+			_walk_cache[r * _cols + c] = (ch != "#" and ch != "" and ch != " ")
+			if ch == "#" or ch == "=": (_stand_rows[c] as Array).append(r)
+
 func _walkable(x: float, y: float) -> bool:
-	var ch := _cell(x, y)
-	return ch != "#" and ch != "" and ch != " "
+	var c := int(floor(x / TILE))
+	var r := int(floor(y / TILE))
+	if r < 0 or c < 0 or c >= _cols or r >= _rows: return true
+	return _walk_cache[r * _cols + c]
 
 func _is_stand(r: int, c: int) -> bool:
 	if r < 0 or r >= _rows or c < 0 or c >= _cols: return r >= _rows
@@ -369,6 +393,18 @@ func _is_stand(r: int, c: int) -> bool:
 func _ground_y(x: float, foot_y: float) -> float:
 	var c := int(floor(x / TILE))
 	var r := int(floor(foot_y / TILE))
+	if c >= 0 and c < _stand_rows.size():
+		# Tìm nhị phân hàng đứng đầu tiên >= r (cache đã sort). O(log rows) thay vì O(rows).
+		var rows: Array = _stand_rows[c]
+		var lo := 0
+		var hi := rows.size()
+		while lo < hi:
+			var mid := (lo + hi) / 2
+			if int(rows[mid]) < r: lo = mid + 1
+			else: hi = mid
+		if lo < rows.size(): return float(rows[lo]) * TILE
+		return float(_rows) * TILE
+	# Fallback (cache chưa bake): quét như cũ.
 	for rr in range(maxi(0, r), _rows):
 		if _is_stand(rr, c): return float(rr) * TILE
 	return float(_rows) * TILE
@@ -422,7 +458,15 @@ func _process(delta: float) -> void:
 	# Chưa nhận được danh sách quái sau 3s: xin server gửi lại (vào phòng bằng pos r=1)
 	if Socket.online and not Socket.mobs_received and Time.get_ticks_msec() - _enter_try > 3000:
 		_on_socket_connected()
-	_update_interact()
+	_interact_acc += delta
+	if _interact_acc >= 0.1:
+		_interact_acc = 0.0
+		_update_interact()
+	elif _interact_mark != null and is_instance_valid(_interact_mark):
+		# vẫn nhấp nhô mũi tên giữa các lần quét
+		var it := str(_interact.get("type", ""))
+		if it != "" and _interact.has("pos"):
+			_interact_mark.position = (_interact["pos"] as Vector2) + Vector2(0, sin(_target_t * 7.7) * 4.0)
 	_update_target(delta)
 	_buff_hud_tick(delta)
 	_regen(delta)
@@ -581,15 +625,23 @@ func _move_step(delta: float) -> void:
 	for u in _mobs.keys():
 		var m: Node2D = _mobs[u]
 		if not is_instance_valid(m) or not m.alive: continue
-		if m.state == 2 and not m.lunge_hit and m.atk > 0 and not _dead:
-			var br: Rect2 = m.body_rect().grow(-4.0)
-			if br.intersects(prect):
-				m.lunge_hit = true
-				_hurt_player(m)
+		if m.state != 2 or m.lunge_hit or m.atk <= 0 or _dead: continue
+		# Lọc tầm bằng số trước khi tạo Rect2: chỉ quái thật sự gần mới cần hộp va chạm.
+		if absf(m.position.x - _player.position.x) > 90.0: continue
+		if absf(m.position.y - _player.position.y) > 90.0: continue
+		var br: Rect2 = m.body_rect().grow(-4.0)
+		if br.intersects(prect):
+			m.lunge_hit = true
+			_hurt_player(m)
 
 	if _cam:
 		# Lệch camera lên trên một chút: nhân vật nằm thấp hơn giữa màn hình, thấy nhiều trời/map phía trên hơn.
-		_cam.position = _player.position + Vector2(0, -24.0)
+		# Smooth follow frame-rate-independent (exp): mượt mà không bị giật từng khung, vẫn bám sát khi chạy.
+		var cam_target := _player.position + Vector2(0, -24.0)
+		var cam_k := 1.0 - exp(-14.0 * delta)
+		_cam.position = _cam.position.lerp(cam_target, cam_k)
+		# Bám ngay nếu lệch quá xa (đổi map/teleport/dịch chuyển không qua _reload_after_move).
+		if _cam.position.distance_squared_to(cam_target) > 40000.0: _cam.position = cam_target
 
 	# Lưu định kỳ
 	_save_acc += delta
@@ -614,12 +666,12 @@ func _server_anim(a: String) -> String:
 	return "idle"
 
 func _set_facing(f: int) -> void:
-	for c in _player.get_children():
-		if c.has_method("set_facing"): c.set_facing(f)
+	if _player_sprite != null and is_instance_valid(_player_sprite) and _player_sprite.has_method("set_facing"):
+		_player_sprite.set_facing(f)
 
 func _play_anim(a: String) -> void:
-	for c in _player.get_children():
-		if c.has_method("play"): c.play(a)
+	if _player_sprite != null and is_instance_valid(_player_sprite) and _player_sprite.has_method("play"):
+		_player_sprite.play(a)
 
 func _hp_pct() -> int:
 	var mx := maxi(1, int(Game.stats.get("maxHp", 100)))
@@ -867,7 +919,11 @@ func _free_proj(p: Dictionary) -> void:
 func _update_projectiles(delta: float) -> void:
 	if _projs.is_empty(): return
 	var ctx := {}   # tính lười: chỉ khi có đạn trúng (special_fx khá tốn)
-	for p in _projs.duplicate():
+	# Chạy ngược bằng chỉ số: không cấp phát mảng mới mỗi khung, vẫn xoá an toàn khi trúng/đạn hết tầm.
+	var pi := _projs.size() - 1
+	while pi >= 0:
+		var p: Dictionary = _projs[pi]
+		pi -= 1
 		var node: Node2D = p["node"]
 		if not is_instance_valid(node): _projs.erase(p); continue
 		var o: Dictionary = p["o"]
@@ -883,6 +939,8 @@ func _update_projectiles(delta: float) -> void:
 			if absf(mob.position.x - node.position.x) > 350.0: continue
 			var fo: Variant = p.get("focus", null)
 			if fo != null and is_instance_valid(fo) and (fo as Node2D).alive and mob != fo: continue
+			# Lọc tầm dọc trước khi tạo hộp va chạm (đạn bay ngang tầm ngực).
+			if absf(mob.position.y - node.position.y) > 90.0: continue
 			var mr: Rect2 = mob.body_rect()
 			# Quái thấp vẫn bị đạn tầm ngực trúng (web dùng khung sprite cao hơn): nới khung lên tối thiểu 70px
 			if mr.size.y < 70.0: mr = Rect2(mr.position.x, mr.end.y - 70.0, mr.size.x, 70.0)
@@ -906,37 +964,47 @@ func _proj_color(sk: Dictionary) -> Color:
 
 ## Gây sát thương của một kỹ năng theo đúng dạng của web (xem WorldSkills.castSkill).
 func _skill_damage(id: String, sk: Dictionary, stype: String, kind: int) -> void:
-	if stype in ["melee", "projectile", "spread"]: _aim_at_target()   # quay mặt về quái đang chỉ định (web: aimAtTarget)
+	if stype in ["melee", "projectile", "spread", "sword_fall", "meteor", "arrow_rain"]: _aim_at_target()   # quay mặt về quái đang chỉ định (web: aimAtTarget)
 	var power := float(sk.get("power", 0.0))
 	var sx := _skill_extra(sk)
 	var fa := float(_facing)
 	var px := _player.position.x
 	var py := _player.position.y
 	var smul := float(Game.stats.get("skillMul", 1.0))
+	# Mục tiêu đang nhắm: các chiêu rơi (kiếm/đá/mưa tên) phải trúng đúng quái trong tầm,
+	# không phải điểm cố định trước mặt người chơi (quái có thể đứng lệch trên/dưới hoặc sau lưng).
+	var aim: Node2D = _target_mob if (_target_mob != null and is_instance_valid(_target_mob) and _target_mob.alive) else null
+	var aim_x := px + fa * 140.0
+	var aim_y := py
+	if aim != null:
+		aim_x = aim.position.x
+		aim_y = aim.position.y - float(aim.get("_height")) * 0.5
 	match stype:
 		"melee":
 			_strike(float(sk.get("range", 90.0)), id, power, kind, maxi(1, int(sk.get("hits", 1))), HIT_GAP, sx)
 		"aoe":
 			_strike_shape({"kind": "circle", "cx": px, "cy": py, "r": float(sk.get("radius", 160.0))}, id, power, kind, sx)
 		"sword_fall":
-			var offs := [140.0, 270.0, 400.0]
-			for k in range(mini(int(sk.get("count", 1)), 3)):
-				var x := clampf(px + fa * float(offs[k]), 30.0, float(_cols) * TILE - 30.0)
+			var cnt_s := mini(int(sk.get("count", 1)), 3)
+			for k in range(cnt_s):
+				# Có mục tiêu: tất cả kiếm rơi quanh mục tiêu. Không có: rơi trước mặt như cũ.
+				var x := clampf(aim_x + fa * (float(k) - float(cnt_s - 1) * 0.5) * 70.0, 30.0, float(_cols) * TILE - 30.0)
 				var kx := sx.duplicate(); kx["knock"] = float(sk.get("knock", 300.0))
-				_after(float(k) * 0.22 + 0.3, func(): _strike_shape({"kind": "circle", "cx": x, "cy": py, "r": float(sk.get("radius", 120.0))}, id, power, kind, kx))
+				_after(float(k) * 0.22 + 0.3, func(): _strike_shape({"kind": "circle", "cx": x, "cy": aim_y, "r": float(sk.get("radius", 120.0))}, id, power, kind, kx))
 		"meteor":
-			for k in range(int(sk.get("count", 1))):
-				var x2 := clampf(px + fa * (170.0 + float(k) * 110.0), 30.0, float(_cols) * TILE - 30.0)
+			var cnt_m := maxi(1, int(sk.get("count", 1)))
+			for k in range(cnt_m):
+				var x2 := clampf(aim_x + fa * (float(k) - float(cnt_m - 1) * 0.5) * 90.0, 30.0, float(_cols) * TILE - 30.0)
 				var km := sx.duplicate(); km["knock"] = float(sk.get("knock", 260.0)); km["chainRadius"] = 170.0
-				_after(float(k) * 0.42 + 0.6, func(): _strike_shape({"kind": "circle", "cx": x2, "cy": py, "r": float(sk.get("radius", 120.0))}, id, power, kind, km))
+				_after(float(k) * 0.42 + 0.6, func(): _strike_shape({"kind": "circle", "cx": x2, "cy": aim_y, "r": float(sk.get("radius", 120.0))}, id, power, kind, km))
 			if float(sk.get("heal", 0.0)) > 0.0: _skill_heal(float(sk["heal"]))
 		"arrow_rain":
 			var width := float(sk.get("width", 300.0))
-			var cx := clampf(px + fa * (width * 0.5 + 30.0), 30.0, float(_cols) * TILE - 30.0)
+			var cx := clampf(aim_x, 30.0, float(_cols) * TILE - 30.0)
 			var n := maxi(1, int(sk.get("arrows", 1)))
 			for i in range(n):
 				var ax := cx + randf_range(-width * 0.5, width * 0.5)
-				_after(0.15 + float(i) * (1.2 / float(n)) + 0.26, func(): _strike_shape({"kind": "rect", "cx": ax, "cy": py, "w": 46.0, "h": 90.0}, id, power, kind, sx))
+				_after(0.15 + float(i) * (1.2 / float(n)) + 0.26, func(): _strike_shape({"kind": "rect", "cx": ax, "cy": aim_y, "w": 46.0, "h": 90.0}, id, power, kind, sx))
 		"projectile":
 			var water := str(sk.get("school", "")) == "phap_su"
 			var cnt := maxi(1, int(sk.get("count", 1)))
@@ -1052,8 +1120,12 @@ func _cast(index: int) -> void:
 		Socket.send_cast(id, _player.position.x, _player.position.y)
 	Audio.play("cast")
 	_attack_until = now + 320
+	# Chiêu rơi (kiếm/đá/mưa tên): căn hiệu ứng vào mục tiêu đang nhắm để kiếm đâm đúng quái.
+	var fx_origin := _player.position
+	if stype0 in ["sword_fall", "meteor", "arrow_rain"] and _target_mob != null and is_instance_valid(_target_mob) and _target_mob.alive:
+		fx_origin = _target_mob.position
 	if _skill_fx and _skill_fx.has_method("play"):
-		_skill_fx.play("cast", id, _player.position, _facing)
+		_skill_fx.play("cast", id, fx_origin, _facing)
 	var custom_fx: bool = _skill_fx != null and _skill_fx.has_method("has_custom") and _skill_fx.has_custom(id)   # có hình riêng -> bỏ hiệu ứng chung theo loại
 	var kind := 3 if bool(sk.get("superUlt", false)) else (2 if bool(sk.get("ult", false)) else 1)
 	var stype := str(sk.get("type", ""))
@@ -1755,6 +1827,7 @@ func _apply_mob_full(node: Node2D, info: Dictionary) -> void:
 		node.visible = true
 	else:
 		node.alive = false
+		node.set_process(false)   # mob chết/ẩn khỏi snapshot: khỏi chạy _process mỗi khung
 		node.visible = false
 
 func _on_mob_packet(msg: Dictionary) -> void:
@@ -1839,10 +1912,14 @@ func _on_mob_packet(msg: Dictionary) -> void:
 				(_mobs[u] as Node).queue_free()
 				_mobs.erase(u)
 
+var _shake_tween: Tween = null
 func shake(strength: float, duration: float) -> void:
 	if _cam == null: return
+	# Chỉ một Tween rung tại một thời điểm: trúng đòn dồn dập không chồng offset.
+	if _shake_tween != null and _shake_tween.is_valid(): _shake_tween.kill()
 	var tw := create_tween()
-	var steps := int(duration / 0.04)
+	_shake_tween = tw
+	var steps := maxi(1, int(duration / 0.04))
 	for i in range(steps):
 		var k := 1.0 - float(i) / float(steps)
 		tw.tween_property(_cam, "offset", Vector2(randf_range(-1, 1), randf_range(-1, 1)) * strength * k, 0.04)
@@ -1932,7 +2009,21 @@ func _potion_heal(iid: String, kind: String) -> int:
 
 ## Chọn bình để uống như web (usePotion): mọi bình cùng hệ xếp theo lượng hồi tăng dần; lấy bình nhỏ nhất đủ lấp phần đang thiếu
 ## (đỡ phí bình xịn), không đủ thì dùng bình mạnh nhất đang có. Bình phải đủ cấp; thuốc chữa nhiễm đỏ chỉ là phương án cuối.
+## Cache theo túi/cấp/máu: hàm này quét toàn bộ Data.ITEMS (~434 mục) và từng ô túi, mà _refresh_hud gọi 2 lần mỗi lần dirty.
+var _potion_pick_cache: Dictionary = {}
+
 func _potion_pick(kind: String) -> String:
+	# Chữ ký gồm mọi đầu vào của phép chọn: túi, cấp, maxHp/maxMp và máu/mana hiện tại.
+	var sig := "%s|%s|%s|%s|%s|%s|%s" % [kind, str(Game.player.get("bag", [])), str(Game.player.get("level", 1)),
+		str(Game.stats.get("maxHp", 0)), str(Game.stats.get("maxMp", 0)), str(Game.hp), str(Game.mp)]
+	if _potion_pick_cache.has(sig): return str(_potion_pick_cache[sig])
+	var picked := _potion_pick_calc(kind)
+	# Giới hạn bộ nhớ cache: mỗi lần máu đổi là một chữ ký mới.
+	if _potion_pick_cache.size() > 64: _potion_pick_cache.clear()
+	_potion_pick_cache[sig] = picked
+	return picked
+
+func _potion_pick_calc(kind: String) -> String:
 	var ids: Array = []
 	for iid in Data.ITEMS.keys():
 		var d: Dictionary = Data.item(str(iid))
@@ -2195,9 +2286,13 @@ class _AuraHalo extends Node2D:
 	var col := Color.WHITE
 	var tier := 1
 	var _t := 0.0
+	var _redraw_acc := 0.0
 	func _process(d: float) -> void:
 		_t += d
-		queue_redraw()
+		_redraw_acc += d
+		if _redraw_acc >= 1.0 / 30.0:
+			_redraw_acc = 0.0
+			queue_redraw()
 	func _draw() -> void:
 		var pulse := 0.5 + 0.5 * sin(_t * (2.5 + float(tier) * 0.7))
 		var r := 30.0 + float(tier) * 3.0 + pulse * 4.0
@@ -2218,6 +2313,7 @@ class _AuraBolts extends Node2D:
 	var col := Color.WHITE
 	var _t := 0.0
 	var _seed := 0
+	var _rng := RandomNumberGenerator.new()
 	func _process(d: float) -> void:
 		_t += d
 		if _t > 0.09:
@@ -2225,14 +2321,13 @@ class _AuraBolts extends Node2D:
 			_seed = randi()
 			queue_redraw()
 	func _draw() -> void:
-		var rng := RandomNumberGenerator.new()
-		rng.seed = _seed
+		_rng.seed = _seed
 		for k in range(2):
 			var p := Vector2(0, -18)
-			var a := rng.randf() * TAU
+			var a := _rng.randf() * TAU
 			for i in range(4):
-				a += rng.randf_range(-0.9, 0.9)
-				var n := p + Vector2(cos(a), sin(a)) * rng.randf_range(7.0, 13.0)
+				a += _rng.randf_range(-0.9, 0.9)
+				var n := p + Vector2(cos(a), sin(a)) * _rng.randf_range(7.0, 13.0)
 				draw_line(p, n, Color(col, 0.95), 1.6)
 				p = n
 

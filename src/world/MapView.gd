@@ -934,14 +934,22 @@ class _WaterFx extends Node2D:
 	var falls: Array = []
 	var pools: Array = []
 	var _t := 0.0
+	var _redraw_acc := 0.0
 	func _process(d: float) -> void:
 		_t += d
-		queue_redraw()
+		_redraw_acc += d
+		if _redraw_acc >= 1.0 / 30.0:
+			_redraw_acc = 0.0
+			queue_redraw()
 	func _draw() -> void:
+		# Chỉ vẽ phần nằm trong khung nhìn camera (map rộng có rất nhiều thác/hồ ngoài màn hình).
+		var vis := get_canvas_transform().affine_inverse() * get_viewport_rect()
+		vis = vis.grow(64.0)
 		if fall_tex != null:
 			var th := float(fall_tex.get_height())
 			for rc in falls:
 				var rect: Rect2 = rc
+				if not rect.intersects(vis): continue
 				# cuộn dọc: vẽ lặp theo chiều cao ảnh
 				var off := fmod(_t * 60.0, th)
 				var y := rect.position.y - off
@@ -956,6 +964,7 @@ class _WaterFx extends Node2D:
 			var tw := float(pool_tex.get_width())
 			for p in pools:
 				var rect2: Rect2 = p[0]
+				if not rect2.intersects(vis): continue
 				var off2 := fmod(_t * 15.0, tw)
 				var x := rect2.position.x - off2
 				while x < rect2.end.x:

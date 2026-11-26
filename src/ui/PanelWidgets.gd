@@ -181,6 +181,21 @@ const PORTRAIT_DEFS := {
 const PORTRAIT_ALIAS := {"than_xa":"cung_thu", "anh_vuong":"sat_thu", "thanh_linh":"tri_lieu_su",
 	"ho_ve_bat_khuat":"tanker", "dai_phap_su":"phap_su", "none":"kiem_si"}
 
+## Cache texture/AtlasTexture dùng chung: panel rebuild (túi/chợ/thú cưng) gọi item_icon/char_avatar
+## hàng chục lần mỗi lần mở; load() + AtlasTexture.new() mỗi lần gây churn không cần thiết.
+static var _tex_cache: Dictionary = {}
+
+static func _cached_atlas(key: String, path: String, region: Rect2) -> Texture2D:
+	if _tex_cache.has(key): return _tex_cache[key]
+	if not ResourceLoader.exists(path): return null
+	var tex := load(path) as Texture2D
+	if tex == null: return null
+	var at := AtlasTexture.new()
+	at.atlas = tex
+	at.region = region
+	_tex_cache[key] = at
+	return at
+
 ## Portrait nhân vật: crop khung idle đầu tiên từ sprite sheet, căn giữa.
 static func char_portrait(school_id: String, size: int = 96) -> TextureRect:
 	var school: String = str(PORTRAIT_ALIAS.get(school_id, school_id))
@@ -192,13 +207,8 @@ static func char_portrait(school_id: String, size: int = 96) -> TextureRect:
 	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.custom_minimum_size = Vector2(size, size)
 	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if not ResourceLoader.exists(path): return tr
-	var tex := load(path) as Texture2D
-	if tex == null: return tr
-	var at := AtlasTexture.new()
-	at.atlas = tex
-	at.region = Rect2(0, 0, float(def[0]), float(def[1]))
-	tr.texture = at
+	var at := _cached_atlas("portrait|" + school, path, Rect2(0, 0, float(def[0]), float(def[1])))
+	if at != null: tr.texture = at
 	return tr
 
 ## Avatar: crop vuông quanh thân trên của nhân vật (khung idle đầu tiên), cho HUD.
@@ -211,17 +221,12 @@ static func char_avatar(school_id: String, size: int = 56) -> TextureRect:
 	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.custom_minimum_size = Vector2(size, size)
 	var path := "res://assets/chars/%s/idle.png" % school
-	if not ResourceLoader.exists(path): return tr
-	var tex := load(path) as Texture2D
-	if tex == null: return tr
 	var fw := float(def[0]); var fh := float(def[1]); var cx := float(def[2]); var fy := float(def[3])
 	var side := minf(minf(fw, fh), 120.0)
 	var x := clampf(cx - side * 0.5, 0.0, fw - side)
 	var y := clampf(fy - side * 1.15, 0.0, fh - side)
-	var at := AtlasTexture.new()
-	at.atlas = tex
-	at.region = Rect2(x, y, side, side)
-	tr.texture = at
+	var at := _cached_atlas("avatar|" + school, path, Rect2(x, y, side, side))
+	if at != null: tr.texture = at
 	return tr
 
 ## Texture icon của item (SVG do web ItemArt sinh ra, export sang assets/items).
@@ -231,9 +236,10 @@ static func item_icon(iid: String, size: int = 44) -> TextureRect:
 	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.custom_minimum_size = Vector2(size, size)
 	var path := ITEM_ICON_DIR + iid + ".svg"
-	if ResourceLoader.exists(path):
+	if not _tex_cache.has("item|" + iid) and ResourceLoader.exists(path):
 		var tex := load(path) as Texture2D
-		if tex: tr.texture = tex
+		if tex: _tex_cache["item|" + iid] = tex
+	if _tex_cache.has("item|" + iid): tr.texture = _tex_cache["item|" + iid]
 	return tr
 
 const CELL := 58.0
@@ -776,7 +782,7 @@ static func glyph_row(glyph: String, title: String, subtitle: String, right_text
 	return b
 
 ## Ô kỹ năng trên thanh: emoji + số ô.
-static func skill_cell(glyph: String, num: int, selected: bool, cb: Callable) -> Button:
+static func skill_cell(glyph: String, num: Variant, selected: bool, cb: Callable) -> Button:
 	var b := T.button("", Vector2(CELL, CELL))
 	var normal: StyleBox = T.UISkin.round_button(int(CELL), "normal", false)
 	var sel: StyleBox = T.UISkin.round_button(int(CELL), "normal", true)
