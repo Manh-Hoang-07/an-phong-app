@@ -28,7 +28,11 @@ var debug_stats: bool = false
 var hints_seen: Dictionary = {}     ## gợi ý lần đầu đã hiện (id -> true)
 var show_damage: bool = true    ## hiện số sát thương nổi
 var haptics: bool = true       ## rung khi bị đánh
-var volume: float = 0.7        ## âm lượng 0..1
+var volume: float = 0.7        ## âm lượng chung (alias tương thích; dùng sfx_volume/music_volume)
+var sfx_enabled: bool = true   ## bật hiệu ứng âm thanh
+var music_enabled: bool = true ## bật nhạc nền
+var sfx_volume: float = 1.0    ## âm lượng hiệu ứng 0..1
+var music_volume: float = 0.6  ## âm lượng nhạc nền 0..1
 var last_user: String = ""     ## tên đăng nhập gần nhất (điền sẵn ở màn Login)
 
 var _cfg := ConfigFile.new()
@@ -50,6 +54,10 @@ func _ready() -> void:
 		show_damage = bool(_cfg.get_value("game", "show_damage", true))
 		hints_seen = _cfg.get_value("ux", "hints_seen", {})
 		volume = float(_cfg.get_value("game", "volume", 0.7))
+		sfx_enabled = bool(_cfg.get_value("game", "sfx_enabled", true))
+		music_enabled = bool(_cfg.get_value("game", "music_enabled", true))
+		sfx_volume = clampf(float(_cfg.get_value("game", "sfx_volume", 1.0)), 0.0, 1.0)
+		music_volume = clampf(float(_cfg.get_value("game", "music_volume", 0.6)), 0.0, 1.0)
 	_load_secure()
 	_enforce_server_pin()
 	_apply_fps()
@@ -119,6 +127,10 @@ func _save() -> void:
 	_cfg.set_value("game", "show_damage", show_damage)
 	_cfg.set_value("ux", "hints_seen", hints_seen)
 	_cfg.set_value("game", "volume", volume)
+	_cfg.set_value("game", "sfx_enabled", sfx_enabled)
+	_cfg.set_value("game", "music_enabled", music_enabled)
+	_cfg.set_value("game", "sfx_volume", sfx_volume)
+	_cfg.set_value("game", "music_volume", music_volume)
 	_cfg.set_value("game", "fps_cap", fps_cap)
 	_cfg.set_value("game", "ui_scale", ui_scale)
 	_cfg.set_value("game", "world_zoom", world_zoom)
@@ -179,8 +191,30 @@ func set_haptics(value: bool) -> void:
 
 func set_volume(value: float) -> void:
 	volume = clampf(value, 0.0, 1.0)
-	Audio.set_volume(volume)
+	sfx_volume = volume
+	Audio.set_sfx_volume(volume)
 	_save(); changed.emit("volume", volume)
+
+func set_sfx_enabled(value: bool) -> void:
+	sfx_enabled = value
+	Audio.set_sfx_enabled(value)
+	_save(); changed.emit("sfx_enabled", value)
+
+func set_music_enabled(value: bool) -> void:
+	music_enabled = value
+	Audio.set_music_enabled(value)
+	_save(); changed.emit("music_enabled", value)
+
+func set_sfx_volume(value: float) -> void:
+	sfx_volume = clampf(value, 0.0, 1.0)
+	volume = sfx_volume
+	Audio.set_sfx_volume(sfx_volume)
+	_save(); changed.emit("sfx_volume", sfx_volume)
+
+func set_music_volume(value: float) -> void:
+	music_volume = clampf(value, 0.0, 1.0)
+	Audio.set_music_volume(music_volume)
+	_save(); changed.emit("music_volume", music_volume)
 
 func mark_hint(id: String) -> void:
 	hints_seen[id] = true

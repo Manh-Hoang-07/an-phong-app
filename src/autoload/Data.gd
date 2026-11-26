@@ -134,6 +134,18 @@ func fmt_cd(cd: float) -> String:
 	var r := snappedf(cd, 0.1)
 	return str(int(r)) if is_equal_approx(r, roundf(r)) else "%.1f" % r
 
+## Thời gian hồi THỰC TẾ sau khi trừ giảm hồi chiêu (CDR) — cùng công thức World._cast_skill.
+func cd_actual(cd: float) -> float:
+	var cdr := float(Game.stats.get("cdr", 0.0)) if not Game.stats.is_empty() else 0.0
+	return maxf(0.0, cd * (1.0 - cdr / 100.0))
+
+## Chuỗi hiển thị: số thực tế làm chính, số gốc trong ngoặc khi CDR làm đổi số.
+func cd_text(cd: float) -> String:
+	var real := cd_actual(cd)
+	var s := fmt_cd(real)
+	if not is_equal_approx(real, cd): s += "s (gốc %ss)" % fmt_cd(cd)
+	return s
+
 func item(id: String) -> Dictionary:
 	var v: Variant = ITEMS.get(id, {})
 	return v if typeof(v) == TYPE_DICTIONARY else {}

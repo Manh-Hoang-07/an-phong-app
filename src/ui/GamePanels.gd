@@ -688,7 +688,7 @@ func _sk_at(sid: String, lv: int) -> Dictionary:
 
 func _sk_line(sid: String, lv: int) -> String:
 	var d := _sk_at(sid, lv)
-	return "MP %d · Hồi %ss" % [int(d.get("mp", 0)), Data.fmt_cd(float(d.get("cd", 0)))]
+	return "MP %d · Hồi %s" % [int(d.get("mp", 0)), Data.cd_text(float(d.get("cd", 0)))]
 
 func _skill_detail(sid: String, learned: Dictionary, pl: Dictionary) -> Control:
 	var d0: Dictionary = Data.skill(sid)
@@ -712,7 +712,7 @@ func _skill_detail(sid: String, learned: Dictionary, pl: Dictionary) -> Control:
 	elif not is_learned: col.add_child(T.label("Do trang bị cấp", T.FS_S, T.C_MUTED))
 	head.add_child(col)
 	body.add_child(head)
-	var chips: Array = [[str(SKILL_TYPES.get(str(d.get("type", "")), "Kỹ năng")), T.C_PURPLE], ["MP %d" % int(d.get("mp", 0)), T.C_BLUE], ["Hồi %ss" % Data.fmt_cd(float(d.get("cd", 0))), T.C_MUTED]]
+	var chips: Array = [[str(SKILL_TYPES.get(str(d.get("type", "")), "Kỹ năng")), T.C_PURPLE], ["MP %d" % int(d.get("mp", 0)), T.C_BLUE], ["Hồi %s" % Data.cd_text(float(d.get("cd", 0))), T.C_MUTED]]
 	if bool(d.get("superUlt", false)): chips.push_front(["Tuyệt phẩm", Color("ff8a4a")])
 	elif bool(d.get("ult", false)): chips.push_front(["Tuyệt kỹ", T.C_GOLD])
 	var chip_flow := HFlowContainer.new()
@@ -2056,6 +2056,29 @@ func _toggle(text: String, hint: String, value: bool, cb: Callable) -> Control:
 	# Hang phang: khong vien vang, khong nen xanh cho o bat/tat.
 	return h
 
+## Một hàng âm lượng: nhãn + giá trị % + thanh kéo. `disabled` làm mờ khi kênh đang tắt.
+func _vol_row(text: String, value: float, disabled: bool, cb: Callable) -> Control:
+	var box := _vb(2)
+	var head := HBoxContainer.new()
+	var lbl := T.label(text, T.FS_M, T.C_TEXT, true)
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(lbl)
+	var val := T.label("%d%%" % int(value * 100.0), T.FS_S, T.C_GOLD, true)
+	val.autowrap_mode = TextServer.AUTOWRAP_OFF
+	val.custom_minimum_size = Vector2(48, 0)
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	head.add_child(val)
+	box.add_child(head)
+	var s := HSlider.new()
+	s.min_value = 0.0; s.max_value = 1.0; s.step = 0.05
+	s.value = value
+	s.custom_minimum_size = Vector2(0, 28)
+	s.editable = not disabled
+	s.modulate = Color(1, 1, 1, 1.0 if not disabled else 0.45)
+	s.value_changed.connect(func(v): cb.call(v); val.text = "%d%%" % int(v * 100.0))
+	box.add_child(s)
+	return W.card_row(box)
+
 func build_config() -> Control:
 	var vb := _vb()
 	vb.add_child(W.section_label("Hiển thị"))
@@ -2076,26 +2099,11 @@ func build_config() -> Control:
 	vb.add_child(_toggle("Giới hạn 30 FPS", "Tiết kiệm pin, máy ít nóng", Settings.fps_cap == 30, func(v): Settings.set_fps_cap(30 if v else 60)))
 	vb.add_child(_toggle("Hiện số sát thương", "Chữ nổi trên đầu quái khi đánh", Settings.show_damage, func(v): Settings.set_show_damage(v)))
 	vb.add_child(W.section_label("Âm thanh & rung"))
-	var vol_box := _vb(2)
-	var vol_head := HBoxContainer.new()
-	var vol_t := T.label("Âm lượng", T.FS_M, T.C_TEXT, true)
-	vol_t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vol_head.add_child(vol_t)
-	var vol_v := T.label("%d%%" % int(Settings.volume * 100.0), T.FS_S, T.C_GOLD, true)
-	vol_v.autowrap_mode = TextServer.AUTOWRAP_OFF
-	vol_v.custom_minimum_size = Vector2(48, 0)
-	vol_v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	vol_head.add_child(vol_v)
-	vol_box.add_child(vol_head)
-	var vol := HSlider.new()
-	vol.min_value = 0.0; vol.max_value = 1.0; vol.step = 0.05
-	vol.value = Settings.volume
-	vol.custom_minimum_size = Vector2(0, 28)
-	vol.value_changed.connect(func(v):
-		Settings.set_volume(v)
-		vol_v.text = "%d%%" % int(v * 100.0))
-	vol_box.add_child(vol)
-	vb.add_child(W.card_row(vol_box))
+	# Hai kênh riêng biệt như web: SFX (tiếng đánh/nhặt đồ) và nhạc nền theo bản đồ.
+	vb.add_child(_toggle("Hiệu ứng âm thanh", "Tiếng đánh, nhặt đồ, mở bảng…", Settings.sfx_enabled, func(v): Settings.set_sfx_enabled(v)))
+	vb.add_child(_vol_row("Âm lượng hiệu ứng", Settings.sfx_volume, not Settings.sfx_enabled, func(v): Settings.set_sfx_volume(v)))
+	vb.add_child(_toggle("Nhạc nền", "Nhạc riêng cho từng vùng", Settings.music_enabled, func(v): Settings.set_music_enabled(v)))
+	vb.add_child(_vol_row("Âm lượng nhạc", Settings.music_volume, not Settings.music_enabled, func(v): Settings.set_music_volume(v)))
 	vb.add_child(_toggle("Rung khi bị đánh", "Chỉ có tác dụng trên điện thoại", Settings.haptics, func(v): Settings.set_haptics(v)))
 	var do_out := func():
 		Net.logout()

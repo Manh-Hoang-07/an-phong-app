@@ -242,6 +242,7 @@ func _load_player_map(arrive: String) -> void:
 	if _map_id.is_empty() or not Data.has_map_text(_map_id):
 		_map_id = "cong_do"
 	_meta = Data.map_def(_map_id)
+	Audio.music(_map_id, str(_meta.get("theme", "city")))
 	var lines: Array = Data.map_text(_map_id).replace("\r", "").split("\n", false)
 	var source_cols := 0
 	for line in lines: source_cols = maxi(source_cols, (line as String).length())
