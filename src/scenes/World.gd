@@ -815,6 +815,8 @@ func _hit_mob(u: int, mob: Node2D, mult: float, kind: int, skill_id: String, ext
 	var dir := 1 if mob.position.x >= _player.position.x else -1
 	_last_hit_uid = u
 	_last_hit_at = Time.get_ticks_msec()
+	if skill_id != "" and _skill_fx != null and _skill_fx.has_method("play_hit"):
+		_skill_fx.play_hit(skill_id, (mob.body_rect() as Rect2).get_center(), 1 if mob.position.x >= _player.position.x else -1)   # hiệu ứng riêng của kỹ năng trên đúng quái bị trúng
 	Socket.send_hit(u, dmg, skill_id, kind, dir, bool(r["crit"]), hit_x)
 	if not bool(mob.passive) and not _dead:
 		var mxh := int(Game.stats.get("maxHp", 1))
@@ -848,6 +850,8 @@ func _shoot(o: Dictionary) -> void:
 	node.position = _player.position + Vector2(float(_facing) * 16.0, -2.0 + float(o.get("dy", 0.0)))
 	var ang := float(o.get("angle", 0.0))
 	node.setup(o.get("color", Color(1.0, 0.6, 0.3)), ang, _facing, float(o.get("size", 1.0)), bool(o.get("arrow", false)))
+	var pinfo: Dictionary = _skill_fx.proj_info(str(o.get("skill_id", ""))) if (_skill_fx != null and _skill_fx.has_method("proj_info")) else {}
+	if not pinfo.is_empty(): node.setup_skill(str(o["skill_id"]), pinfo["col"], pinfo["core"], bool(pinfo["dark"]))   # đạn mang hình riêng của kỹ năng
 	_fx.add_child(node)
 	var spd := float(o.get("speed", 700.0))
 	# Đạn đơn mục tiêu bay vào đúng quái đang chỉ định, bỏ qua quái khác chắn đường (đạn xuyên thì trúng hết)
@@ -1049,6 +1053,7 @@ func _cast(index: int) -> void:
 	_attack_until = now + 320
 	if _skill_fx and _skill_fx.has_method("play"):
 		_skill_fx.play("cast", id, _player.position, _facing)
+	var custom_fx: bool = _skill_fx != null and _skill_fx.has_method("has_custom") and _skill_fx.has_custom(id)   # có hình riêng -> bỏ hiệu ứng chung theo loại
 	var kind := 3 if bool(sk.get("superUlt", false)) else (2 if bool(sk.get("ult", false)) else 1)
 	var stype := str(sk.get("type", ""))
 	match stype:
@@ -1074,10 +1079,11 @@ func _cast(index: int) -> void:
 			var dx := _skill_extra(sk)
 			if float(sk.get("power", 0.0)) > 0.0: _strike_shape(dshape, id, float(sk["power"]), kind, dx)
 			if float(sk.get("after", 0.0)) > 0.0: _after(0.18, func(): _strike_shape(dshape, id, float(sk["after"]), kind, dx))
-		"melee", "backstep": _fxs.slash(_player.position + Vector2(0, 6), _facing, Color(1.0, 0.85, 0.5), 1.5)
+		"melee", "backstep":
+			if not custom_fx: _fxs.slash(_player.position + Vector2(0, 6), _facing, Color(1.0, 0.85, 0.5), 1.5)
 		"guard", "manashield", "buff":
 			_add_buff(id, sk, stype)
-			_fxs.shield(_player.position + Vector2(0, 26), Color(0.45, 0.72, 1.0) if stype != "buff" else Color(1.0, 0.85, 0.4))
+			if not custom_fx: _fxs.shield(_player.position + Vector2(0, 26), Color(0.45, 0.72, 1.0) if stype != "buff" else Color(1.0, 0.85, 0.4))
 		"heal":
 			_skill_heal(float(sk.get("heal", 0.0)))
 			if float(sk.get("mpHeal", 0.0)) > 0.0:
@@ -1085,15 +1091,15 @@ func _cast(index: int) -> void:
 				var gm := int(roundf(float(mxm) * float(sk["mpHeal"])))
 				Game.mp = mini(mxm, Game.mp + gm)
 				FloatText.spawn(_fx, _player.position + Vector2(0, -46), "+%d" % gm, Color(0.39, 0.71, 0.96), 14)
-			_fxs.heal(_player.position)
+			if not custom_fx: _fxs.heal(_player.position)
 			Audio.play("coin", 0.8)
 		"aoe", "meteor", "sword_fall", "arrow_rain":
 			if stype == "aoe" and float(sk.get("heal", 0.0)) > 0.0: _skill_heal(float(sk["heal"]))
-			_fxs.ring(_player.position + Vector2(float(_facing) * 70.0, 28), Color(1.0, 0.6, 0.3), 120.0, 0.5, 5.0)
+			if not custom_fx: _fxs.ring(_player.position + Vector2(float(_facing) * 70.0, 28), Color(1.0, 0.6, 0.3), 120.0, 0.5, 5.0)
 		"summon", "shadow_toggle", "shadow_command":
 			if stype == "summon": Net.action("summon_toggle", {}, {"silent": true})
 			elif stype == "shadow_toggle": Net.action("shadow_toggle", {}, {"silent": true})
-			_fxs.ring(_player.position + Vector2(0, 28), Color(0.7, 0.5, 1.0), 80.0, 0.6, 4.0)
+			if not custom_fx: _fxs.ring(_player.position + Vector2(0, 28), Color(0.7, 0.5, 1.0), 80.0, 0.6, 4.0)
 	if stype != "dash" and float(sk.get("power", 0.0)) > 0.0:
 		_skill_damage(id, sk, stype, kind)
 	_hud_dirty = true
@@ -2289,6 +2295,7 @@ func _buff_hud_tick(delta: float) -> void:
 	_buff_hud_acc += delta
 	if _buff_hud_acc < 0.12: return
 	_buff_hud_acc = 0.0
+	if _skill_fx != null and _skill_fx.has_method("sync_auras"): _skill_fx.sync_auras(_buffs, _player, _facing)   # hào quang buff theo người suốt thời gian hiệu lực
 	if _hud_node == null: return
 	var now := Time.get_ticks_msec()
 	var list: Array = []

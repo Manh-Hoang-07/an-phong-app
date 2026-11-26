@@ -304,4 +304,4 @@ func _hidden_npc_options(pl: Dictionary) -> void:
 			if not bool((unl as Dictionary).get(sch, false)) or str(pl.get("school", "")) == str(sch): continue
 			var ok5: bool = lvl >= 5
 			var sc := str(sch)
-			_opt("Thức tỉnh %s%s" % [str(sd.get("name", sc)), "" if ok5 else " (cần cấp 5)"], "char", ok5, func(): Net.action("awaken_pick", {"school": sc}), not ok5)
+			_opt("Thức tỉnh %s%s" % [str(sd.get("name", sc)), "" if ok5 else " (cần cấp 5)"], "char", ok5, func(): _panel("code", {"confirm": sc}), not ok5)

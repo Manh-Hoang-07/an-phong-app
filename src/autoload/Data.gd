@@ -150,6 +150,150 @@ func npc(id: String) -> Dictionary:
 	var v: Variant = raw.get("NPCS", {}).get(id, {})
 	return v if typeof(v) == TYPE_DICTIONARY else {}
 
+# ---------------------------------------------------------------- Cửa hàng
+# Bản sao các hàm trong shared/logic/shop.js của web/server để app bày đúng hàng.
+const SHOP_SLOT_ORDER := ["weapon", "mu", "ao", "gang_tay", "dai_lung", "quan", "giay", "nhan", "day_chuyen", "ngoc_boi"]
+const SHOP_TIER_OF := {"nho": 1, "vua": 2, "lon": 3, "dac": 4, "than_thoai": 5, "trung": 2, "cao": 3}
+const SHOP_TIER_CAP := {1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 5, 7: 5}
+
+var _shop_gear_cache: Array = []
+var _shop_book_cache: Array = []
+
+func base_school(id: String) -> String:
+	var sd := school(id)
+	var b := str(sd.get("base", ""))
+	return b if not b.is_empty() else id
+
+func set_of_item(d: Dictionary) -> int:
+	if str(d.get("slot", "")).is_empty(): return 0
+	var lv := maxi(1, int(d.get("level", 1)))
+	return mini(9, (lv - 1) / 10)
+
+func _shop_gear() -> Array:
+	if _shop_gear_cache.is_empty():
+		var ids: Array = []
+		for id in ITEMS.keys():
+			var d: Dictionary = ITEMS[id]
+			if not str(d.get("slot", "")).is_empty() and int(d.get("price", 0)) > 0 and not d.has("desc"):
+				ids.append(str(id))
+		ids.sort_custom(func(a, b):
+			var sa := set_of_item(ITEMS[a]); var sb := set_of_item(ITEMS[b])
+			if sa != sb: return sa < sb
+			var oa := SHOP_SLOT_ORDER.find(str(ITEMS[a].get("slot", ""))); var ob := SHOP_SLOT_ORDER.find(str(ITEMS[b].get("slot", "")))
+			if oa != ob: return oa < ob
+			return int(ITEMS[a].get("level", 1)) < int(ITEMS[b].get("level", 1)))
+		_shop_gear_cache = ids
+	return _shop_gear_cache.duplicate()
+
+func _book_line(id: String) -> String:
+	var sk := skill(str(ITEMS[id].get("skill", "")))
+	if sk.is_empty(): return ""
+	return base_school(str(sk.get("evolutionKey", sk.get("school", ""))))
+
+func _shop_book_ids() -> Array:
+	if _shop_book_cache.is_empty():
+		var ids: Array = []
+		for id in ITEMS.keys():
+			if str(ITEMS[id].get("kind", "")) == "skill_book": ids.append(str(id))
+		ids.sort_custom(func(a, b):
+			var la := _book_line(a); var lb := _book_line(b)
+			if la != lb: return la < lb
+			return int(ITEMS[a].get("level", 0)) < int(ITEMS[b].get("level", 0)))
+		_shop_book_cache = ids
+	return _shop_book_cache.duplicate()
+
+func available_skills(pl: Dictionary) -> Array:
+	var sch := str(pl.get("school", ""))
+	if sch.is_empty(): return []
+	var ids: Array = []
+	var tn := base_school(sch) == "toan_nang"
+	for id in SKILLS.keys():
+		var s: Dictionary = SKILLS[id]
+		if bool(s.get("ult", false)):
+			if not tn and not bool(s.get("ultAny", false)):
+				var list: Array = s.get("ultSchools", [s.get("school", "")]) if s.has("ultSchools") else [str(s.get("school", ""))]
+				var schools: Array = [base_school(sch), sch]
+				var ok := false
+				for x in schools:
+					if list.has(x): ok = true; break
+				if not ok: continue
+		elif tn:
+			pass
+		elif str(s.get("type", "")) == "shadow_toggle" and sch != "trieu_hoi_su" and sch != "tu_linh_thuat_su":
+			continue
+		elif s.has("evolutionKey"):
+			if str(s.get("evolutionKey", "")) != sch: continue
+		elif str(s.get("school", "")) != sch:
+			continue
+		ids.append(str(id))
+	return ids
+
+func _shop_item_tier(id: String) -> int:
+	if id == "da_cuong_hoa": return 1
+	var parts := id.split("_")
+	if parts.size() > 0:
+		var t := str(parts[parts.size() - 1])
+		return int(SHOP_TIER_OF.get(t, 0))
+	return 0
+
+func _shop_cap_by_village(pl: Dictionary, list: Array) -> Array:
+	var md := map_def(str(pl.get("map", "")))
+	var v: Variant = md.get("village", null)
+	if typeof(v) != TYPE_DICTIONARY: return list
+	var cap := int((v as Dictionary).get("cap", 0))
+	var n := int((v as Dictionary).get("n", 0))
+	var out: Array = []
+	for id in list:
+		var d := item(str(id))
+		if not str(d.get("slot", "")).is_empty():
+			if int(d.get("level", 1)) <= cap: out.append(id)
+		else:
+			var t := _shop_item_tier(str(id))
+			if t == 0 or t <= int(SHOP_TIER_CAP.get(n, 0)): out.append(id)
+	return out
+
+## Danh sách hàng xu của một NPC — khớp G.shopItems(player, npcId) của web.
+func shop_items(pl: Dictionary, npc_id: String) -> Array:
+	var nd := npc(npc_id)
+	if nd.is_empty() or not nd.has("shop"): return []
+	var base: Array = nd.get("shop", [])
+	var list: Array = []
+	if bool(nd.get("gearShop", false)):
+		list = _shop_gear()
+		for id in base:
+			if not list.has(str(id)): list.append(str(id))
+	else:
+		list = base.duplicate()
+	var add := func(ids: Array) -> void:
+		for id in ids:
+			if not item(str(id)).is_empty() and not list.has(str(id)): list.append(str(id))
+	var kind := str(nd.get("shopKind", ""))
+	if kind == "herb" and side_done(pl, "p5-2"): add.call(["thuoc_nhiem_do"])
+	if kind == "gear" and side_done(pl, "p2-1"): add.call(["binh_mau_vua", "binh_nl_vua"])
+	if kind == "gear" and side_done(pl, "p2-2"): add.call(["da_cuong_hoa_cao"])
+	if kind == "gear":
+		var pet_ids: Array = []
+		for id in ITEMS.keys():
+			if str(ITEMS[id].get("kind", "")) == "pet_gear": pet_ids.append(str(id))
+		add.call(pet_ids)
+		if not str(pl.get("school", "")).is_empty():
+			var mine := available_skills(pl)
+			var own: Array = []
+			var rest: Array = []
+			for id in _shop_book_ids():
+				var skid := str(item(str(id)).get("skill", ""))
+				if mine.has(skid): own.append(str(id))
+				else: rest.append(str(id))
+			add.call(own + rest)
+	var out: Array = []
+	for id in _shop_cap_by_village(pl, list):
+		if int(item(str(id)).get("priceNgoc", 0)) <= 0: out.append(id)
+	return out
+
+## Giá mua xu sau giảm giá khách quen — khớp G.shopPrice.
+func shop_price(pl: Dictionary, d: Dictionary, qty: int = 1) -> int:
+	return maxi(1, roundi(float(d.get("price", 0)) * float(qty) * (1.0 - float(pl.get("shopDiscount", 0)))))
+
 func monster(id: String) -> Dictionary:
 	var v: Variant = MONSTERS.get(id, {})
 	return v if typeof(v) == TYPE_DICTIONARY else {}
@@ -294,6 +438,82 @@ func npc_here(player: Dictionary, map_id: String, npc_id: String) -> bool:
 		var b: int = _quest_edge(r[1], true)
 		if step >= a and step <= b: return true
 	return false
+
+## Có NPC với role/shop cụ thể đang hiện ở map này không (khớp G.npcByRole / shopHere của web).
+func npc_role_here(player: Dictionary, map_id: String, role: String, require_shop: bool = false) -> bool:
+	var npcs: Variant = map_def(map_id).get("npcs", {})
+	if typeof(npcs) != TYPE_DICTIONARY: return false
+	for key in (npcs as Dictionary).keys():
+		var nid := str((npcs as Dictionary)[key])
+		if not npc_here(player, map_id, nid): continue
+		var nd := npc(nid)
+		if str(nd.get("role", "")) != role: continue
+		if require_shop and not nd.has("shop"): continue
+		return true
+	return false
+
+func shop_here(player: Dictionary, map_id: String) -> bool:
+	return npc_role_here(player, map_id, "shop", true)
+
+## Có Dược sư (NPC role=shop, shopKind=herb) đang hiện ở map này không.
+func herb_shop_here(player: Dictionary, map_id: String) -> bool:
+	var npcs: Variant = map_def(map_id).get("npcs", {})
+	if typeof(npcs) != TYPE_DICTIONARY: return false
+	for key in (npcs as Dictionary).keys():
+		var nid := str((npcs as Dictionary)[key])
+		if not npc_here(player, map_id, nid): continue
+		var nd := npc(nid)
+		if str(nd.get("role", "")) == "shop" and str(nd.get("shopKind", "")) == "herb": return true
+	return false
+
+# Nội tại class (khớp shared/data/classes/passives.js của web).
+const PASSIVES := {
+	"kiem_si": {"icon": "@heart", "name": "Kiếm Tâm", "desc": "Mỗi lần đánh thường trúng quái hồi 0,5% máu tối đa."},
+	"cung_thu": {"icon": "@target", "name": "Yếu Điểm", "desc": "Đòn chí mạng gây 180% sát thương thay vì 160%."},
+	"phap_su": {"icon": "@mana", "name": "Dòng Chảy", "desc": "Hồi 0,5% năng lượng tối đa mỗi giây ngay cả khi đang chiến đấu; ngoài chiến đấu hồi gấp đôi."},
+	"sat_thu": {"icon": "@shadow", "name": "Bóng Tối", "desc": "Chí mạng đầu tiên sau kỹ năng lướt gây 250% sát thương."},
+	"tanker": {"icon": "@shield", "name": "Thành Đồng", "desc": "Giảm thêm 10% sát thương nhận vào khi máu dưới 50%."},
+	"tri_lieu_su": {"icon": "@heal", "name": "Sinh Lực", "desc": "Kỹ năng hồi máu hồi thêm 20% lượng hồi."},
+	"trieu_hoi_su": {"icon": "@pet", "name": "Liên Kết Linh Thể", "desc": "Thực thể được triệu hồi gây thêm 10% sát thương."},
+	"tu_linh_thuat_su": {"icon": "@skull", "name": "Thu Hồn", "desc": "Quái thường và tinh anh do bạn kết liễu được lưu thành bóng ma. Bộ sưu tập tối đa 20 bóng."},
+}
+
+func passives_of(pl: Dictionary) -> Array:
+	var school := str(pl.get("school", ""))
+	if school.is_empty(): return []
+	var base := base_school(school)
+	if base == "toan_nang": return PASSIVES.keys()
+	if PASSIVES.has(school): return [school]
+	if PASSIVES.has(base): return [base]
+	return []
+
+# ---------------------------------------------------------------- Thợ rèn (khớp shared/logic/items.js + inventory.js của web)
+const SMITH_UPGRADE_MAX := 12
+const SMITH_PERFECT_MIN := 95
+const SMITH_UPGRADE_RATES := [1.0, 1.0, 1.0, 1.0, 0.85, 0.78, 0.7, 0.62, 0.55, 0.48, 0.4, 0.3]
+
+static func smith_upgrade_cost(plus: int) -> Dictionary:
+	return {"gold": 15 * (plus + 1) * (plus + 1), "stones": ceili(float(plus + 1) / 3.0)}
+
+func smith_reforge_cost(inst: Dictionary) -> Dictionary:
+	var q := maxi(1, int(inst.get("q", 1)))
+	var lv := maxi(2, int(item(str(inst.get("id", ""))).get("level", 1)))
+	return {"gold": 60 * q * lv, "stones": q}
+
+func smith_seal_cost(inst: Dictionary) -> Dictionary:
+	var q := maxi(1, int(inst.get("q", 1)))
+	var lv := maxi(2, int(item(str(inst.get("id", ""))).get("level", 1)))
+	return {"gold": 120 * q * lv, "stones": q * 2}
+
+static func smith_q(inst: Dictionary) -> int:
+	return maxi(1, int(inst.get("q", 1)))
+
+static func smith_salvage_stones(inst: Dictionary) -> int:
+	var base: Array = [0, 1, 3, 6]
+	var q := smith_q(inst)
+	var n := 0 if q <= 0 else int(base[mini(q, 4) - 1])
+	if q == 1: n = 0  # Thường: 0-1 ngẫu nhiên, hiện mức thấp nhất để không hứa sai
+	return n + int(inst.get("plus", 0)) / 2
 
 func _quest_edge(v: Variant, hi: bool) -> int:
 	if typeof(v) == TYPE_STRING:

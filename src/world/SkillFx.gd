@@ -1,5 +1,7 @@
 extends Node2D
 const FxExt := preload("res://src/world/fx/FxExt.gd")
+const FxProj := preload("res://src/world/fx/FxProj.gd")
+const FxCreature := preload("res://src/world/fx/FxCreature.gd")
 ## Bộ vẽ hiệu ứng kỹ năng cho app: đọc CÙNG file JSON với web
 ## (shared/data/skillfx/<id>.json, đóng gói vào res://data/skillfx/).
 ##
@@ -114,6 +116,8 @@ func _take(key: String, color: Color, core: Color, ctx: Dictionary, p: Dictionar
 		node.kind = parts[0]
 		node.theme = parts[1] if parts.size() > 1 else ""
 		add_child(node)
+	node.steady = false
+	node.auto = false
 	node.dark = bool(ctx.get("dark", false))
 	node.material = null if node.dark else _additive()
 	node.col = color
@@ -129,7 +133,7 @@ func _take(key: String, color: Color, core: Color, ctx: Dictionary, p: Dictionar
 	node.queue_redraw()
 	return node
 
-func _give(node: Node2D, key: String) -> void:
+func _give(node: Variant, key: String) -> void:
 	if not is_instance_valid(node): return
 	node.visible = false
 	var arr: Array = _pool.get(key, [])
@@ -366,6 +370,8 @@ func _paint_sig(r: Dictionary, origin: Vector2, facing: int, ctx: Dictionary, co
 	var sg := str(SIG_BY_ID.get(str(r.get("id", "")), r.get("sig", "")))
 	var ext_sg := FxExt.sig_for(str(r.get("id", "")))
 	if ext_sg != "": sg = ext_sg
+	if FxProj.has(str(r.get("id", ""))) and str(Data.skill(str(r.get("id", ""))).get("type", "")) in ["projectile", "spread"]:
+		sg = "pj_muzzle_bow" if str((_manifest.get(str(r.get("id", "")), {}) as Dictionary).get("school", "")) == "cung_thu" else "pj_muzzle"   # kỹ năng bắn: đạn bay mang hình riêng, tung chiêu chỉ loé nòng
 	var xc := FxExt.cfg_for(sg)
 	if sg == "" or sg in SIG_SKIP: return
 	var f := float(facing) if facing != 0 else 1.0
@@ -374,11 +380,13 @@ func _paint_sig(r: Dictionary, origin: Vector2, facing: int, ctx: Dictionary, co
 	var key := "sig|%s|%d" % [str(ctx.get("theme", "")), 1 if ctx.get("dark", false) else 0]
 	var node := _take(key, color, core, ctx, {})
 	node.sig = sg
+	node.nocreature = FxCreature.has(str(r.get("id", ""))) or FxCreature.has_aura(str(r.get("id", "")))
 	node._lowq = Settings.quality_low
 	node.vs = str(r.get("id", sg)).hash() + int(ctx.get("variant", 0)) * 7919
 	node.prog = 0.0
 	node.z_index = 9
 	var big := 1.4 if str(r.get("tier", "")) == "ult" else 1.0
+	if bool(xc.get("nobig", false)): big = 1.0
 	var pos := origin + Vector2(f * 58.0, -4.0)
 	var sx := f
 	if sg == "swordrain":
@@ -396,6 +404,7 @@ func _paint_sig(r: Dictionary, origin: Vector2, facing: int, ctx: Dictionary, co
 		match str(xc.get("place", "front")):
 			"ground": pos = origin + Vector2(f * 30.0, GROUND - 4.0)
 			"body": pos = origin + Vector2(0, -4.0); sx = 1.0
+			"bodyf": pos = origin + Vector2(0, -4.0)   # thân nhân vật, lật theo hướng nhìn
 			"far": pos = origin + Vector2(f * 90.0, GROUND - 4.0); sx = 1.0
 		if xc.get("rumble", 0.0) > 0.0: _rumble(float(xc["rumble"]) * big, 0.7)
 	node.position = pos
@@ -425,6 +434,131 @@ func _shift_colors(colors: Array, shift: float) -> Array:
 		out.append("0x%02x%02x%02x" % [int(sh.r * 255.0), int(sh.g * 255.0), int(sh.b * 255.0)])
 	return out
 
+## ---------------------------------------------------------------- Trúng đòn trên từng quái
+const HIT_THEME := {"sword": "slash", "steel": "slash", "wind": "slash", "dragon": "slash", "arrow": "pierce", "fire": "fire", "inferno": "fire",
+	"ice": "ice", "bolt": "bolt", "holy": "holy", "heal": "holy", "star": "holy", "shadow": "dark", "blood": "blood", "necro": "soul",
+	"spirit": "soul", "void": "soul", "earth": "rock", "water": "water", "arcane": "arcane"}
+const HIT_SCHOOL := {"kiem_si": "slash", "tanker": "", "cung_thu": ""}
+const MAX_HIT_FX := 8     # tối đa số quái có hiệu ứng riêng cùng lúc (4 khi quality_low)
+var _hit_active := 0
+
+func hit_style(id: String) -> String:
+	var r := recipe(id)
+	var school := str((_manifest.get(id, {}) as Dictionary).get("school", ""))
+	var theme := str(r.get("theme", ""))
+	if HIT_SCHOOL.get(school, "") != "": return str(HIT_SCHOOL[school])
+	if school == "cung_thu" and theme in ["arrow", "wind", "steel", "spirit"]: return "pierce"
+	if school == "tanker" and theme in ["steel", "earth", "dragon"]: return "rock" if theme != "steel" else "slash"
+	return str(HIT_THEME.get(theme, "slash"))
+
+## Hiệu ứng trúng đòn đặt đúng vào người quái bị đánh trúng (gọi từ World._hit_mob).
+func play_hit(id: String, pos: Vector2, dir: int = 1) -> void:
+	if id == "" or _manifest.is_empty(): return
+	if _hit_active >= (MAX_HIT_FX / 2 if Settings.quality_low else MAX_HIT_FX): return
+	var r := recipe(id)
+	if r.is_empty(): return
+	var colors: Array = r.get("colors", ["0xffffff", "0xffffff", "0xffffff"])
+	var variant := int(r.get("variant", 0))
+	if variant > 0: colors = _shift_colors(colors, 0.085 * float(variant))
+	var ctx := {"theme": str(r.get("theme", "")), "dark": bool(r.get("dark", false)), "variant": variant}
+	var key := "sig|%s|%d" % [str(ctx["theme"]), 1 if ctx["dark"] else 0]
+	var node := _take(key, _color("main", colors), _color("core", colors), ctx, {})
+	node.sig = "hit_" + hit_style(id)
+	node._lowq = Settings.quality_low
+	node.vs = str(id).hash()
+	node.prog = 0.0
+	node.z_index = 12
+	node.position = pos
+	node.scale = Vector2(float(dir) if dir != 0 else 1.0, 1.0)
+	var dur := 0.4
+	var tw := create_tween()
+	tw.tween_property(node, "prog", 1.0, dur)
+	_fade(node, key, dur, 0.0, 0.35)
+	_hit_active += 1
+	get_tree().create_timer(dur + 0.02).timeout.connect(func(): _hit_active = maxi(0, _hit_active - 1))
+
+## ---------------------------------------------------------------- Buff kéo dài: hào quang theo người suốt thời gian hiệu lực
+var _auras: Dictionary = {}   # id kỹ năng -> Node2D hào quang đang gắn vào người
+
+## Gọi định kỳ từ World: buffs = {id: {until(ms), ...}}; target = node nhân vật.
+func sync_auras(buffs: Dictionary, target: Node2D, facing: int) -> void:
+	if _manifest.is_empty() or target == null: return
+	var now := Time.get_ticks_msec()
+	for id in buffs.keys():
+		var b: Dictionary = buffs[id]
+		var active := now < int(b.get("until", 0))
+		var has: bool = _auras.has(id) and is_instance_valid(_auras[id])
+		if active and not has:
+			_start_aura(str(id), target, facing)
+		elif active and has:
+			(_auras[id] as Node2D).scale.x = float(facing) if facing != 0 else 1.0
+		elif not active and has:
+			_end_aura(str(id))
+	for id in _auras.keys():
+		if not buffs.has(id): _end_aura(str(id))
+
+func _start_aura(id: String, target: Node2D, facing: int) -> void:
+	var r := recipe(id)
+	if r.is_empty(): return
+	# buff/hộ thể có con vật hoặc hình người sprite đi theo: gắn sprite thay cho hào quang vẽ tay
+	if FxCreature.has_aura(id):
+		var rc0 := recipe(id)
+		var cols0: Array = rc0.get("colors", ["0xffffff", "0xffffff", "0xffffff"])
+		var rn := FxCreature.attach(target, id, facing, _color("main", cols0), _color("core", cols0))
+		if rn != null: _auras[id] = rn
+		return
+	var stype := str(Data.skill(id).get("type", ""))
+	var sg := FxExt.sig_for(id)
+	if not FxExt.has_aura(sg):
+		sg = "au_guard" if stype == "guard" else ("au_shield" if stype == "manashield" else "au_buff")
+	var colors: Array = r.get("colors", ["0xffffff", "0xffffff", "0xffffff"])
+	var variant := int(r.get("variant", 0))
+	if variant > 0: colors = _shift_colors(colors, 0.085 * float(variant))
+	var n := _FxShape.new()
+	n.kind = "sig"
+	n.theme = str(r.get("theme", ""))
+	n.dark = bool(r.get("dark", false))
+	n.material = null if n.dark else _additive()
+	n.col = _color("main", colors)
+	n.core = _color("core", colors)
+	n.sig = sg
+	n.steady = true
+	n.auto = true
+	n._lowq = Settings.quality_low
+	n.vs = id.hash()
+	n.z_index = 1
+	n.position = Vector2(0, -4)
+	n.scale = Vector2(float(facing) if facing != 0 else 1.0, 1.0)
+	n.modulate = Color(1, 1, 1, 0.0)
+	target.add_child(n)
+	_auras[id] = n
+	var tw := n.create_tween()
+	tw.tween_interval(0.9)   # chờ hiệu ứng tung chiêu ban đầu tan bớt rồi mới hiện hào quang
+	tw.tween_property(n, "modulate:a", 0.8, 0.5)
+
+func _end_aura(id: String) -> void:
+	var n: Variant = _auras.get(id, null)
+	_auras.erase(id)
+	if n == null or not is_instance_valid(n): return
+	var node := n as Node2D
+	var tw := node.create_tween()
+	tw.tween_property(node, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(node.queue_free)
+
+## Thông tin để vẽ đạn riêng của kỹ năng ({} nếu kỹ năng không có hình đạn riêng).
+func proj_info(id: String) -> Dictionary:
+	if not FxProj.has(id): return {}
+	var r := recipe(id)
+	if r.is_empty(): return {}
+	var colors: Array = r.get("colors", ["0xffffff", "0xffffff", "0xffffff"])
+	var variant := int(r.get("variant", 0))
+	if variant > 0: colors = _shift_colors(colors, 0.085 * float(variant))
+	return {"col": _color("main", colors), "core": _color("core", colors), "dark": bool(r.get("dark", false))}
+
+## Kỹ năng đã có hình vẽ riêng (FxExt hoặc SIG_BY_ID): bỏ các lớp hiệu ứng chung của web (rune/quầng sáng/tia lửa/cột sáng).
+func has_custom(id: String) -> bool:
+	return FxExt.sig_for(id) != "" or SIG_BY_ID.has(id)
+
 ## Điểm vào: gọi từ World khi cast/khit. args tuỳ kind (toạ độ mục tiêu...).
 func play(kind: String, id: String, origin: Vector2, facing: int = 1, args: Array = []) -> bool:
 	if _manifest.is_empty():
@@ -440,8 +574,12 @@ func play(kind: String, id: String, origin: Vector2, facing: int = 1, args: Arra
 	var hit := false
 	# Web chọn fx theo skill id và fire MỌI trigger của recipe; "cast" gọi kèm các layer còn lại.
 	var fire_all := kind == "cast"
+	var custom := has_custom(id)
 	for layer in layers:
 		if typeof(layer) != TYPE_DICTIONARY:
+			continue
+		# Kỹ năng có hình riêng: khi cast chỉ giữ rung màn hình, bỏ lớp chung chồng lên.
+		if custom and kind == "cast" and str(layer.get("kind", "")) != "shake":
 			continue
 		var lk := str(layer.get("trigger", ""))
 		if lk != kind and not fire_all:
@@ -453,6 +591,8 @@ func play(kind: String, id: String, origin: Vector2, facing: int = 1, args: Arra
 		if is_inside_tree():
 			_paint(layer, colors, origin, facing, ctx)
 	if kind == "cast":
+		if FxCreature.has(id):
+			FxCreature.spawn(self, id, origin, facing, _color("main", colors), _color("core", colors))
 		_paint_sig(r, origin, facing, ctx, colors)
 		hit = true
 	if hit:
@@ -737,6 +877,9 @@ class _FxShape extends Node2D:
 	# --- bóng tàn ảnh
 	# ================= BIỂU TƯỢNG ĐẶC TRƯNG (mỗi `sig` của kỹ năng một hình riêng) =================
 	var sig := "nova"
+	var nocreature := false   # kỹ năng có con vật sprite riêng (FxCreature): sig bỏ phần con vật vẽ tay
+	var steady := false   # hào quang buff: giữ trạng thái đầy đủ
+	var auto := false     # tự tăng prog theo thời gian
 	var vs := 0
 	var _lowq := false
 	var prog := 0.0:
@@ -795,8 +938,12 @@ class _FxShape extends Node2D:
 		draw_rect(Rect2(c.x - sz * 0.6, c.y - sz * 0.12, sz * 1.2, sz * 0.24), c2)
 		draw_rect(Rect2(c.x - sz * 0.12, c.y - sz * 0.6, sz * 0.24, sz * 1.2), c2)
 
+	func _process(delta: float) -> void:
+		if auto: prog += delta
+
 	func _d_sig_new() -> bool:
 		var t := prog
+		if steady: return FxExt.draw_aura(self, sig, t, _lowq)
 		if FxExt.draw_sig(self, sig, t, _lowq): return true
 		match sig:
 			"swordrain":

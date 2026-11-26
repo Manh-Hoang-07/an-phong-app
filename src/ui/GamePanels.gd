@@ -141,7 +141,10 @@ func _nhiem_block(parent: Control, entry: Dictionary, params: Dictionary) -> voi
 	var warn := T.label("Nhiễm đỏ bậc %d: chỉ số chính +18%%, máu tối đa -%d%%, không hồi máu ngoài giao chiến." % [n, 6 * n], T.FS_S, T.C_RED)
 	warn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(warn)
-	var btn := W.action_button("Gột bằng Thuốc chữa nhiễm đỏ (%d)" % meds, func(): act("cleanse_nhiem", params), meds <= 0)
+	var pl := p()
+	var at_herb := Data.herb_shop_here(pl, str(pl.get("map", "")))
+	var btn := W.action_button("Gột bằng Thuốc chữa nhiễm đỏ (%d)" % meds, func(): act("cleanse_nhiem", params), meds <= 0 or not at_herb)
+	if not at_herb: btn.tooltip_text = "Hãy đến gặp Dược sư để gột vết nhiễm."
 	parent.add_child(btn)
 
 func _bag_detail(e: Dictionary) -> Control:
@@ -164,16 +167,22 @@ func _bag_detail(e: Dictionary) -> Control:
 		body.add_child(W.action_button("Sử dụng", func(): act("use", {"item": iid})))
 	elif d.has("hp") or d.has("mp"):
 		body.add_child(W.action_button("Sử dụng", func(): act("use", {"item": iid})))
-	if int(d.get("price", 0)) > 0:
+	if int(d.get("price", 0)) > 0 and str(d.get("kind", "")) != "quest" and Data.shop_here(p(), str(p().get("map", ""))):
 		body.add_child(W.action_button("Bán 1", func(): act("sell", {"uid": uidn, "qty": 1}); _deselect()))
-	var ck := "%d:all" % uidn
-	var do_drop := func():
-		act("drop", {"uid": uidn, "qty": qty})
-		_deselect()
-	var drop := W.action_button("Vứt bỏ", func():
-		host.confirm("Vứt vật phẩm?", "Bạn sắp vứt %s%s. Không thể lấy lại." % [str(d.get("name", iid)), (" ×%d" % qty) if qty > 1 else ""], "Vứt", do_drop, true))
-	drop.add_theme_color_override("font_color", T.C_RED)
-	body.add_child(drop)
+		if qty > 1: body.add_child(W.action_button("Bán %d" % qty, func(): act("sell", {"uid": uidn, "qty": qty}); _deselect()))
+	if str(d.get("kind", "")) != "quest":
+		var do_drop := func(n: int):
+			act("drop", {"uid": uidn, "qty": n})
+			_deselect()
+		var drop1 := W.action_button("Vứt 1" if qty > 1 else "Vứt đi", func():
+			host.confirm("Vứt vật phẩm?", "Bạn sắp vứt 1 %s. Không thể lấy lại." % str(d.get("name", iid)), "Vứt", func(): do_drop.call(1), true))
+		drop1.add_theme_color_override("font_color", T.C_RED)
+		body.add_child(drop1)
+		if qty > 1:
+			var dropall := W.action_button("Vứt hết %d" % qty, func():
+				host.confirm("Vứt vật phẩm?", "Bạn sắp vứt %s ×%d. Không thể lấy lại." % [str(d.get("name", iid)), qty], "Vứt", func(): do_drop.call(qty), true))
+			dropall.add_theme_color_override("font_color", T.C_RED)
+			body.add_child(dropall)
 	return box
 
 # ============================================================ EQUIP
@@ -619,7 +628,7 @@ func build_char() -> Control:
 		fr.add_theme_constant_override("separation", 6)
 		for t in range(1, unlocked + 1):
 			var tt := t
-			var fbn := W.action_button("Biến Hình %s" % str(Data.ROMAN[t - 1]), func(): act("form_select", {"choice": "awaken%d" % tt}), Game.form_active)
+			var fbn := W.action_button("Biến Hình %s" % str(Data.ROMAN[t - 1]), func(): act("form_select", {"choice": "awaken%d" % tt}))
 			fbn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			if tt == cur: fbn.add_theme_color_override("font_color", T.C_GOLD)
 			fr.add_child(fbn)
@@ -667,6 +676,10 @@ const SKILL_TYPES := {"dash": "Lướt", "melee": "Cận chiến", "guard": "Th�
 	"fusion": "Hợp thể", "manaburst": "Bùng nổ", "allin": "Tất tay"}
 
 ## Thông số kỹ năng ở một cấp, đúng công thức server (shared/logic/skills.js): MP × hệ số tiêu hao như web.
+## Cấp kỹ năng mượn từ trang bị: theo cấp nhân vật (12→1, 40→5, 80→10), khớp gearSkillLevel của web.
+func _gear_skill_level(pl: Dictionary) -> int:
+	return mini(10, maxi(1, int(pl.get("level", 1)) / 8))
+
 func _sk_at(sid: String, lv: int) -> Dictionary:
 	var d: Dictionary = Data.skill_at(sid, maxi(1, lv))
 	if d.is_empty(): return d
@@ -683,6 +696,7 @@ func _skill_detail(sid: String, learned: Dictionary, pl: Dictionary) -> Control:
 	var is_learned := learned.has(sid) or is_super
 	var lv := 0
 	if is_learned: lv = int((learned[sid] as Dictionary).get("lv", 1)) if typeof(learned.get(sid, null)) == TYPE_DICTIONARY else int(learned.get(sid, 1))
+	elif sid == _gear_skill_of(pl): lv = _gear_skill_level(pl)
 	var d: Dictionary = _sk_at(sid, maxi(1, lv))
 	var box := W.detail_box()
 	var body := W.box_body(box)
@@ -714,12 +728,33 @@ func _skill_detail(sid: String, learned: Dictionary, pl: Dictionary) -> Control:
 	if d.has("range"): stat_bits.append("Tầm %d" % int(d["range"]))
 	if d.has("distance"): stat_bits.append("Xa %d" % int(d["distance"]))
 	if d.has("duration"): stat_bits.append("Kéo dài %ss" % str(d["duration"]))
+	# Hiệu ứng thật (khớp skillNumbers của web) — những cái này mới là thứ người chơi cần thấy.
+	if d.has("heal"): stat_bits.append("Hồi %d%% máu" % roundi(float(d["heal"]) * 100.0))
+	if d.has("mpHeal"): stat_bits.append("+%d%% năng lượng" % roundi(float(d["mpHeal"]) * 100.0))
+	if d.has("reduce"): stat_bits.append("Giảm %d%% sát thương" % roundi(float(d["reduce"]) * 100.0))
+	if d.has("reflect"): stat_bits.append("Phản %d%%" % roundi(float(d["reflect"]) * 100.0))
+	if d.has("absorb"): stat_bits.append("Đỡ %d%% sát thương" % roundi(float(d["absorb"]) * 100.0))
+	if d.has("atkBuff"): stat_bits.append("Tấn công %+d%%" % roundi(float(d["atkBuff"]) * 100.0))
+	if d.has("critBuff"): stat_bits.append("Chí mạng +%d%%" % int(d["critBuff"]))
+	if d.has("speedBuff"): stat_bits.append("Tốc đánh %+d%%" % roundi(float(d["speedBuff"]) * 100.0))
+	if d.has("slow"): stat_bits.append("Làm chậm %ss" % str(d["slow"]))
+	if d.has("freeze"): stat_bits.append("Đóng băng %ss" % str(d["freeze"]))
+	if d.has("stun"): stat_bits.append("Choáng %ss" % str(d["stun"]))
+	if d.has("knock") and bool(d["knock"]): stat_bits.append("Hất văng")
+	if d.has("pierce") and bool(d["pierce"]): stat_bits.append("Xuyên")
+	if d.has("chain"): stat_bits.append("Nổ lan %d%%" % roundi(float(d["chain"]) * 100.0))
+	if d.has("radius"): stat_bits.append("Bán kính %d" % int(d["radius"]))
+	if bool(d.get("selfZero", false)): stat_bits.append("Giết ngay · mình về 0 máu" + (" (Bùa giữ 1 máu)" if bool(d.get("buaSaves", false)) else ""))
+	if str(d.get("type", "")) == "manaburst": stat_bits.append("Đốt sạch MP · phong ấn hồi năng lượng %ds" % int(d.get("lockSec", 10)))
+	if str(d.get("type", "")) == "allin": stat_bits.append("Phong ấn mọi kỹ năng %ds" % int(d.get("lockSec", 60)))
+	if str(d.get("type", "")) == "fusion": stat_bits.append("Dung hợp bóng ma %ds · bộ sưu tập mất trắng" % int(d.get("fusionSec", 60)))
 	if not stat_bits.is_empty(): body.add_child(T.label(" · ".join(stat_bits), T.FS_S, T.C_GREEN))
 	# Mốc nâng cấp
-	for ms in [[5, "t5"], [10, "t10"]]:
-		if not d.has(str(ms[1])): continue
+	for ms in [[5, "t5", "m5"], [10, "t10", "m10"]]:
+		var txt := str(d.get(str(ms[1]), ""))
+		if txt.is_empty(): continue
 		var reached := is_learned and lv >= int(ms[0])
-		body.add_child(T.label("%s Cấp %d: %s" % ["+" if reached else "·", int(ms[0]), str(d[str(ms[1])])], T.FS_S, T.C_GREEN if reached else Color(T.C_MUTED, 0.8)))
+		body.add_child(T.label("%s Cấp %d: %s" % ["+" if reached else "·", int(ms[0]), txt], T.FS_S, T.C_GREEN if reached else Color(T.C_MUTED, 0.8)))
 	var pts := int(pl.get("skillPoints", 0))
 	if is_learned:
 		if not is_super:
@@ -743,6 +778,13 @@ func _skill_detail(sid: String, learned: Dictionary, pl: Dictionary) -> Control:
 			if here: bt.add_theme_color_override("font_color", T.C_GOLD)
 			row.add_child(bt)
 		body.add_child(row)
+		# Gỡ chiêu đang gắn khỏi ô (khớp nút ✕ của web, server nhận skill:null).
+		for i in targets:
+			var oi: int = i
+			if oi < slots.size() and str(slots[oi]) == sid:
+				var cap2 := ("Tuyệt %d" % (oi - 4)) if is_ult else str(oi + 1)
+				body.add_child(W.action_button("Gỡ khỏi ô %s" % cap2, func(): act("set_skill", {"slot": oi, "skill": null})))
+				break
 	return box
 
 func _gear_skill_of(pl: Dictionary) -> String:
@@ -777,14 +819,24 @@ func build_skills() -> Control:
 	left.add_child(top)
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 8)
-	for i in [0, 1, 2, 3, 5, 6]:
+	var tn_bar := str(Data.school(str(pl.get("school", ""))).get("base", str(pl.get("school", "")))) == "toan_nang"
+	var slot_ids: Array = [0, 1, 2, 3, 4, 5, 6, 7] if tn_bar else [0, 1, 2, 3, 5, 6]
+	for i in slot_ids:
 		var raw: Variant = slots[i] if i < slots.size() else null
 		var sid := "" if raw == null or str(raw) == "<null>" else str(raw)
 		var idx: int = i
-		bar.add_child(W.skill_cell(W.skill_icon(sid) if not sid.is_empty() else "", (i + 1 if i < 4 else i), selected_where == "skill" and not sid.is_empty() and selected_key == sid, func():
+		var cap := ("Tuyệt %d" % (i - 4)) if i >= 5 else str(i + 1)
+		bar.add_child(W.skill_cell(W.skill_icon(sid) if not sid.is_empty() else "", cap, selected_where == "skill" and not sid.is_empty() and selected_key == sid, func():
 			if not sid.is_empty(): _select("skill", sid)))
 	left.add_child(bar)
 	left.add_child(T.label("Ô 1–4: kỹ năng thường · Ô 5–6: tuyệt kỹ hoặc tuyệt phẩm (R, X)", 12, Color(T.C_MUTED, 0.85)))
+	# Nội tại class (khớp mục Nội tại của web).
+	var passives: Array = Data.passives_of(pl)
+	if not passives.is_empty():
+		left.add_child(T.heading("Nội tại", T.C_GREEN))
+		for pk in passives:
+			var pd: Dictionary = Data.PASSIVES[str(pk)]
+			left.add_child(W.glyph_row(str(pd.get("icon", "@star")), str(pd.get("name", pk)), str(pd.get("desc", "")), "", false, func() -> void: pass, T.C_GREEN))
 	# Chỉ liệt kê kỹ năng ĐÃ HỌC, chia 3 nhóm riêng: thường / tuyệt kỹ / tuyệt phẩm.
 	var supers: Array = _supers_of(pl)
 	var group_normal: Array = []   # [sid, lv]
@@ -801,7 +853,8 @@ func build_skills() -> Control:
 	if gsid != "":
 		var gd: Dictionary = Data.skill(gsid)
 		left.add_child(T.heading("Kỹ năng trang bị", Color(0.45, 0.92, 0.7)))
-		left.add_child(W.glyph_row(W.skill_icon(gsid), str(gd.get("name", gsid)), "Do trang bị cấp · MP %d" % int(_sk_at(gsid, 1).get("mp", 0)), "Trang bị", selected_where == "skill" and selected_key == gsid, func(): _select("skill", gsid), Color(0.45, 0.92, 0.7)))
+		var glv := _gear_skill_level(pl)
+		left.add_child(W.glyph_row(W.skill_icon(gsid), str(gd.get("name", gsid)), "Do trang bị cấp · cấp %d · MP %d" % [glv, int(_sk_at(gsid, glv).get("mp", 0))], "Trang bị", selected_where == "skill" and selected_key == gsid, func(): _select("skill", gsid), Color(0.45, 0.92, 0.7)))
 
 	left.add_child(T.hsep())
 	left.add_child(T.heading("Kỹ năng thường", T.C_GOLD))
@@ -947,6 +1000,13 @@ func _reward_chips(rw: Dictionary) -> Control:
 	if int(rw.get("gold", 0)) > 0: chips.append(["%s xu" % W.fmt_num(int(rw["gold"])), T.C_GOLD])
 	for it in rw.get("items", []):
 		if typeof(it) == TYPE_ARRAY and (it as Array).size() >= 2: chips.append(["%s ×%d" % [W.item_name(str(it[0])), int(it[1])], T.C_PURPLE])
+		elif typeof(it) == TYPE_STRING:
+			var parts := str(it).split(" ")
+			if parts.size() >= 2: chips.append(["%s ×%d" % [W.item_name(str(parts[0])), int(parts[1])], T.C_PURPLE])
+			elif parts.size() == 1: chips.append([W.item_name(str(parts[0])), T.C_PURPLE])
+	if bool(rw.get("schoolWeapon", false)): chips.append(["Vũ khí class", T.C_GOLD])
+	var perk := str(rw.get("perk", ""))
+	if not perk.is_empty(): chips.append(["Nội tại: %s" % perk, T.C_GREEN])
 	var fl := HFlowContainer.new()
 	fl.add_theme_constant_override("h_separation", 6)
 	fl.add_theme_constant_override("v_separation", 4)
@@ -978,10 +1038,15 @@ func build_quest() -> Control:
 		if not npc_id.is_empty():
 			var where := _npc_places(npc_id)
 			inner.add_child(T.label("Gặp %s%s" % [W.npc_name(npc_id), (" — " + where) if not where.is_empty() else ""], T.FS_S, T.C_MUTED))
-		inner.add_child(T.hsep())
-		inner.add_child(T.label("Mục tiêu", T.FS_S, T.C_MUTED, true))
-		var prog: Dictionary = qd.get("progress", {}) if typeof(qd.get("progress", {})) == TYPE_DICTIONARY else {}
-		_objective_rows(cur.get("obj", {}), prog, inner)
+		var min_lv := int(cur.get("minLevel", 1))
+		if state == "none" and min_lv > 1:
+			var ok_lv := int(pl.get("level", 1)) >= min_lv
+			inner.add_child(T.label(("%s Cần đạt cấp %d để nhận nhiệm vụ%s" % ["✓" if ok_lv else "🔒", min_lv, "" if ok_lv else " (bạn đang cấp %d)" % int(pl.get("level", 1))]), T.FS_S, T.C_GREEN if ok_lv else T.C_RED))
+		if state != "none":
+			inner.add_child(T.hsep())
+			inner.add_child(T.label("Mục tiêu", T.FS_S, T.C_MUTED, true))
+			var prog: Dictionary = qd.get("progress", {}) if typeof(qd.get("progress", {})) == TYPE_DICTIONARY else {}
+			_objective_rows(cur.get("obj", {}), prog, inner)
 		var rw: Dictionary = cur.get("reward", {})
 		if not rw.is_empty():
 			inner.add_child(T.label("Phần thưởng", T.FS_S, T.C_MUTED, true))
@@ -1008,6 +1073,15 @@ func build_quest() -> Control:
 				var swhere := _npc_places(str(sq["npc"]))
 				inner2.add_child(T.label("Về gặp %s%s để trả" % [W.npc_name(str(sq["npc"])), (" · " + swhere) if swhere != "" else ""], T.FS_S, T.C_GREEN))
 			vb.add_child(W.card_row(inner2))
+	# Phụ tuyến có thể nhận (web liệt kê kèm NPC nhận ở cuối danh sách).
+	var avail: Array = []
+	for sq in Data.SIDE_QUESTS:
+		if typeof(sq) == TYPE_DICTIONARY and Data.side_available(pl, sq as Dictionary): avail.append(sq as Dictionary)
+	if not avail.is_empty():
+		if active.is_empty(): vb.add_child(W.section_label("Phụ tuyến"))
+		for aq in avail:
+			var anpc := str(aq.get("npc", ""))
+			vb.add_child(T.label("• %s — nhận ở %s" % [str(aq.get("name", "")), W.npc_name(anpc)], T.FS_S, T.C_MUTED))
 	# Nhiệm vụ ngày chỉ hiển thị ở NPC/bảng nhiệm vụ, không đưa vào tab Nhiệm vụ.
 	return vb
 
@@ -1062,13 +1136,26 @@ func build_map() -> Control:
 	var view: Control = WorldMapView.new()
 	view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	view.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	# Bản đồ chiếm toàn bộ phần còn lại (bỏ cột chi tiết).
 	var mapbox := PanelContainer.new()
 	mapbox.add_theme_stylebox_override("panel", T.UISkin.inset(3))
 	mapbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mapbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vb.add_child(mapbox)
 	mapbox.add_child(view)
+	# Cột chi tiết: chạm một khu để hiện quái/NPC/đường nối/trạng thái mở (khớp web).
+	var detail := PanelContainer.new()
+	detail.add_theme_stylebox_override("panel", T.UISkin.inset(3))
+	detail.custom_minimum_size = Vector2(300, 0)
+	var dbox := _vb(8)
+	detail.add_child(dbox)
+	_map_info(dbox, str(p().get("map", "lang")))
+	view.selected.connect(func(id: String): _map_info(dbox, id))
+	var split := HSplitContainer.new()
+	split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	split.add_child(mapbox)
+	split.add_child(detail)
+	split.split_offset = 720
+	vb.add_child(split)
 	return W.fill(vb)
 
 func _dict_values(d: Dictionary) -> Array:
@@ -1110,14 +1197,15 @@ func build_shop() -> Control:
 	sh_head.add_child(sh_name)
 	sh_head.add_child(_gold_row(pl))
 	vb.add_child(sh_head)
-	vb.add_child(W.segmented([["buy", "Mua"], ["sell", "Bán"]], shop_tab, func(t): shop_tab = t; _deselect()))
+	var is_ngoc: bool = bool(nd.get("ngocShop", false))
+	if not is_ngoc:
+		var discount := roundi(float(pl.get("shopDiscount", 0)) * 100.0)
+		vb.add_child(W.segmented([["buy", "Mua"], ["sell", "Bán"]], shop_tab, func(t): shop_tab = t; _deselect()))
+		if discount > 0: vb.add_child(T.label("Khách quen: giảm %d%%" % discount, T.FS_S, T.C_GREEN))
 	var left: Control
 	var right: Control = W.empty_detail()
-	if shop_tab == "buy":
-		var items: Array = nd.get("shop", [])
-		var is_ngoc: bool = bool(nd.get("ngocShop", false))
-		if is_ngoc: items = _ngoc_shop_items(items)
-		else: items = items.filter(func(x): return int(Data.item(str(x)).get("priceNgoc", 0)) <= 0)
+	if shop_tab == "buy" or is_ngoc:
+		var items: Array = Data.shop_items(pl, npc) if not is_ngoc else _ngoc_shop_items(nd.get("shop", []))
 		var last_grp := ""
 		var lv := _vb(6)
 		for iid in items:
@@ -1128,7 +1216,7 @@ func build_shop() -> Control:
 				if grp != last_grp:
 					last_grp = grp
 					lv.add_child(W.section_label(str(NGOC_GROUP_NAMES.get(grp, "Tiện ích"))))
-			var price_txt := ("%s ngọc" % W.fmt_num(int(d0.get("priceNgoc", 0)))) if is_ngoc else ("%s xu" % W.fmt_num(int(d0.get("price", 0))))
+			var price_txt := ("%s ngọc" % W.fmt_num(int(d0.get("priceNgoc", 0)))) if is_ngoc else ("%s xu" % W.fmt_num(Data.shop_price(pl, d0)))
 			var sub_parts: Array = W.item_stat_lines(d0)
 			var sub := ", ".join(sub_parts.slice(0, 2)) if not sub_parts.is_empty() else str(d0.get("desc", ""))
 			lv.add_child(W.shop_row(sid, sub, price_txt, selected_where == "shop" and selected_key == sid, func(): _select("shop", sid)))
@@ -1136,10 +1224,14 @@ func build_shop() -> Control:
 		if selected_where == "shop":
 			var box := W.item_detail(selected_key)
 			var body := W.box_body(box)
+			var dsel: Dictionary = Data.item(selected_key)
+			var stackable := bool(dsel.get("stack", false))
+			if not stackable: shop_qty = 1
 			var qty_row := HBoxContainer.new()
 			qty_row.add_theme_constant_override("separation", 8)
 			var minus := W.action_button("−", func(): shop_qty = maxi(1, shop_qty - 1); refresh())
 			minus.custom_minimum_size = Vector2(48, 44)
+			minus.disabled = not stackable
 			qty_row.add_child(minus)
 			var ql := T.label(str(shop_qty), T.FS_L, T.C_GOLD, true)
 			ql.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1147,10 +1239,11 @@ func build_shop() -> Control:
 			qty_row.add_child(ql)
 			var plus := W.action_button("+", func(): shop_qty = mini(99, shop_qty + 1); refresh())
 			plus.custom_minimum_size = Vector2(48, 44)
+			plus.disabled = not stackable
 			qty_row.add_child(plus)
-			body.add_child(qty_row)
+			if stackable: body.add_child(qty_row)
 			var key := npc + ":" + selected_key
-			var total := int(Data.item(selected_key).get("priceNgoc" if is_ngoc else "price", 0)) * shop_qty
+			var total: int = (int(dsel.get("priceNgoc", 0)) if is_ngoc else Data.shop_price(pl, dsel)) * shop_qty
 			var cur_unit := "ngọc" if is_ngoc else "xu"
 			var buy := W.action_button(("Chạm lần nữa: mua %d (%s %s)" if confirm_buy == key else "Mua %d · %s %s") % [shop_qty, W.fmt_num(total), cur_unit], func():
 				if confirm_buy == key:
@@ -1197,7 +1290,7 @@ func build_smith() -> Control:
 	vb.add_child(_gold_row(pl, false))
 	vb.add_child(W.segmented(SMITH_TABS, smith_tab, func(t): smith_tab = t; _deselect()))
 	vb.add_child(T.label(str(SMITH_DESC.get(smith_tab, "")), T.FS_S, T.C_MUTED))
-	# Ứng viên: đồ trong túi có ô trang bị + đồ đang mặc
+	# Ứng viên: tab Phân rã chỉ nhận đồ trong túi (server phân rã theo uid trong túi)
 	var g := _grid(6)
 	var cands := 0
 	for e in pl.get("bag", []):
@@ -1208,14 +1301,21 @@ func build_smith() -> Control:
 		cands += 1
 		g.add_child(W.item_cell(iid, 1, selected_where == "smith" and selected_key == key, func(): _select("smith", key), ("+%d" % int(e.get("plus", 0))) if int(e.get("plus", 0)) > 0 else ""))
 	var eq: Dictionary = pl.get("equip", {})
-	for s in eq.keys():
-		if typeof(eq[s]) != TYPE_DICTIONARY: continue
-		var key2 := "s" + str(s)
-		var iid2 := str((eq[s] as Dictionary).get("id", ""))
-		cands += 1
-		g.add_child(W.item_cell(iid2, 1, selected_where == "smith" and selected_key == key2, func(): _select("smith", key2), "Mặc"))
+	if smith_tab != "salvage":
+		for s in eq.keys():
+			if typeof(eq[s]) != TYPE_DICTIONARY: continue
+			var key2 := "s" + str(s)
+			var iid2 := str((eq[s] as Dictionary).get("id", ""))
+			cands += 1
+			g.add_child(W.item_cell(iid2, 1, selected_where == "smith" and selected_key == key2, func(): _select("smith", key2), "Mặc"))
 	var left: Control = g if cands > 0 else _empty("Không có trang bị.")
-	var right: Control = W.empty_detail("Chọn trang bị để chế tác. Phải đứng cạnh Thợ rèn.")
+	var tips := {
+		"upgrade": "Chọn trang bị bên trái để nâng cấp. Mỗi cấp +8% chỉ số chính.",
+		"reforge": "Tẩy luyện gieo lại toàn bộ dòng phụ của đồ Tốt, Hiếm, Huyền thoại (giữ nguyên số dòng).",
+		"seal": "Khắc ấn: đồ đạt độ hoàn hảo %d%% trở lên được thêm 1 dòng phụ thứ tư, vĩnh viễn." % Data.SMITH_PERFECT_MIN,
+		"salvage": "Phân rã đồ trong túi để lấy Đá cường hóa: Tốt 1, Hiếm 3, Huyền thoại 6 viên, cộng thêm theo cấp nâng.",
+	}
+	var right: Control = W.empty_detail(str(tips.get(smith_tab, "")))
 	if selected_where == "smith":
 		var params: Dictionary = {}
 		var iid3 := ""
@@ -1232,9 +1332,54 @@ func build_smith() -> Control:
 			params = {"slot": slot}
 		if not iid3.is_empty():
 			var box := W.item_detail(iid3, plus, true, sm_entry)
-			var names := {"upgrade": "Cường hóa lên +%d" % (plus + 1), "reforge": "Tẩy luyện", "salvage": "Phân rã lấy đá", "seal": "Khắc ấn"}
+			var body := W.box_body(box)
+			var gold := int(pl.get("gold", 0))
+			var stones := 0
+			for b in pl.get("bag", []):
+				if typeof(b) == TYPE_DICTIONARY and str((b as Dictionary).get("id", "")) == "da_cuong_hoa":
+					stones += int((b as Dictionary).get("qty", (b as Dictionary).get("n", 1)))
+			var q := Data.smith_q(sm_entry)
 			var tab := smith_tab
-			W.box_body(box).add_child(W.action_button(str(names.get(tab, tab)), func(): act(tab, params)))
+			var can := false
+			var label := ""
+			if tab == "upgrade":
+				if plus >= Data.SMITH_UPGRADE_MAX:
+					body.add_child(T.label("Đã đạt tối đa +%d." % Data.SMITH_UPGRADE_MAX, T.FS_S, T.C_GOLD))
+				else:
+					var c := Data.smith_upgrade_cost(plus)
+					var rate := roundi(float(Data.SMITH_UPGRADE_RATES[mini(plus, Data.SMITH_UPGRADE_RATES.size() - 1)]) * 100.0)
+					body.add_child(T.label("Tỉ lệ %d%%%s" % [rate, " · thất bại giảm 1 cấp" if plus + 1 >= 12 else ""], T.FS_S, T.C_GREEN if rate >= 70 else (T.C_GOLD if rate >= 40 else T.C_RED)))
+					body.add_child(T.label("Chi phí: %s xu, %d đá cường hóa" % [W.fmt_num(int(c["gold"])), int(c["stones"])], T.FS_S, T.C_MUTED))
+					can = gold >= int(c["gold"]) and stones >= int(c["stones"])
+					label = "Cường hóa lên +%d" % (plus + 1)
+			elif tab == "reforge":
+				if q < 2:
+					body.add_child(T.label("Đồ Thường không có dòng phụ. Chỉ đồ Tốt trở lên mới tẩy luyện được.", T.FS_S, T.C_MUTED))
+				else:
+					var c := Data.smith_reforge_cost(sm_entry)
+					body.add_child(T.label("Chi phí: %s xu, %d đá cường hóa" % [W.fmt_num(int(c["gold"])), int(c["stones"])], T.FS_S, T.C_MUTED))
+					can = gold >= int(c["gold"]) and stones >= int(c["stones"])
+					label = "Tẩy luyện"
+			elif tab == "seal":
+				var pf := W.inst_perfection(sm_entry)
+				if bool(sm_entry.get("seal", false)):
+					body.add_child(T.label("Món này đã được khắc ấn rồi.", T.FS_S, T.C_MUTED))
+				elif q < 2:
+					body.add_child(T.label("Đồ Thường không có dòng phụ. Chỉ đồ Tốt trở lên mới khắc ấn được.", T.FS_S, T.C_MUTED))
+				elif pf < Data.SMITH_PERFECT_MIN:
+					body.add_child(T.label("Cần độ hoàn hảo %d%% trở lên. Món này đang %d%%." % [Data.SMITH_PERFECT_MIN, pf], T.FS_S, T.C_RED))
+				else:
+					var c := Data.smith_seal_cost(sm_entry)
+					body.add_child(T.label("Chi phí: %s xu, %d đá cường hóa" % [W.fmt_num(int(c["gold"])), int(c["stones"])], T.FS_S, T.C_MUTED))
+					can = gold >= int(c["gold"]) and stones >= int(c["stones"])
+					label = "Khắc ấn"
+			else:
+				var st := Data.smith_salvage_stones(sm_entry)
+				body.add_child(T.label("Nhận về: %d Đá cường hóa. Món đồ sẽ mất vĩnh viễn." % st, T.FS_S, T.C_MUTED))
+				can = true
+				label = "Phân rã lấy đá"
+			if not label.is_empty():
+				body.add_child(W.action_button(label, func(): act(tab, params); _deselect(), not can))
 			right = box
 	vb.add_child(W.split(left, right))
 	return W.fill(vb)
@@ -1245,14 +1390,17 @@ func build_storage() -> Control:
 	var pl := p()
 	var here := str(pl.get("map", "lang"))
 	var store: Array = pl.get("storageByMap", {}).get(here, [])
-	vb.add_child(W.chip_row([["Kho %s" % W.map_name(here), T.C_GOLD], ["%d/%d" % [store.size(), Data.const_int("STORAGE_SIZE", 30)], T.C_MUTED]]))
+	var cap_max := Data.const_int("STORAGE_SIZE", 30)
+	vb.add_child(W.chip_row([["Kho %s" % W.map_name(here), T.C_GOLD], ["%d/%d" % [store.size(), cap_max], T.C_MUTED]]))
+	if store.size() > cap_max: vb.add_child(T.label("Kho đang vượt giới hạn. Hãy lấy bớt đồ ra để gửi thêm.", T.FS_S, T.C_RED))
+	elif store.size() >= cap_max: vb.add_child(T.label("Kho đã đầy.", T.FS_S, T.C_RED))
 	vb.add_child(W.segmented([["store", "Gửi vào kho"], ["take", "Lấy ra"]], storage_tab, func(t): storage_tab = t; _deselect()))
 	var src: Array = pl.get("bag", []) if storage_tab == "store" else store
 	var g := _grid(6)
 	for e in src:
 		if typeof(e) != TYPE_DICTIONARY: continue
 		var uid := str(e.get("uid", 0))
-		g.add_child(W.item_cell(str(e.get("id", "")), int(e.get("n", 1)), selected_where == "store" and selected_key == uid, func(): _select("store", uid)))
+		g.add_child(W.item_cell(str(e.get("id", "")), int(e.get("qty", e.get("n", 1))), selected_where == "store" and selected_key == uid, func(): _select("store", uid)))
 	var left: Control = g if not src.is_empty() else _empty("Không có đồ.")
 	var right: Control = W.empty_detail()
 	if selected_where == "store":
@@ -1272,15 +1420,17 @@ func build_storage() -> Control:
 func build_teleport() -> Control:
 	var vb := _vb()
 	var pl := p()
-	vb.add_child(T.label("Chọn Tân Đô đã từng tới. Mỗi lần dịch chuyển tốn phí cố định.", T.FS_S, T.C_MUTED))
+	vb.add_child(T.label("Chọn Tân Đô đã từng tới. Phí 300 xu/lượt, về Hiệp Hội miễn phí. Bạn có %s xu." % W.fmt_num(int(pl.get("gold", 0))), T.FS_S, T.C_MUTED))
 	var any := false
 	for mid in pl.get("villages", []):
 		var sid := str(mid)
 		if sid == str(pl.get("map", "")): continue
 		if not (Data.MAPS.get(sid, {}) as Dictionary).get("village", false): continue
 		any = true
-		var h := W.list_row(null, W.map_name(sid), "Tân Đô")
-		var go := W.action_button("Đi", func(): act("teleport", {"to": sid, "hp": Game.hp, "mp": Game.mp}))
+		var fee := 0 if sid == str(Data.raw.get("CONSTANTS", {}).get("START_MAP", "lang")) else 300
+		var enough := int(pl.get("gold", 0)) >= fee
+		var h := W.list_row(null, W.map_name(sid), "Tân Đô · " + ("miễn phí" if fee == 0 else "%s xu" % W.fmt_num(fee)))
+		var go := W.action_button("Đi", func(): act("teleport", {"to": sid, "hp": Game.hp, "mp": Game.mp}), not enough)
 		go.custom_minimum_size = Vector2(90, 44)
 		h.add_child(go)
 		vb.add_child(W.card_row(h))
@@ -1308,7 +1458,7 @@ func build_gate() -> Control:
 				break
 		var ok := reason.is_empty()
 		var h := W.list_row(null, ("" if ok else "🔒 ") + W.map_name(to), "Sẵn sàng" if ok else reason, T.C_TEXT if ok else T.C_MUTED)
-		var go := W.action_button("Đi" if ok else "Khoá", func(): act("change_map", {"portal": key, "hp": Game.hp, "mp": Game.mp}), not ok)
+		var go := W.action_button("Đi" if ok else "Khoá", func(): act("change_map", {"portal": key, "hp": Game.hp, "mp": Game.mp, "pets": p().get("pets", {})}), not ok)
 		go.custom_minimum_size = Vector2(90, 44)
 		h.add_child(go)
 		vb.add_child(W.card_row(h))
@@ -1317,45 +1467,130 @@ func build_gate() -> Control:
 	return vb
 
 # ============================================================ DAILY
+const WEEKLY_KILLS := 200
+const WEEKLY_BOSSES := 5
+const WEEKLY_BOOKS := 1
+const DAILY_BONUS_STONES := 6
+
+## Hệ số thưởng theo làng: Tân Đô I ×0.4 … VII ×1.0 (G.villageRewardMult của web).
+func _village_reward_mult(map_id: String) -> float:
+	var v: Variant = Data.map_def(map_id).get("village", null)
+	if typeof(v) != TYPE_DICTIONARY: return 1.0
+	return 0.4 + 0.1 * float((v as Dictionary).get("n", 1) - 1)
+
+func _daily_reward(level: int, map_id: String) -> Dictionary:
+	var k := _village_reward_mult(map_id)
+	return {"exp": roundi(float(Formulas.exp_to_next(level)) * 0.22 * k), "gold": roundi(40.0 * float(level) * k), "stones": 1}
+
+func _weekly_reward(level: int, map_id: String) -> Dictionary:
+	var k := _village_reward_mult(map_id)
+	var st := func(n: int) -> int: return maxi(1, roundi(float(n) * k))
+	return {
+		"kills": {"exp": roundi(float(Formulas.exp_to_next(level)) * 0.5 * k), "gold": roundi(100.0 * float(level) * k), "stones": st.call(8)},
+		"bosses": {"exp": roundi(float(Formulas.exp_to_next(level)) * 0.6 * k), "gold": roundi(150.0 * float(level) * k), "stones": st.call(3)},
+	}
+
+func _daily_line_text(x: Dictionary) -> String:
+	var target := str(x.get("target", ""))
+	var need := int(x.get("need", 0))
+	var typ := str(x.get("type", ""))
+	var name := str(Data.monster(target).get("name", Data.item(target).get("name", target)))
+	if typ == "kill": return "Hạ %d %s" % [need, name]
+	if typ == "boss": return "Hạ trùm %s" % name
+	return "Thu thập %d %s" % [need, name]
+
+func _daily_line_have(pl: Dictionary, x: Dictionary) -> int:
+	var need := int(x.get("need", 0))
+	if str(x.get("type", "")) == "collect":
+		var target := str(x.get("target", ""))
+		var total := 0
+		for e in pl.get("bag", []):
+			if typeof(e) == TYPE_DICTIONARY and str((e as Dictionary).get("id", "")) == target:
+				total += int((e as Dictionary).get("n", (e as Dictionary).get("qty", 1)))
+		return mini(need, total)
+	return mini(need, int(x.get("have", 0)))
+
+func _reward_text(exp: int, gold: int, stones: int, stone_name: String = "đá cường hóa") -> String:
+	return "%s kinh nghiệm, %s xu, %d %s" % [W.fmt_num(exp), W.fmt_num(gold), stones, stone_name]
+
 func build_daily() -> Control:
 	var vb := _vb()
 	var pl := p()
 	var here := str(pl.get("map", "lang"))
+	var lvl := int(pl.get("level", 1))
 	var by_map: Variant = pl.get("dailyByMap", {})
 	var d: Dictionary = (by_map as Dictionary).get(here, {}) if typeof(by_map) == TYPE_DICTIONARY else {}
 	if typeof(d) != TYPE_DICTIONARY: d = {}
 	vb.add_child(W.section_label("Bảng nhiệm vụ · %s" % W.map_name(here)))
 	var list: Array = d.get("list", []) if typeof(d.get("list", [])) == TYPE_ARRAY else []
-	if list.is_empty(): vb.add_child(_empty("Chưa có nhiệm vụ ngày ở đây.\nMỗi làng có bảng nhiệm vụ riêng.", "quest"))
+	if list.is_empty():
+		vb.add_child(_empty("Chưa có nhiệm vụ ngày ở đây.\nHoàn thành nhiệm vụ Cổng đỏ của Hội trưởng Khải để mở khu săn của làng này.", "quest"))
+		return vb
+	var r := _daily_reward(lvl, here)
+	vb.add_child(T.label("Mỗi ngày 3 nhiệm vụ theo quái của vùng này. Thưởng của làng này ×%.1f." % _village_reward_mult(here), T.FS_S, T.C_MUTED))
 	for i in range(list.size()):
-		var item: Dictionary = list[i] if typeof(list[i]) == TYPE_DICTIONARY else {}
-		var done := bool(item.get("done", false))
-		var claimed := bool(item.get("claimed", false))
-		var h := W.list_row(null, str(item.get("name", "Nhiệm vụ %d" % (i + 1))), "Đã nhận thưởng" if claimed else ("Hoàn thành" if done else "Đang làm"), T.C_MUTED if claimed else T.C_TEXT)
+		var x: Dictionary = list[i] if typeof(list[i]) == TYPE_DICTIONARY else {}
+		var need := int(x.get("need", 0))
+		var have := _daily_line_have(pl, x)
+		var done := have >= need
+		var claimed := bool(x.get("claimed", false))
+		var mul := 2 if str(x.get("type", "")) == "boss" else 1
+		var icon := "👑" if str(x.get("type", "")) == "boss" else ("🔶" if str(x.get("type", "")) == "collect" else "⚔️")
+		var h := W.list_row(null, icon + " " + _daily_line_text(x), "Tiến độ: %d/%d%s" % [have, need, " · rơi từ quái trong cổng" if str(x.get("type", "")) == "collect" else ""], T.C_MUTED if claimed else T.C_TEXT)
+		var inner := VBoxContainer.new()
+		inner.add_theme_constant_override("separation", 2)
+		inner.add_child(T.label(_reward_text(int(r["exp"]) * mul, int(r["gold"]) * mul, int(r["stones"]) * mul), T.FS_S, T.C_GOLD))
+		h.add_child(inner)
 		var idx := i
-		var b := W.action_button("Nhận", func(): act("daily_claim", {"i": idx}), claimed or not done)
-		b.custom_minimum_size = Vector2(90, 44)
-		h.add_child(b)
+		if claimed:
+			h.add_child(T.label("✓ Đã nhận", T.FS_S, T.C_GREEN))
+		else:
+			var b := W.action_button("Nhận thưởng", func(): act("daily_claim", {"i": idx}), not done)
+			b.custom_minimum_size = Vector2(110, 44)
+			h.add_child(b)
 		vb.add_child(W.card_row(h))
-	var bonus_v: Variant = d.get("bonus", {})
-	var bonus: Dictionary = bonus_v if typeof(bonus_v) == TYPE_DICTIONARY else {}
-	if not bonus.is_empty():
-		vb.add_child(W.action_button("Nhận thưởng thêm", func(): act("daily_bonus", {}), bool(bonus.get("claimed", false))))
+	# Thưởng hoàn thành cả 3
+	var all := true
+	for x in list:
+		if not bool((x as Dictionary).get("claimed", false)): all = false; break
+	var bonus_v: Variant = d.get("bonus", null)
+	var bonus_claimed := bool(bonus_v) if typeof(bonus_v) != TYPE_DICTIONARY else bool((bonus_v as Dictionary).get("claimed", false))
+	var bonus_box := _vb(4)
+	bonus_box.add_child(T.label("🎁 Thưởng hoàn thành cả 3: %d đá cường hóa" % DAILY_BONUS_STONES, T.FS_S, T.C_GOLD))
+	bonus_box.add_child(T.label("Sách kỹ năng không còn ở nhiệm vụ ngày — mỗi tuần nhận %d cuốn ở mốc hạ trùm bên dưới." % WEEKLY_BOOKS, T.FS_S, T.C_MUTED))
+	if bonus_claimed:
+		bonus_box.add_child(T.label("✓ Đã nhận hôm nay", T.FS_S, T.C_GREEN))
+	else:
+		bonus_box.add_child(W.action_button("Nhận thưởng thêm", func(): act("daily_bonus", {}), not all))
+	vb.add_child(W.card_row(bonus_box))
+	# Nhiệm vụ tuần
 	var weekly_v: Variant = pl.get("weeklyByMap", {})
 	var w: Dictionary = (weekly_v as Dictionary).get(here, {}) if typeof(weekly_v) == TYPE_DICTIONARY else {}
 	if typeof(w) != TYPE_DICTIONARY: w = {}
 	if not w.is_empty():
 		vb.add_child(T.hsep())
-		vb.add_child(W.section_label("Nhiệm vụ tuần"))
-		vb.add_child(W.chip_row([["Quái  %d" % int(w.get("kills", 0)), T.C_BLUE], ["Boss  %d" % int(w.get("bosses", 0)), T.C_RED]]))
-		var r := HBoxContainer.new()
-		r.add_theme_constant_override("separation", 8)
-		var b1 := W.action_button("Thưởng quái", func(): act("weekly_claim", {"kind": "kills"}))
-		b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var b2 := W.action_button("Thưởng boss", func(): act("weekly_claim", {"kind": "bosses"}))
-		b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		r.add_child(b1); r.add_child(b2)
-		vb.add_child(r)
+		vb.add_child(W.section_label("Nhiệm vụ tuần · %s" % str(w.get("week", ""))))
+		vb.add_child(T.label("Làm mới vào thứ Hai · chỉ tính quái hạ ở vùng của làng này.", T.FS_S, T.C_MUTED))
+		var wr := _weekly_reward(lvl, here)
+		var rows: Array = [
+			{"kind": "kills", "icon": "⚔️", "label": "Hạ %d quái" % WEEKLY_KILLS, "have": int(w.get("kills", 0)), "need": WEEKLY_KILLS,
+				"claimed": bool(w.get("claimedKills", false)), "reward": _reward_text(int(wr["kills"]["exp"]), int(wr["kills"]["gold"]), int(wr["kills"]["stones"]))},
+			{"kind": "bosses", "icon": "👑", "label": "Hạ %d trùm" % WEEKLY_BOSSES, "have": int(w.get("bosses", 0)), "need": WEEKLY_BOSSES,
+				"claimed": bool(w.get("claimedBosses", false)), "reward": _reward_text(int(wr["bosses"]["exp"]), int(wr["bosses"]["gold"]), int(wr["bosses"]["stones"]), "đá cường hóa cao") + ", %d sách kỹ năng" % WEEKLY_BOOKS},
+		]
+		for row in rows:
+			var have := mini(int(row["have"]), int(row["need"]))
+			var done := have >= int(row["need"])
+			var rh := W.list_row(null, str(row["icon"]) + " " + str(row["label"]), "Tiến độ: %d/%d" % [have, int(row["need"])], T.C_MUTED if bool(row["claimed"]) else T.C_TEXT)
+			rh.add_child(T.label("Thưởng: " + str(row["reward"]), T.FS_S, T.C_GOLD))
+			if bool(row["claimed"]):
+				rh.add_child(T.label("✓ Đã nhận", T.FS_S, T.C_GREEN))
+			else:
+				var kind := str(row["kind"])
+				var rb := W.action_button("Nhận", func(): act("weekly_claim", {"kind": kind}), not done)
+				rb.custom_minimum_size = Vector2(90, 44)
+				rh.add_child(rb)
+			vb.add_child(W.card_row(rh))
 	return vb
 
 # ============================================================ NPC
@@ -1413,8 +1648,18 @@ func build_code() -> Control:
 	vb.add_child(ed)
 	vb.add_child(T.button_primary("Xác nhận", Vector2(0, 48)))
 	(vb.get_child(vb.get_child_count() - 1) as Button).pressed.connect(func():
-		Net.action("redeem", {"code": code_draft})
-		code_draft = ""; refresh())
+		var code := code_draft.strip_edges()
+		if code.is_empty(): return
+		var data := await Net.send_action("redeem", {"code": code})
+		if bool(data.get("ok", false)):
+			code_draft = ""; code_msg = ""
+			if data.has("player"): Game.set_player(data["player"], false)
+			if data.has("rev"): Game.rev = int(data["rev"])
+			if data.has("events"): Game.on_events(data["events"])
+			host.open_panel("npc", {"id": "lu_khach"})
+		else:
+			code_msg = str(data.get("error", "Mật mã không đúng."))
+			refresh())
 	var confirm := str(ctx_extra.get("confirm", ""))
 	if not confirm.is_empty():
 		vb.add_child(T.hsep())
@@ -1454,31 +1699,112 @@ func build_school() -> Control:
 	return vb
 
 # ============================================================ MOUNT (Linh thú Triệu Hồi Sư)
+## Chỉ số linh thú theo cấp (khớp Assist.summon_stats / G.summonUnitStats của web).
+func _summon_stats(pl: Dictionary, mid: String) -> Dictionary:
+	var sm: Dictionary = pl.get("summons", {}) if typeof(pl.get("summons", {})) == TYPE_DICTIONARY else {}
+	var units: Dictionary = sm.get("units", {}) if typeof(sm.get("units", {})) == TYPE_DICTIONARY else {}
+	var un: Dictionary = units.get(mid, {}) if typeof(units.get(mid, null)) == TYPE_DICTIONARY else {}
+	var lv := mini(maxi(1, int(pl.get("level", 1))), maxi(1, int(un.get("lv", 1))))
+	var skills: Dictionary = pl.get("skills", {}) if typeof(pl.get("skills", {})) == TYPE_DICTIONARY else {}
+	var th5: Variant = skills.get("th5", 1)
+	var skl := maxi(1, int((th5 as Dictionary).get("lv", 1)) if typeof(th5) == TYPE_DICTIONARY else int(th5))
+	var mul := 1.0 + 0.12 * float(skl - 1)
+	var sp: Dictionary = Data.calc.get("SUMMONS", {}).get(mid, {})
+	var pc: Dictionary = Data.calc.get("PET_CURVE", {})
+	var st := {
+		"maxHp": roundi(Formulas.interp(pc.get("hp", []), float(lv)) * float(sp.get("hp", 1.0)) * mul),
+		"maxMp": roundi((24.0 + 4.0 * float(lv - 1)) * mul),
+		"maxSta": roundi((70.0 + 2.0 * float(lv - 1)) * mul),
+		"atk": Formulas.interp(pc.get("atk", []), float(lv)) * mul,
+		"def": roundi(Formulas.interp(pc.get("def", []), float(lv)) * float(sp.get("def", 1.0))),
+		"lv": lv,
+	}
+	var gear: Dictionary = pl.get("petGear", {}) if typeof(pl.get("petGear", {})) == TYPE_DICTIONARY else {}
+	var gmid: Dictionary = gear.get(mid, {}) if typeof(gear.get(mid, null)) == TYPE_DICTIONARY else {}
+	var table: Dictionary = Data.calc.get("PET_GEAR", {})
+	for slot in gmid.keys():
+		var b: Dictionary = table.get(str(gmid[slot]), {}) if typeof(table.get(str(gmid[slot]), null)) == TYPE_DICTIONARY else {}
+		if b.has("maxHp"): st["maxHp"] = int(st["maxHp"]) + int(b["maxHp"])
+		if b.has("atk"): st["atk"] = float(st["atk"]) + float(b["atk"])
+		if b.has("def"): st["def"] = int(st["def"]) + int(b["def"])
+	return st
+
 func build_mount() -> Control:
 	var vb := _vb()
-	var summons: Dictionary = p().get("summons", {})
-	if str(p().get("school", "")) != "trieu_hoi_su":
+	var pl := p()
+	var summons: Dictionary = pl.get("summons", {}) if typeof(pl.get("summons", {})) == TYPE_DICTIONARY else {}
+	if str(pl.get("school", "")) != "trieu_hoi_su":
 		vb.add_child(_empty("Chỉ Triệu Hồi Sư mới có linh thú.\nĐổi class để mở tính năng này.", "pet"))
 		return vb
-	vb.add_child(W.action_button("Bật / tắt linh thú", func(): act("summon_toggle", {})))
+	var skills: Dictionary = pl.get("skills", {}) if typeof(pl.get("skills", {})) == TYPE_DICTIONARY else {}
+	var th5v: Variant = skills.get("th5", 0)
+	var th5lv := int((th5v as Dictionary).get("lv", 0)) if typeof(th5v) == TYPE_DICTIONARY else int(th5v)
+	var can_summon := th5lv > 0
+	var enabled := bool(summons.get("enabled", false))
+	var toggle := W.action_button("Tắt linh thú" if enabled else "Bật linh thú", func(): act("summon_toggle", {}), not can_summon)
+	if not can_summon: toggle.tooltip_text = "Cần học kỹ năng Triệu Hồi Linh Thú (th5) từ sách kỹ năng."
+	vb.add_child(toggle)
 	var choice := str(summons.get("choice", ""))
-	var g := _grid(2)
-	for sid in Data.SKILLS.keys():
-		var s: Dictionary = Data.SKILLS[sid] if typeof(Data.SKILLS[sid]) == TYPE_DICTIONARY else {}
-		if str(s.get("school", "")) != "trieu_hoi_su" or str(s.get("summon", "")).is_empty(): continue
-		var mid := str(s["summon"])
-		var b := W.action_button(("Đang dùng · " if mid == choice else "Chọn · ") + W.monster_name(mid), func(): act("summon_pick", {"id": mid}))
-		if mid == choice: b.add_theme_color_override("font_color", T.C_GOLD)
-		g.add_child(b)
-	if g.get_child_count() == 0: vb.add_child(_empty("Chỉ Triệu Hồi Sư mới có linh thú."))
-	else: vb.add_child(g)
-	var states: Dictionary = summons.get("states", {})
-	for mid2 in states.keys():
-		var st: Dictionary = states[mid2] if typeof(states[mid2]) == TYPE_DICTIONARY else {}
-		vb.add_child(W.bar(W.monster_name(str(mid2)), int(st.get("hp", 0)), int(st.get("maxHp", 100)), T.C_GREEN))
+	var states: Dictionary = summons.get("states", {}) if typeof(summons.get("states", {})) == TYPE_DICTIONARY else {}
+	var defs: Dictionary = Data.calc.get("SUMMONS", {})
+	if defs.is_empty(): vb.add_child(_empty("Chưa có dữ liệu linh thú."))
+	for mid in defs.keys():
+		var m: Dictionary = defs[mid] if typeof(defs[mid]) == TYPE_DICTIONARY else {}
+		var sid := str(mid)
+		var picked := sid == choice
+		var on := enabled and picked
+		var st := _summon_stats(pl, sid)
+		var card := _vb(6)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.custom_minimum_size = Vector2(520, 0)
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 10)
+		head.add_child(_pet_avatar(sid, 56))
+		var tc := _vb(2)
+		tc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tc.add_child(T.label("%s · cấp %d%s" % [str(m.get("name", sid)), int(st["lv"]), " · đang theo chủ" if on else ""], T.FS_M, T.C_GOLD if on else T.C_TEXT, true))
+		tc.add_child(T.label(str(m.get("desc", "")), T.FS_S, T.C_MUTED))
+		tc.add_child(T.label("HP %d · MP %d · STA %d · Công %d · Thủ %d" % [int(st["maxHp"]), int(st["maxMp"]), int(st["maxSta"]), int(st["atk"]), int(st["def"])], T.FS_S, T.C_TEXT))
+		head.add_child(tc)
+		head.add_child(W.action_button("Đang dùng" if picked else ("Đổi sang" if enabled else "Chọn"), func(): act("summon_pick", {"id": sid}), picked))
+		card.add_child(head)
+		if on:
+			var cur: Dictionary = states.get(sid, {}) if typeof(states.get(sid, null)) == TYPE_DICTIONARY else {}
+			card.add_child(W.bar("HP", int(cur.get("hp", st["maxHp"])), int(st["maxHp"]), T.C_GREEN))
+			card.add_child(W.bar("MP", int(cur.get("mp", st["maxMp"])), int(st["maxMp"]), T.C_BLUE))
+			card.add_child(W.bar("Thể lực", int(cur.get("sta", st["maxSta"])), int(st["maxSta"]), T.C_GOLD))
+		# Kỹ năng linh thú theo cấp.
+		var sks: Array = Data.calc.get("SUMMON_SKILLS", {}).get(sid, [])
+		if not sks.is_empty():
+			var bits: Array = []
+			for sk in sks:
+				if typeof(sk) != TYPE_DICTIONARY: continue
+				var unlocked := int(sk.get("lv", 1)) <= int(st["lv"])
+				bits.append(("%s %s" % [str(sk.get("icon", "")), str(sk.get("name", ""))]) if unlocked else ("🔒 %s (cấp %d)" % [str(sk.get("name", "")), int(sk.get("lv", 1))]))
+			if not bits.is_empty(): card.add_child(T.label("Kỹ năng: " + " · ".join(bits), T.FS_S, T.C_MUTED))
+		card.add_child(_pet_gear_section(pl, sid))
+		vb.add_child(W.card_row(card))
 	return vb
 
 # ============================================================ COMPANION (thú đồng hành)
+## Chỉ số thú đồng hành: cố định theo loài + cộng trang bị thú (khớp companionStats của web).
+func _companion_stats(pl: Dictionary, mid: String) -> Dictionary:
+	var m := Data.mount(mid)
+	var s: Dictionary = m.get("stats", {}) if typeof(m.get("stats", {})) == TYPE_DICTIONARY else m
+	var st := {
+		"maxHp": int(s.get("hp", 1000)), "maxMp": int(s.get("mp", 60)), "maxSta": int(s.get("sta", 100)),
+		"atk": float(s.get("atk", 100)), "def": float(s.get("def", 100)),
+	}
+	var gear: Dictionary = pl.get("petGear", {}) if typeof(pl.get("petGear", {})) == TYPE_DICTIONARY else {}
+	var gm: Dictionary = gear.get(mid, {}) if typeof(gear.get(mid, null)) == TYPE_DICTIONARY else {}
+	var table: Dictionary = Data.calc.get("PET_GEAR", {})
+	for slot in gm.keys():
+		var b: Dictionary = table.get(str(gm[slot]), {}) if typeof(table.get(str(gm[slot]), null)) == TYPE_DICTIONARY else {}
+		if b.has("maxHp"): st["maxHp"] = int(st["maxHp"]) + int(b["maxHp"])
+		if b.has("atk"): st["atk"] = float(st["atk"]) + float(b["atk"])
+		if b.has("def"): st["def"] = float(st["def"]) + float(b["def"])
+	return st
+
 func build_companion() -> Control:
 	var vb := _vb()
 	var pl := p()
@@ -1489,11 +1815,15 @@ func build_companion() -> Control:
 	if owned.is_empty():
 		vb.add_child(_empty("Bạn chưa có thú đồng hành.\nNhận thú qua mã quà tặng hoặc sự kiện.", "pet"))
 		return vb
-	vb.add_child(T.label("Thú đi theo và đánh cùng bạn. Chỉ số cố định theo loài, mạnh lên nhờ trang bị thú.", T.FS_S, T.C_MUTED))
+	vb.add_child(T.label("Thú đi theo và đánh cùng bạn. Chỉ số cố định theo loài, mạnh lên nhờ trang bị thú. Triệu hồi tốn 10 MP.", T.FS_S, T.C_MUTED))
+	var pets: Dictionary = pl.get("pets", {}) if typeof(pl.get("pets", {})) == TYPE_DICTIONARY else {}
+	var skill_map: Dictionary = mounts.get("skills", {}) if typeof(mounts.get("skills", {})) == TYPE_DICTIONARY else {}
+	var pet_skills: Dictionary = Data.calc.get("PET_SKILLS", {})
 	for mid in owned:
 		var sid := str(mid)
 		var active := sid in summoned
 		var m := Data.mount(sid)
+		var st := _companion_stats(pl, sid)
 		var card := _vb(6)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.custom_minimum_size = Vector2(520, 0)
@@ -1506,28 +1836,34 @@ func build_companion() -> Control:
 		tc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tc.custom_minimum_size = Vector2(240, 0)
 		tc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		var nm_lb := T.label(Data.mount_name(sid), T.FS_L, T.C_GOLD if active else T.C_TEXT, true)
-		nm_lb.autowrap_mode = TextServer.AUTOWRAP_OFF
-		tc.add_child(nm_lb)
-		if not m.is_empty():
-			var ds_lb := T.label(str(m.get("desc", "")), 12, T.C_MUTED)
-			ds_lb.autowrap_mode = TextServer.AUTOWRAP_OFF
-			ds_lb.clip_text = true
-			tc.add_child(ds_lb)
-			var st_lb := T.label("HP %d · Công %d · Thủ %d · MP %d" % [int(m.get("hp", 0)), int(m.get("atk", 0)), int(m.get("def", 0)), int(m.get("mp", 0))], T.FS_S, T.C_TEXT)
-			st_lb.autowrap_mode = TextServer.AUTOWRAP_OFF
-			tc.add_child(st_lb)
-		var tb: Button
-		if active:
-			tb = W.action_button("Thu hồi", func(): act("mount_set", {"id": sid}))
-		else:
-			tb = T.button_primary("Triệu hồi", Vector2(104, 38))
-			tb.pressed.connect(func(): act("mount_set", {"id": sid}))
-		tb.custom_minimum_size = Vector2(104, 38)
-		tb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tc.add_child(T.label(Data.mount_name(sid) + (" · đã triệu hồi" if active else ""), T.FS_L, T.C_GOLD if active else T.C_TEXT, true))
+		if not m.is_empty(): tc.add_child(T.label(str(m.get("desc", "")), T.FS_S, T.C_MUTED))
+		tc.add_child(T.label("HP %d · Công %d · Thủ %d · MP %d" % [int(st["maxHp"]), int(st["atk"]), int(st["def"]), int(st["maxMp"])], T.FS_S, T.C_TEXT))
 		head.add_child(tc)
-		head.add_child(tb)
+		if active:
+			head.add_child(W.action_button("Thu hồi", func(): act("mount_set", {"id": sid})))
+		else:
+			var can := int(pl.get("mp", 0)) >= 10 and int(pl.get("level", 1)) >= int(m.get("level", 1))
+			var tb := W.action_button("Triệu hồi · 10 MP", func(): act("mount_set", {"id": sid}), not can)
+			if not can: tb.tooltip_text = "Cần 10 MP và cấp %d." % int(m.get("level", 1))
+			head.add_child(tb)
 		card.add_child(head)
+		if active:
+			var cur: Dictionary = pets.get(sid, {}) if typeof(pets.get(sid, null)) == TYPE_DICTIONARY else {}
+			card.add_child(W.bar("HP", int(cur.get("hp", st["maxHp"])), int(st["maxHp"]), T.C_GREEN))
+			card.add_child(W.bar("MP", int(cur.get("mp", st["maxMp"])), int(st["maxMp"]), T.C_BLUE))
+			card.add_child(W.bar("Thể lực", int(cur.get("sta", st["maxSta"])), int(st["maxSta"]), T.C_GOLD))
+			# Ô chọn kỹ năng thú (khớp pet_skill của web).
+			var skill_id := str(skill_map.get(sid, mounts.get("skill", "bite")))
+			var sg := _grid(3)
+			for skid in pet_skills.keys():
+				var skill: Dictionary = pet_skills[skid] if typeof(pet_skills[skid]) == TYPE_DICTIONARY else {}
+				var skid_s := str(skid)
+				var sb := W.action_button("%s %s · %d MP / %d STA" % [str(skill.get("icon", "")), str(skill.get("name", skid_s)), int(skill.get("mp", 0)), int(skill.get("sta", 0))], func(): act("pet_skill_set", {"id": sid, "skill": skid_s}), skid_s == skill_id)
+				sb.tooltip_text = str(skill.get("desc", ""))
+				sg.add_child(sb)
+			card.add_child(W.section_label("Ô kỹ năng"))
+			card.add_child(sg)
 		card.add_child(_pet_gear_section(pl, sid))
 		vb.add_child(W.card_row(card))
 	return vb
@@ -1535,6 +1871,9 @@ func build_companion() -> Control:
 ## Anh thú: dùng bộ sprite quái theo look của loài (giống web).
 func _pet_avatar(mid: String, px: int) -> Control:
 	var m := Data.mount(mid)
+	if m.is_empty():
+		var sm: Variant = Data.calc.get("SUMMONS", {}).get(mid, null)
+		if typeof(sm) == TYPE_DICTIONARY: m = sm as Dictionary
 	var look := str(m.get("look", "wolf"))
 	if not MobSpriteCls.PET_DEF.has(look): look = "wolf"
 	var pd: Dictionary = MobSpriteCls.PET_DEF[look]
@@ -2152,14 +2491,25 @@ func _social_market(vb: VBoxContainer) -> void:
 					price_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 					price_le.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
 					pr.add_child(price_le)
-					var qty_all: int = int(e2.get("n", e2.get("qty", 1)))
+					var qty_all: int = int(e2.get("qty", e2.get("n", 1)))
+					var is_stack := bool(Data.item(str(e2.get("id", ""))).get("stack", false))
+					if is_stack and qty_all > 1:
+						var qty_le := LineEdit.new()
+						qty_le.text = str(qty_all)
+						qty_le.placeholder_text = "Số lượng"
+						qty_le.custom_minimum_size = Vector2(90, 40)
+						qty_le.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+						pr.add_child(qty_le)
+						pr.set_meta("qty_le", qty_le)
 					pr.add_child(W.action_button("Đăng bán", func():
 						var pv := int(price_le.text.to_int())
 						if pv < 1: host.toast("Nhập giá hợp lệ", "warn"); return
-						Net.action("market_list", {"uid": int(market_sel_uid), "qty": qty_all, "price": pv})
+						var sq := qty_all
+						if pr.has_meta("qty_le"):
+							sq = mini(maxi(1, (pr.get_meta("qty_le") as LineEdit).text.to_int()), qty_all)
+						Net.action("market_list", {"uid": int(market_sel_uid), "qty": sq, "price": pv})
 						market_sel_uid = ""; refresh()))
 					inner.add_child(pr)
-					if qty_all > 1: inner.add_child(T.label("Sẽ đăng cả %d món." % qty_all, T.FS_S, T.C_MUTED))
 					vb.add_child(W.card_row(inner))
 		_:
 			var ml: Array = Social.mine.get("list", [])
