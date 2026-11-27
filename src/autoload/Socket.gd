@@ -81,6 +81,8 @@ func _connect() -> void:
 
 func _schedule_reconnect() -> void:
 	var wait: int = mini(10000, int(1000 * pow(1.6, _retry)))
+	# Jitter ±30%: sau khi server restart, hàng trăm máy không nối lại cùng một giây (tránh dồn tải đọc DB / đăng nhập).
+	wait = int(wait * randf_range(0.7, 1.3))
 	_retry += 1
 	_reconnect_at = Time.get_ticks_msec() + wait
 

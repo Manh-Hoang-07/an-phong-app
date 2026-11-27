@@ -25,6 +25,10 @@ const ALIAS := {
 	"kiem_thanh":"kiem_thanh",
 }
 
+## SpriteFrames dựng một lần cho mỗi class rồi dùng chung cho mọi CharSprite (người chơi khác, NPC...).
+## Trước đây mỗi người tạo ~60-70 AtlasTexture mới → vào khu đủ 20 người bị khựng. Không ai sửa SpriteFrames sau khi dựng.
+static var _frames_cache: Dictionary = {}
+
 var school: String = "kiem_si"
 var facing: int = 1
 var _sprites: Dictionary = {}   # anim -> SpriteFrames
@@ -39,6 +43,15 @@ func setup(school_id: String) -> void:
 
 func _build() -> void:
 	var def: Dictionary = CHARS[school]
+	if _frames_cache.has(school):
+		_sprites = _frames_cache[school]
+	else:
+		_sprites = {}
+		_build_frames(def)
+		_frames_cache[school] = _sprites
+	_attach(def)
+
+func _build_frames(def: Dictionary) -> void:
 	var anims: Dictionary = def["anims"]
 	for anim in anims.keys():
 		var path := "%s/%s/%s.png" % [ASSET_DIR, school, anim]
@@ -65,6 +78,7 @@ func _build() -> void:
 			frames.add_frame(anim, at)
 		_sprites[anim] = frames
 
+func _attach(def: Dictionary) -> void:
 	if _sprites.is_empty():
 		# Không có ảnh: vẫn có thân màu để không vỡ màn hình
 		_fallback = ColorRect.new()
