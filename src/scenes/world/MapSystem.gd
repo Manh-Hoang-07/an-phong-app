@@ -114,6 +114,8 @@ func _load_player_map(arrive: String) -> void:
 	_nth_count.clear()
 	_map_id = str(Game.player.get("map", "cong_do"))
 	if _map_id.is_empty() or not Data.has_map_text(_map_id):
+		# Thiếu data/maps/<id>.txt (thường do bản build không đóng gói file .txt: xem include_filter trong export_presets.cfg)
+		push_error("Thiếu dữ liệu map '%s', tạm dùng cong_do" % _map_id)
 		_map_id = "cong_do"
 	_meta = Data.map_def(_map_id)
 	Audio.music(_map_id, str(_meta.get("theme", "city")))
