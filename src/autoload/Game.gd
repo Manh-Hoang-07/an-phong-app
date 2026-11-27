@@ -79,6 +79,7 @@ func _set_bonus() -> Dictionary:
 	for slot in Data.calc.get("SLOTS", []):
 		var it: Variant = equip.get(slot, null)
 		if typeof(it) != TYPE_DICTIONARY: continue
+		if Formulas.is_broken(it): continue
 		var d: Dictionary = Data.item(str((it as Dictionary).get("id", "")))
 		if str(d.get("slot", "")).is_empty(): continue
 		var lv := maxi(1, int(d.get("level", 1)))
@@ -103,6 +104,7 @@ func special_fx() -> Dictionary:
 	for slot in Data.calc.get("SLOTS", []):
 		var it: Variant = equip.get(slot, null)
 		if typeof(it) != TYPE_DICTIONARY: continue
+		if Formulas.is_broken(it): continue
 		var fx: Dictionary = _as_dict(Data.item(str((it as Dictionary).get("id", ""))).get("fx", {}))
 		if fx.has("kind"): out[str(fx["kind"])] = fx
 	var kn: Dictionary = _as_dict(player.get("kyNguyen", {}))
@@ -184,6 +186,7 @@ func recalc_stats() -> void:
 	for slot in Data.calc.get("SLOTS", []):
 		var it: Variant = equip.get(slot, null)
 		if typeof(it) != TYPE_DICTIONARY: continue
+		if Formulas.is_broken(it): continue
 		nhiem += int((it as Dictionary).get("nhiem", 0))
 		var s := _inst_stats(it)
 		for k in s.keys(): eq[k] = float(eq.get(k, 0.0)) + float(s[k])

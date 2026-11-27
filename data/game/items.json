@@ -1,0 +1,4042 @@
+{
+  "ITEMS": {
+    "binh_mau_nho": {
+      "name": "Bình máu nhỏ",
+      "kind": "potion",
+      "hp": 80,
+      "price": 10,
+      "stack": true,
+      "desc": "Hồi 80 máu."
+    },
+    "binh_mau_vua": {
+      "name": "Bình máu vừa",
+      "kind": "potion",
+      "hp": 260,
+      "price": 40,
+      "level": 6,
+      "stack": true,
+      "desc": "Hồi 260 máu."
+    },
+    "binh_nl_nho": {
+      "name": "Bình năng lượng nhỏ",
+      "kind": "potion",
+      "mp": 40,
+      "price": 12,
+      "stack": true,
+      "desc": "Hồi 40 năng lượng."
+    },
+    "binh_nl_vua": {
+      "name": "Bình năng lượng vừa",
+      "kind": "potion",
+      "mp": 130,
+      "price": 45,
+      "level": 6,
+      "stack": true,
+      "desc": "Hồi 130 năng lượng."
+    },
+    "thuoc_nhiem_do": {
+      "name": "Thuốc chữa nhiễm đỏ",
+      "kind": "potion",
+      "hpPct": 0.5,
+      "cleanse": true,
+      "level": 20,
+      "price": 900,
+      "stack": true,
+      "desc": "Hồi 50% máu tối đa và giải hiệu ứng làm chậm. Công thức của Dược sư Lan."
+    },
+    "binh_mau_lon": {
+      "name": "Bình máu lớn",
+      "kind": "potion",
+      "hp": 700,
+      "price": 100,
+      "level": 11,
+      "stack": true,
+      "desc": "Hồi 700 máu."
+    },
+    "binh_mau_dac": {
+      "name": "Bình máu đặc biệt",
+      "kind": "potion",
+      "hp": 1800,
+      "price": 250,
+      "level": 21,
+      "stack": true,
+      "desc": "Hồi 1800 máu."
+    },
+    "binh_mau_than_thoai": {
+      "name": "Bình máu thần thoại",
+      "kind": "potion",
+      "hp": 6500,
+      "price": 1800,
+      "level": 31,
+      "stack": true,
+      "desc": "Hồi 6500 máu."
+    },
+    "binh_nl_lon": {
+      "name": "Bình năng lượng lớn",
+      "kind": "potion",
+      "mp": 350,
+      "price": 100,
+      "level": 11,
+      "stack": true,
+      "desc": "Hồi 350 năng lượng."
+    },
+    "binh_nl_dac": {
+      "name": "Bình năng lượng đặc biệt",
+      "kind": "potion",
+      "mp": 900,
+      "price": 250,
+      "level": 21,
+      "stack": true,
+      "desc": "Hồi 900 năng lượng."
+    },
+    "binh_nl_than_thoai": {
+      "name": "Bình năng lượng thần thoại",
+      "kind": "potion",
+      "mp": 3200,
+      "price": 1800,
+      "level": 31,
+      "stack": true,
+      "desc": "Hồi 3200 năng lượng."
+    },
+    "da_cuong_hoa": {
+      "name": "Đá cường hóa",
+      "kind": "material",
+      "price": 80,
+      "stack": true,
+      "desc": "Dùng để nâng cấp trang bị ở Thợ rèn."
+    },
+    "bua_x2_kinh_nghiem": {
+      "name": "Bùa nhân đôi kinh nghiệm",
+      "kind": "boost",
+      "boost": "exp",
+      "mul": 2,
+      "minutes": 60,
+      "stack": true,
+      "price": 0,
+      "priceNgoc": 8,
+      "ngocGroup": "util",
+      "desc": "Dùng để nhận gấp đôi kinh nghiệm khi hạ quái trong 60 phút. Dùng thêm khi còn hiệu lực sẽ cộng dồn thời gian (tối đa 24 giờ)."
+    },
+    "da_cuong_hoa_trung": {
+      "name": "Đá cường hóa trung",
+      "kind": "material",
+      "price": 300,
+      "stack": true,
+      "desc": "Đá cường hóa chất lượng cao, dùng cho trang bị cấp 11 trở lên."
+    },
+    "da_cuong_hoa_cao": {
+      "name": "Đá cường hóa cao",
+      "kind": "material",
+      "price": 1000,
+      "stack": true,
+      "desc": "Đá cường hóa tinh khiết, dùng cho trang bị cấp 21 trở lên."
+    },
+    "da_cuong_hoa_than_thoai": {
+      "name": "Đá cường hóa thần thoại",
+      "kind": "material",
+      "price": 5000,
+      "stack": true,
+      "desc": "Đá cường hóa tối thượng, dùng cho trang bị cấp 31 trở lên."
+    },
+    "loi_tinh_van": {
+      "name": "Lõi Tinh Vân",
+      "kind": "material",
+      "price": 12000,
+      "stack": true,
+      "desc": "Nguyên liệu cường hóa và chế tạo trang bị cấp 51 trở lên."
+    },
+    "sach_tiem_nang": {
+      "name": "Sách tiềm năng",
+      "kind": "potential_book",
+      "potential": 3,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để nhận ngay 3 điểm tiềm năng (cộng vào Sức mạnh / Thể chất / Tinh thần / Nhanh nhẹn tùy ý). Không giới hạn số cuốn."
+    },
+    "sach_ky_nang": {
+      "name": "Sách kỹ năng",
+      "kind": "book",
+      "stack": true,
+      "price": 0,
+      "priceNgoc": 20,
+      "ngocGroup": "util",
+      "desc": "Đọc để nhận thêm 1 điểm kỹ năng. Mỗi nhân vật đọc tối đa 7 cuốn (+7 điểm)."
+    },
+    "sach_bien_hinh_1": {
+      "name": "Sách Biến Hình I",
+      "kind": "transform_book",
+      "transform": "awaken1",
+      "stack": true,
+      "price": 0,
+      "desc": "Mở khóa hình thái biến hình lần thứ nhất."
+    },
+    "sach_tien_hoa_chuc_nghiep": {
+      "name": "Sách Tiến Hóa Chức Nghiệp",
+      "kind": "transform_book",
+      "transform": "evolution",
+      "stack": true,
+      "price": 0,
+      "desc": "Mở khóa hình thái tiến hóa của class nền."
+    },
+    "sach_bien_hinh_2": {
+      "name": "Sách Biến Hình II",
+      "kind": "transform_book",
+      "transform": "awaken2",
+      "stack": true,
+      "price": 0,
+      "desc": "Mở khóa hình thái biến hình lần thứ hai (cấp 40)."
+    },
+    "sach_bien_hinh_3": {
+      "name": "Sách Biến Hình III",
+      "kind": "transform_book",
+      "transform": "awaken3",
+      "stack": true,
+      "price": 0,
+      "desc": "Mở khóa hình thái biến hình lần thứ ba (cấp 60)."
+    },
+    "sach_bien_hinh_4": {
+      "name": "Sách Biến Hình IV",
+      "kind": "transform_book",
+      "transform": "awaken4",
+      "stack": true,
+      "price": 0,
+      "desc": "Mở khóa hình thái biến hình lần thứ tư (cấp 80)."
+    },
+    "sach_bien_hinh_5": {
+      "name": "Sách Biến Hình V",
+      "kind": "transform_book",
+      "transform": "awaken5",
+      "stack": true,
+      "price": 0,
+      "desc": "Mở khóa hình thái biến hình lần thứ năm (cấp 100)."
+    },
+    "sach_mo_rong_thuong": {
+      "name": "Sách Mở Rộng Ô Kỹ Năng",
+      "kind": "slot_book",
+      "ult": false,
+      "stack": true,
+      "price": 0,
+      "priceNgoc": 35,
+      "ngocGroup": "book",
+      "desc": "Đọc để mở thêm 1 ô học kỹ năng thường (tối đa +2 ô)."
+    },
+    "sach_mo_rong_tuyet_ky": {
+      "name": "Sách Mở Rộng Ô Tuyệt Kỹ",
+      "kind": "slot_book",
+      "ult": true,
+      "stack": true,
+      "price": 0,
+      "priceNgoc": 45,
+      "ngocGroup": "book",
+      "desc": "Đọc để mở thêm 1 ô học tuyệt kỹ (tối đa +2 ô)."
+    },
+    "sach_tay_ky_nang": {
+      "name": "Sách Tẩy Kỹ Năng",
+      "kind": "erase_book",
+      "stack": true,
+      "price": 0,
+      "priceNgoc": 15,
+      "ngocGroup": "util",
+      "desc": "Cần để Hội trưởng Khải tẩy điểm kỹ năng. Đưa sách cho ông ấy, mọi điểm đã cộng được hoàn lại đủ."
+    },
+    "thu_yen_nho": {
+      "name": "Yên Vải",
+      "kind": "pet_gear",
+      "petSlot": "yen",
+      "refLv": 5,
+      "stack": true,
+      "price": 725,
+      "desc": "Trang bị cho thú, ô Yên: tăng Máu. Thú cần đạt cấp 5."
+    },
+    "thu_yen_vua": {
+      "name": "Yên Da",
+      "kind": "pet_gear",
+      "petSlot": "yen",
+      "refLv": 20,
+      "stack": true,
+      "price": 8788,
+      "desc": "Trang bị cho thú, ô Yên: tăng Máu. Thú cần đạt cấp 20."
+    },
+    "thu_yen_lon": {
+      "name": "Yên Sắt",
+      "kind": "pet_gear",
+      "petSlot": "yen",
+      "refLv": 40,
+      "stack": true,
+      "price": 30603,
+      "desc": "Trang bị cho thú, ô Yên: tăng Máu. Thú cần đạt cấp 40."
+    },
+    "thu_yen_dac": {
+      "name": "Yên Bạc",
+      "kind": "pet_gear",
+      "petSlot": "yen",
+      "refLv": 60,
+      "stack": true,
+      "price": 63494,
+      "desc": "Trang bị cho thú, ô Yên: tăng Máu. Thú cần đạt cấp 60."
+    },
+    "thu_yen_than_thoai": {
+      "name": "Yên Linh Ngọc",
+      "kind": "pet_gear",
+      "petSlot": "yen",
+      "refLv": 80,
+      "stack": true,
+      "price": 106567,
+      "desc": "Trang bị cho thú, ô Yên: tăng Máu. Thú cần đạt cấp 80."
+    },
+    "thu_cuong_nho": {
+      "name": "Dây Cương Vải",
+      "kind": "pet_gear",
+      "petSlot": "cuong",
+      "refLv": 5,
+      "stack": true,
+      "price": 725,
+      "desc": "Trang bị cho thú, ô Dây Cương: tăng Tấn công. Thú cần đạt cấp 5."
+    },
+    "thu_cuong_vua": {
+      "name": "Dây Cương Da",
+      "kind": "pet_gear",
+      "petSlot": "cuong",
+      "refLv": 20,
+      "stack": true,
+      "price": 8788,
+      "desc": "Trang bị cho thú, ô Dây Cương: tăng Tấn công. Thú cần đạt cấp 20."
+    },
+    "thu_cuong_lon": {
+      "name": "Dây Cương Sắt",
+      "kind": "pet_gear",
+      "petSlot": "cuong",
+      "refLv": 40,
+      "stack": true,
+      "price": 30603,
+      "desc": "Trang bị cho thú, ô Dây Cương: tăng Tấn công. Thú cần đạt cấp 40."
+    },
+    "thu_cuong_dac": {
+      "name": "Dây Cương Bạc",
+      "kind": "pet_gear",
+      "petSlot": "cuong",
+      "refLv": 60,
+      "stack": true,
+      "price": 63494,
+      "desc": "Trang bị cho thú, ô Dây Cương: tăng Tấn công. Thú cần đạt cấp 60."
+    },
+    "thu_cuong_than_thoai": {
+      "name": "Dây Cương Linh Ngọc",
+      "kind": "pet_gear",
+      "petSlot": "cuong",
+      "refLv": 80,
+      "stack": true,
+      "price": 106567,
+      "desc": "Trang bị cho thú, ô Dây Cương: tăng Tấn công. Thú cần đạt cấp 80."
+    },
+    "thu_giap_nho": {
+      "name": "Giáp Thú Vải",
+      "kind": "pet_gear",
+      "petSlot": "giap",
+      "refLv": 5,
+      "stack": true,
+      "price": 725,
+      "desc": "Trang bị cho thú, ô Giáp Thú: tăng Phòng thủ. Thú cần đạt cấp 5."
+    },
+    "thu_giap_vua": {
+      "name": "Giáp Thú Da",
+      "kind": "pet_gear",
+      "petSlot": "giap",
+      "refLv": 20,
+      "stack": true,
+      "price": 8788,
+      "desc": "Trang bị cho thú, ô Giáp Thú: tăng Phòng thủ. Thú cần đạt cấp 20."
+    },
+    "thu_giap_lon": {
+      "name": "Giáp Thú Sắt",
+      "kind": "pet_gear",
+      "petSlot": "giap",
+      "refLv": 40,
+      "stack": true,
+      "price": 30603,
+      "desc": "Trang bị cho thú, ô Giáp Thú: tăng Phòng thủ. Thú cần đạt cấp 40."
+    },
+    "thu_giap_dac": {
+      "name": "Giáp Thú Bạc",
+      "kind": "pet_gear",
+      "petSlot": "giap",
+      "refLv": 60,
+      "stack": true,
+      "price": 63494,
+      "desc": "Trang bị cho thú, ô Giáp Thú: tăng Phòng thủ. Thú cần đạt cấp 60."
+    },
+    "thu_giap_than_thoai": {
+      "name": "Giáp Thú Linh Ngọc",
+      "kind": "pet_gear",
+      "petSlot": "giap",
+      "refLv": 80,
+      "stack": true,
+      "price": 106567,
+      "desc": "Trang bị cho thú, ô Giáp Thú: tăng Phòng thủ. Thú cần đạt cấp 80."
+    },
+    "thu_vong_nho": {
+      "name": "Vòng Cổ Vải",
+      "kind": "pet_gear",
+      "petSlot": "vong",
+      "refLv": 5,
+      "stack": true,
+      "price": 725,
+      "desc": "Trang bị cho thú, ô Vòng Cổ: tăng Máu, tấn công, phòng thủ (ít hơn). Thú cần đạt cấp 5."
+    },
+    "thu_vong_vua": {
+      "name": "Vòng Cổ Da",
+      "kind": "pet_gear",
+      "petSlot": "vong",
+      "refLv": 20,
+      "stack": true,
+      "price": 8788,
+      "desc": "Trang bị cho thú, ô Vòng Cổ: tăng Máu, tấn công, phòng thủ (ít hơn). Thú cần đạt cấp 20."
+    },
+    "thu_vong_lon": {
+      "name": "Vòng Cổ Sắt",
+      "kind": "pet_gear",
+      "petSlot": "vong",
+      "refLv": 40,
+      "stack": true,
+      "price": 30603,
+      "desc": "Trang bị cho thú, ô Vòng Cổ: tăng Máu, tấn công, phòng thủ (ít hơn). Thú cần đạt cấp 40."
+    },
+    "thu_vong_dac": {
+      "name": "Vòng Cổ Bạc",
+      "kind": "pet_gear",
+      "petSlot": "vong",
+      "refLv": 60,
+      "stack": true,
+      "price": 63494,
+      "desc": "Trang bị cho thú, ô Vòng Cổ: tăng Máu, tấn công, phòng thủ (ít hơn). Thú cần đạt cấp 60."
+    },
+    "thu_vong_than_thoai": {
+      "name": "Vòng Cổ Linh Ngọc",
+      "kind": "pet_gear",
+      "petSlot": "vong",
+      "refLv": 80,
+      "stack": true,
+      "price": 106567,
+      "desc": "Trang bị cho thú, ô Vòng Cổ: tăng Máu, tấn công, phòng thủ (ít hơn). Thú cần đạt cấp 80."
+    },
+    "manh_vai_den": {
+      "name": "Mảnh huy hiệu đen",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Mảnh kim loại đen khắc hình trăng khuyết."
+    },
+    "tinh_the_xanh": {
+      "name": "Tinh thể xanh",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Tinh thể mát lạnh lấy từ lồng ngực Bộ Xương Pha Lê, hút được năng lượng đỏ."
+    },
+    "loi_nang_luong": {
+      "name": "Lõi năng lượng",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Vật phẩm nhiệm vụ ngày, rơi từ quái trong cổng."
+    },
+    "manh_an_1": {
+      "name": "Lõi cổng đỏ",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Lõi năng lượng của Cổng hạng D, vẫn còn đập như tim sống."
+    },
+    "the_bai_minh": {
+      "name": "Thẻ bài của Minh",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Thẻ bài thợ săn đã sờn, khắc tên Minh — đồng đội cũ của Vy."
+    },
+    "doan_kiem_ga": {
+      "name": "Đoạn kiếm gãy",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Phần lưỡi kiếm gãy của đội Bình Minh, còn vương băng."
+    },
+    "khan_binh_minh": {
+      "name": "Khăn Bình Minh",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Chiếc khăn đỏ sẫm của đội Bình Minh, lẫn trong bùn đầm lầy."
+    },
+    "thao_duoc_do": {
+      "name": "Thảo dược đỏ",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Loại cỏ chỉ mọc nơi nước nhiễm đỏ, nguyên liệu chữa bệnh của Lan."
+    },
+    "doc_to_dac": {
+      "name": "Độc tố đặc",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Tuyến độc đặc quánh lấy từ Nhện Cống Ngầm, cần để bào chế thuốc."
+    },
+    "hang_that_lac": {
+      "name": "Hàng thất lạc",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Kiện hàng của tiệm Tư bị quái tha đi trong lúc giao hàng."
+    },
+    "chia_khoa_kho": {
+      "name": "Chìa khóa kho",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Chìa khóa đồng của Quản kho Bảo, rơi trong lúc dọn kho."
+    },
+    "manh_ao_tho_san": {
+      "name": "Mảnh áo thợ săn",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Mảnh vải áo của thợ săn mất tích, nhuốm mùi nước bẩn."
+    },
+    "chia_khoa_long_giam": {
+      "name": "Chìa khóa lồng giam",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Chìa khóa gỉ sét mở lồng giam trong cống ngầm Thành Phố Chìm."
+    },
+    "thu_lam_suong": {
+      "name": "Thư Lam Sương",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Mảnh giấy Lam Sương để lại sau khi bỏ chạy, chữ run lẩy bẩy."
+    },
+    "valy_thuy_xa": {
+      "name": "Vảy Thủy Xà Vương",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Vảy rắn khổng lồ ánh xanh, vẫn rỉ độc."
+    },
+    "loi_cong_xanh": {
+      "name": "Lõi Cổng Xanh",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Lõi năng lượng của Cổng hạng C, phát sáng xanh dương."
+    },
+    "bang_tinh": {
+      "name": "Băng tinh thượng thừa",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Tinh thể băng trong vắt, lạnh buốt khi cầm."
+    },
+    "than_co": {
+      "name": "Than cổ",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Than đá cổ từ Lò Rèn, vẫn còn ấm."
+    },
+    "trai_tim_bang_long": {
+      "name": "Trái Tim Băng Long",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Trái tim băng rực sáng, nguồn sức mạnh tối thượng hệ Băng."
+    },
+    "manh_loi_do_co_dai": {
+      "name": "Mảnh Lõi Đỏ cổ đại",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Mảnh Lõi Đỏ từ thời Hệ thống mới hình thành, năng lượng mãnh liệt."
+    },
+    "nhat_ky_nguoi_choi": {
+      "name": "Nhật ký người chơi",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Trang nhật ký của một người chơi đã mất tích, chữ viết nhạt dần."
+    },
+    "manh_luu_tru": {
+      "name": "Mảnh trang lưu trữ",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Mảnh dữ liệu lưu trữ cổ, phát sáng khi xếp cạnh nhau."
+    },
+    "tri_thuc_co_dai": {
+      "name": "Tri thức cổ đại",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Khối tri thức cô đọng từ Thư Viện Hệ Thống."
+    },
+    "mat_na_trang_khuyet": {
+      "name": "Mặt Nạ Trăng Khuyết",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Mặt nạ đen hình trăng khuyết của Thiên, vẫn còn ấm."
+    },
+    "manh_khoi": {
+      "name": "Mảnh Khôi",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Mảnh thiên thạch còn nóng, rơi từ quái Vùng Thiên Khôi. Thợ rèn Thiết dùng nó rèn bộ cấp 51–60."
+    },
+    "manh_ngoc_mach": {
+      "name": "Mảnh Ngọc Mạch",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Ngọc xanh từ mạch rồng ngầm, ấm như thể còn dòng máu chảy bên trong."
+    },
+    "manh_tinh_van": {
+      "name": "Mảnh Tinh Vân",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Bụi sao kết thành tinh thể, tím lấp lánh, chạm vào nghe tiếng ù xa xăm."
+    },
+    "canh_buom_mong": {
+      "name": "Cánh Bướm Mộng",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Cánh bướm mỏng như giấc mơ, tan khi nhìn quá lâu."
+    },
+    "manh_ky_uc": {
+      "name": "Mảnh Ký Ức",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Mảnh ký ức của ai đó, đọng thành tinh thể sáng vàng nhạt."
+    },
+    "manh_he_thong": {
+      "name": "Mảnh Hệ Thống cuối cùng",
+      "kind": "quest",
+      "stack": true,
+      "desc": "Mảnh vỡ cuối cùng của Hệ thống, chứa toàn bộ dữ liệu cốt lõi."
+    },
+    "kiem_go": {
+      "name": "Kiếm luyện tập",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": null,
+      "level": 1,
+      "stats": {"atk": 5},
+      "price": 30,
+      "desc": "Kiếm tập của thợ săn mới, chưa thuộc class nào."
+    },
+    "kiem_sat": {
+      "name": "Kiếm thép",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 1,
+      "stats": {"atk": 14},
+      "price": 153
+    },
+    "cung_go": {
+      "name": "Cung gỗ sồi",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 1,
+      "stats": {"atk": 13, "crit": 2},
+      "price": 153
+    },
+    "truong_go": {
+      "name": "Trượng gỗ",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 1,
+      "stats": {"atk": 11, "mp": 20},
+      "price": 153
+    },
+    "kiem_thach_quy": {
+      "name": "Kiếm Thạch Vương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 11,
+      "minQ": 3,
+      "stats": {"atk": 36, "def": 4, "hp": 50},
+      "price": 813
+    },
+    "cung_thach_vuong": {
+      "name": "Cung Thạch Vương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 11,
+      "minQ": 3,
+      "stats": {"atk": 34, "crit": 6},
+      "price": 813
+    },
+    "truong_thach_vuong": {
+      "name": "Trượng Thạch Vương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 11,
+      "minQ": 3,
+      "stats": {"atk": 29, "mp": 70, "hp": 80},
+      "price": 813
+    },
+    "kiem_bang_long": {
+      "name": "Kiếm Băng Long",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 21,
+      "minQ": 3,
+      "stats": {"atk": 54, "def": 6, "hp": 80},
+      "price": 1440
+    },
+    "cung_bang_long": {
+      "name": "Cung Băng Long",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 21,
+      "minQ": 3,
+      "stats": {"atk": 51, "crit": 9, "hp": 50},
+      "price": 1440
+    },
+    "truong_bang_long": {
+      "name": "Trượng Băng Long",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 21,
+      "minQ": 3,
+      "stats": {"atk": 43, "mp": 100, "hp": 120},
+      "price": 1440
+    },
+    "kiem_luu_tru": {
+      "name": "Kiếm Lưu Trữ",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 31,
+      "minQ": 3,
+      "stats": {"atk": 78, "def": 9, "hp": 120},
+      "price": 3170
+    },
+    "cung_luu_tru": {
+      "name": "Cung Lưu Trữ",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 31,
+      "minQ": 3,
+      "stats": {"atk": 73, "crit": 13, "hp": 80},
+      "price": 3170
+    },
+    "truong_luu_tru": {
+      "name": "Trượng Lưu Trữ",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 31,
+      "minQ": 3,
+      "stats": {"atk": 62, "mp": 140, "hp": 170},
+      "price": 3170
+    },
+    "kiem_vinh_hang": {
+      "name": "Kiếm Vĩnh Hằng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 41,
+      "minQ": 3,
+      "stats": {"atk": 110, "def": 12, "hp": 180},
+      "price": 14100
+    },
+    "cung_vinh_hang": {
+      "name": "Cung Vĩnh Hằng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 41,
+      "minQ": 3,
+      "stats": {"atk": 104, "crit": 18, "hp": 120},
+      "price": 14100
+    },
+    "truong_vinh_hang": {
+      "name": "Trượng Vĩnh Hằng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 41,
+      "minQ": 3,
+      "stats": {"atk": 88, "mp": 190, "hp": 240},
+      "price": 14100
+    },
+    "kiem_thien_khoi": {
+      "name": "Kiếm Thiên Khôi",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 51,
+      "minQ": 3,
+      "stats": {"atk": 145, "def": 9, "hp": 217, "mp": 144},
+      "price": 36400
+    },
+    "cung_thien_khoi": {
+      "name": "Cung Thiên Khôi",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 51,
+      "minQ": 3,
+      "stats": {"atk": 138, "hp": 217, "mp": 144, "crit": 20},
+      "price": 36400
+    },
+    "truong_thien_khoi": {
+      "name": "Trượng Thiên Khôi",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 51,
+      "minQ": 3,
+      "stats": {"atk": 116, "def": 9, "hp": 217, "mp": 216},
+      "price": 36400
+    },
+    "kiem_long_mach": {
+      "name": "Kiếm Long Mạch",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 61,
+      "minQ": 3,
+      "stats": {"atk": 165, "def": 10, "hp": 267, "mp": 177},
+      "price": 43000
+    },
+    "cung_long_mach": {
+      "name": "Cung Long Mạch",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 61,
+      "minQ": 3,
+      "stats": {"atk": 157, "hp": 267, "mp": 177, "crit": 22},
+      "price": 43000
+    },
+    "truong_long_mach": {
+      "name": "Trượng Long Mạch",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 61,
+      "minQ": 3,
+      "stats": {"atk": 132, "def": 10, "hp": 267, "mp": 266},
+      "price": 43000
+    },
+    "kiem_tinh_van": {
+      "name": "Kiếm Tinh Vân",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 71,
+      "minQ": 3,
+      "stats": {"atk": 185, "def": 12, "hp": 317, "mp": 211},
+      "price": 49600
+    },
+    "cung_tinh_van": {
+      "name": "Cung Tinh Vân",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 71,
+      "minQ": 3,
+      "stats": {"atk": 176, "hp": 317, "mp": 211, "crit": 24},
+      "price": 49600
+    },
+    "truong_tinh_van": {
+      "name": "Trượng Tinh Vân",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 71,
+      "minQ": 3,
+      "stats": {"atk": 148, "def": 12, "hp": 317, "mp": 317},
+      "price": 49600
+    },
+    "kiem_than_mong": {
+      "name": "Kiếm Thần Mộng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 81,
+      "minQ": 3,
+      "stats": {"atk": 205, "def": 14, "hp": 367, "mp": 244},
+      "price": 56300
+    },
+    "cung_than_mong": {
+      "name": "Cung Thần Mộng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 81,
+      "minQ": 3,
+      "stats": {"atk": 195, "hp": 367, "mp": 244, "crit": 26},
+      "price": 56300
+    },
+    "truong_than_mong": {
+      "name": "Trượng Thần Mộng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 81,
+      "minQ": 3,
+      "stats": {"atk": 164, "def": 14, "hp": 367, "mp": 366},
+      "price": 56300
+    },
+    "kiem_sang_the": {
+      "name": "Kiếm Sáng Thế",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 91,
+      "minQ": 3,
+      "stats": {"atk": 225, "def": 16, "hp": 417, "mp": 277},
+      "price": 62900
+    },
+    "cung_sang_the": {
+      "name": "Cung Sáng Thế",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "cung",
+      "school": "cung_thu",
+      "level": 91,
+      "minQ": 3,
+      "stats": {"atk": 214, "hp": 417, "mp": 277, "crit": 28},
+      "price": 62900
+    },
+    "truong_sang_the": {
+      "name": "Trượng Sáng Thế",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "truong",
+      "school": "phap_su",
+      "level": 91,
+      "minQ": 3,
+      "stats": {"atk": 180, "def": 16, "hp": 417, "mp": 416},
+      "price": 62900
+    },
+    "song_dao_lam_suong": {
+      "name": "Song Đao Lam Sương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 15,
+      "minQ": 3,
+      "stats": {"atk": 28, "crit": 8, "speed": 20},
+      "price": 5000,
+      "grantsSkill": "st1",
+      "desc": "Song đao của Lam Sương: tốc chạy +20. Cầm đao là dùng được Lướt Bóng của Sát Thủ (ô kỹ năng F)."
+    },
+    "thuong_bang_suong": {
+      "name": "Thượng Băng Sương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 27,
+      "minQ": 4,
+      "stats": {"atk": 65, "hp": 150, "def": 10},
+      "price": 25000,
+      "fx": {"kind": "slowAura", "range": 170, "mul": 0.5},
+      "grantsSkill": "tn3",
+      "desc": "Kiếm băng: quái lại gần (trong 170) bị làm chậm một nửa tốc độ. Cầm kiếm là dùng được Băng Ngục của Pháp Sư (ô kỹ năng F)."
+    },
+    "than_kiem_vinh_hang": {
+      "name": "Thần Kiếm Vĩnh Hằng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "kiem",
+      "school": "kiem_si",
+      "level": 45,
+      "minQ": 4,
+      "stats": {"atk": 130, "def": 15, "hp": 250, "boss": 30},
+      "price": 0,
+      "fx": {"kind": "pierce", "minLevel": 41, "maxLevel": 50},
+      "grantsSkill": "pa4",
+      "desc": "Đòn đánh xuyên mọi phòng thủ của quái Hư Không (cấp 41–50) và tăng sát thương lên trùm. Cầm kiếm là dùng được Khiên Ý Chí (ô kỹ năng F)."
+    },
+    "mu_da": {
+      "name": "Mũ da sói",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 5,
+      "stats": {"def": 4, "hp": 32},
+      "price": 189
+    },
+    "mu_thach_quy": {
+      "name": "Mũ Thạch Vương",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 15,
+      "minQ": 3,
+      "stats": {"def": 9, "hp": 90, "mp": 20},
+      "price": 651
+    },
+    "mu_bang_long": {
+      "name": "Mũ Băng Long",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 25,
+      "minQ": 3,
+      "stats": {"def": 14, "hp": 150, "mp": 30},
+      "price": 1320
+    },
+    "mu_luu_tru": {
+      "name": "Mũ Lưu Trữ",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 35,
+      "minQ": 3,
+      "stats": {"def": 20, "hp": 230, "mp": 45},
+      "price": 2960
+    },
+    "mu_vinh_hang": {
+      "name": "Mũ Vĩnh Hằng",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 45,
+      "minQ": 3,
+      "stats": {"def": 28, "hp": 340, "mp": 65},
+      "price": 13300
+    },
+    "mu_thien_khoi": {
+      "name": "Mũ Thiên Khôi",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 55,
+      "minQ": 3,
+      "stats": {"def": 35, "hp": 433, "mp": 144},
+      "price": 36400
+    },
+    "mu_long_mach": {
+      "name": "Mũ Long Mạch",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 65,
+      "minQ": 3,
+      "stats": {"def": 41, "hp": 533, "mp": 167},
+      "price": 43000
+    },
+    "mu_tinh_van": {
+      "name": "Mũ Tinh Vân",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 75,
+      "minQ": 3,
+      "stats": {"def": 48, "hp": 633, "mp": 192},
+      "price": 49600
+    },
+    "mu_than_mong": {
+      "name": "Mũ Thần Mộng",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 85,
+      "minQ": 3,
+      "stats": {"def": 56, "hp": 733, "mp": 218},
+      "price": 56300
+    },
+    "mu_sang_the": {
+      "name": "Mũ Sáng Thế",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 95,
+      "minQ": 3,
+      "stats": {"def": 64, "hp": 833, "mp": 244},
+      "price": 62900
+    },
+    "vuong_mien_tri_thuc": {
+      "name": "Vương Miện Tri Thức",
+      "kind": "armor",
+      "slot": "mu",
+      "level": 36,
+      "minQ": 4,
+      "stats": {"def": 25, "hp": 300, "mp": 150, "cdr": 15},
+      "price": 80000,
+      "grantsSkill": "tk4",
+      "desc": "Giảm 15% hồi chiêu toàn bộ kỹ năng. Đội mũ là dùng được Giáp Sắt của Tanker (ô kỹ năng F)."
+    },
+    "ao_da": {
+      "name": "Áo khoác da sói",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 2,
+      "stats": {"def": 8, "hp": 55},
+      "price": 236
+    },
+    "ao_giap_da": {
+      "name": "Giáp đá Thạch Vương",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 12,
+      "minQ": 3,
+      "stats": {"def": 15, "hp": 140},
+      "price": 678
+    },
+    "ao_bang_long": {
+      "name": "Giáp Băng Long",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 22,
+      "minQ": 3,
+      "stats": {"def": 22, "hp": 230},
+      "price": 1380
+    },
+    "ao_luu_tru": {
+      "name": "Giáp Lưu Trữ",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 32,
+      "minQ": 3,
+      "stats": {"def": 33, "hp": 360},
+      "price": 3100
+    },
+    "ao_vinh_hang": {
+      "name": "Giáp Vĩnh Hằng",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 42,
+      "minQ": 3,
+      "stats": {"def": 46, "hp": 520},
+      "price": 13700
+    },
+    "ao_thien_khoi": {
+      "name": "Giáp Thiên Khôi",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 52,
+      "minQ": 3,
+      "stats": {"def": 52, "hp": 650},
+      "price": 36400
+    },
+    "ao_long_mach": {
+      "name": "Giáp Long Mạch",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 62,
+      "minQ": 3,
+      "stats": {"def": 62, "hp": 800},
+      "price": 43000
+    },
+    "ao_tinh_van": {
+      "name": "Giáp Tinh Vân",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 72,
+      "minQ": 3,
+      "stats": {"def": 72, "hp": 950},
+      "price": 49600
+    },
+    "ao_than_mong": {
+      "name": "Giáp Thần Mộng",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 82,
+      "minQ": 3,
+      "stats": {"def": 84, "hp": 1100},
+      "price": 56300
+    },
+    "ao_sang_the": {
+      "name": "Giáp Sáng Thế",
+      "kind": "armor",
+      "slot": "ao",
+      "level": 92,
+      "minQ": 3,
+      "stats": {"def": 96, "hp": 1250},
+      "price": 62900
+    },
+    "quan_da": {
+      "name": "Quần da sói",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 6,
+      "stats": {"def": 6, "hp": 40},
+      "price": 206
+    },
+    "quan_thach_quy": {
+      "name": "Quần đá Thạch Vương",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 16,
+      "minQ": 3,
+      "stats": {"def": 14, "hp": 120},
+      "price": 651
+    },
+    "quan_bang_long": {
+      "name": "Quần Băng Long",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 26,
+      "minQ": 3,
+      "stats": {"def": 21, "hp": 200},
+      "price": 1320
+    },
+    "quan_luu_tru": {
+      "name": "Quần Lưu Trữ",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 36,
+      "minQ": 3,
+      "stats": {"def": 31, "hp": 310},
+      "price": 2960
+    },
+    "quan_vinh_hang": {
+      "name": "Quần Vĩnh Hằng",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 46,
+      "minQ": 3,
+      "stats": {"def": 44, "hp": 450},
+      "price": 13300
+    },
+    "quan_thien_khoi": {
+      "name": "Quần Thiên Khôi",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 56,
+      "minQ": 3,
+      "stats": {"def": 42, "hp": 520},
+      "price": 36400
+    },
+    "quan_long_mach": {
+      "name": "Quần Long Mạch",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 66,
+      "minQ": 3,
+      "stats": {"def": 50, "hp": 640},
+      "price": 43000
+    },
+    "quan_tinh_van": {
+      "name": "Quần Tinh Vân",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 76,
+      "minQ": 3,
+      "stats": {"def": 58, "hp": 760},
+      "price": 49600
+    },
+    "quan_than_mong": {
+      "name": "Quần Thần Mộng",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 86,
+      "minQ": 3,
+      "stats": {"def": 67, "hp": 880},
+      "price": 56300
+    },
+    "quan_sang_the": {
+      "name": "Quần Sáng Thế",
+      "kind": "armor",
+      "slot": "quan",
+      "level": 96,
+      "minQ": 3,
+      "stats": {"def": 77, "hp": 1000},
+      "price": 62900
+    },
+    "giay_da": {
+      "name": "Giày da sói",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 4,
+      "stats": {"def": 4, "hp": 25, "crit": 1},
+      "price": 177
+    },
+    "giay_thach_quy": {
+      "name": "Giày đá Thạch Vương",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 14,
+      "minQ": 3,
+      "stats": {"def": 9, "hp": 60, "crit": 1},
+      "price": 651
+    },
+    "giay_bang_long": {
+      "name": "Giày Băng Long",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 24,
+      "minQ": 3,
+      "stats": {"def": 14, "hp": 100, "crit": 2},
+      "price": 1320
+    },
+    "giay_luu_tru": {
+      "name": "Giày Lưu Trữ",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 34,
+      "minQ": 3,
+      "stats": {"def": 21, "hp": 160, "crit": 3},
+      "price": 2960
+    },
+    "giay_vinh_hang": {
+      "name": "Giày Vĩnh Hằng",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 44,
+      "minQ": 3,
+      "stats": {"def": 30, "hp": 240, "crit": 4},
+      "price": 13300
+    },
+    "giay_thien_khoi": {
+      "name": "Giày Thiên Khôi",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 54,
+      "minQ": 3,
+      "stats": {"def": 27, "hp": 347, "crit": 5},
+      "price": 36400
+    },
+    "giay_long_mach": {
+      "name": "Giày Long Mạch",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 64,
+      "minQ": 3,
+      "stats": {"def": 33, "hp": 427, "crit": 5},
+      "price": 43000
+    },
+    "giay_tinh_van": {
+      "name": "Giày Tinh Vân",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 74,
+      "minQ": 3,
+      "stats": {"def": 38, "hp": 507, "crit": 6},
+      "price": 49600
+    },
+    "giay_than_mong": {
+      "name": "Giày Thần Mộng",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 84,
+      "minQ": 3,
+      "stats": {"def": 44, "hp": 587, "crit": 6},
+      "price": 56300
+    },
+    "giay_sang_the": {
+      "name": "Giày Sáng Thế",
+      "kind": "armor",
+      "slot": "giay",
+      "level": 94,
+      "minQ": 3,
+      "stats": {"def": 51, "hp": 667, "crit": 7},
+      "price": 62900
+    },
+    "gang_da": {
+      "name": "Găng da sói",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 3,
+      "stats": {"atk": 3, "def": 2},
+      "price": 189
+    },
+    "gang_thach_quy": {
+      "name": "Găng Thạch Vương",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 13,
+      "minQ": 3,
+      "stats": {"atk": 8, "def": 5, "crit": 2},
+      "price": 651
+    },
+    "gang_bang_long": {
+      "name": "Găng Băng Long",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 23,
+      "minQ": 3,
+      "stats": {"atk": 12, "def": 8, "crit": 3},
+      "price": 1320
+    },
+    "gang_luu_tru": {
+      "name": "Găng Lưu Trữ",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 33,
+      "minQ": 3,
+      "stats": {"atk": 18, "def": 12, "crit": 4},
+      "price": 2960
+    },
+    "gang_vinh_hang": {
+      "name": "Găng Vĩnh Hằng",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 43,
+      "minQ": 3,
+      "stats": {"atk": 26, "def": 17, "crit": 6},
+      "price": 13300
+    },
+    "gang_tay_thien_khoi": {
+      "name": "Găng Thiên Khôi",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 53,
+      "minQ": 3,
+      "stats": {"def": 26, "hp": 325, "atk": 34, "crit": 6},
+      "price": 36400
+    },
+    "gang_tay_long_mach": {
+      "name": "Găng Long Mạch",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 63,
+      "minQ": 3,
+      "stats": {"def": 31, "hp": 400, "atk": 38, "crit": 7},
+      "price": 43000
+    },
+    "gang_tay_tinh_van": {
+      "name": "Găng Tinh Vân",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 73,
+      "minQ": 3,
+      "stats": {"def": 36, "hp": 475, "atk": 42, "crit": 7},
+      "price": 49600
+    },
+    "gang_tay_than_mong": {
+      "name": "Găng Thần Mộng",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 83,
+      "minQ": 3,
+      "stats": {"def": 42, "hp": 550, "atk": 46, "crit": 8},
+      "price": 56300
+    },
+    "gang_tay_sang_the": {
+      "name": "Găng Sáng Thế",
+      "kind": "armor",
+      "slot": "gang_tay",
+      "level": 93,
+      "minQ": 3,
+      "stats": {"def": 48, "hp": 625, "atk": 51, "crit": 8},
+      "price": 62900
+    },
+    "dai_da": {
+      "name": "Đai da sói",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 7,
+      "stats": {"hp": 45, "mp": 15, "def": 1},
+      "price": 189
+    },
+    "dai_thach_quy": {
+      "name": "Đai đá Thạch Vương",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 17,
+      "minQ": 3,
+      "stats": {"def": 6, "hp": 110, "mp": 35},
+      "price": 651
+    },
+    "dai_bang_long": {
+      "name": "Đai Băng Long",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 27,
+      "minQ": 3,
+      "stats": {"def": 9, "hp": 180, "mp": 55},
+      "price": 1320
+    },
+    "dai_luu_tru": {
+      "name": "Đai Lưu Trữ",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 37,
+      "minQ": 3,
+      "stats": {"def": 14, "hp": 280, "mp": 85},
+      "price": 2960
+    },
+    "dai_vinh_hang": {
+      "name": "Đai Vĩnh Hằng",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 47,
+      "minQ": 3,
+      "stats": {"def": 20, "hp": 400, "mp": 120},
+      "price": 13300
+    },
+    "dai_lung_thien_khoi": {
+      "name": "Đai Thiên Khôi",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 57,
+      "minQ": 3,
+      "stats": {"def": 29, "hp": 368},
+      "price": 36400
+    },
+    "dai_lung_long_mach": {
+      "name": "Đai Long Mạch",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 67,
+      "minQ": 3,
+      "stats": {"def": 35, "hp": 453},
+      "price": 43000
+    },
+    "dai_lung_tinh_van": {
+      "name": "Đai Tinh Vân",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 77,
+      "minQ": 3,
+      "stats": {"def": 41, "hp": 538},
+      "price": 49600
+    },
+    "dai_lung_than_mong": {
+      "name": "Đai Thần Mộng",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 87,
+      "minQ": 3,
+      "stats": {"def": 48, "hp": 623},
+      "price": 56300
+    },
+    "dai_lung_sang_the": {
+      "name": "Đai Sáng Thế",
+      "kind": "armor",
+      "slot": "dai_lung",
+      "level": 97,
+      "minQ": 3,
+      "stats": {"def": 54, "hp": 708},
+      "price": 62900
+    },
+    "nhan_bac": {
+      "name": "Nhẫn bạc",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 8,
+      "stats": {"atk": 7, "crit": 2},
+      "price": 354
+    },
+    "nhan_thach_quy": {
+      "name": "Nhẫn Thạch Vương",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 18,
+      "minQ": 3,
+      "stats": {"atk": 11, "crit": 4},
+      "price": 678
+    },
+    "nhan_bang_long": {
+      "name": "Nhẫn Băng Long",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 28,
+      "minQ": 3,
+      "stats": {"atk": 17, "crit": 6},
+      "price": 1380
+    },
+    "nhan_luu_tru": {
+      "name": "Nhẫn Lưu Trữ",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 38,
+      "minQ": 3,
+      "stats": {"atk": 25, "crit": 9},
+      "price": 3100
+    },
+    "nhan_vinh_hang": {
+      "name": "Nhẫn Vĩnh Hằng",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 48,
+      "minQ": 3,
+      "stats": {"atk": 36, "crit": 13},
+      "price": 13700
+    },
+    "nhan_thien_khoi": {
+      "name": "Nhẫn Thiên Khôi",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 58,
+      "minQ": 3,
+      "stats": {"atk": 39, "crit": 14},
+      "price": 36400
+    },
+    "nhan_long_mach": {
+      "name": "Nhẫn Long Mạch",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 68,
+      "minQ": 3,
+      "stats": {"atk": 44, "crit": 15},
+      "price": 43000
+    },
+    "nhan_tinh_van": {
+      "name": "Nhẫn Tinh Vân",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 78,
+      "minQ": 3,
+      "stats": {"atk": 48, "crit": 16},
+      "price": 49600
+    },
+    "nhan_than_mong": {
+      "name": "Nhẫn Thần Mộng",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 88,
+      "minQ": 3,
+      "stats": {"atk": 53, "crit": 17},
+      "price": 56300
+    },
+    "nhan_sang_the": {
+      "name": "Nhẫn Sáng Thế",
+      "kind": "armor",
+      "slot": "nhan",
+      "level": 98,
+      "minQ": 3,
+      "stats": {"atk": 59, "crit": 18},
+      "price": 62900
+    },
+    "day_chuyen_bac": {
+      "name": "Dây chuyền bạc",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 9,
+      "stats": {"hp": 80, "mp": 30},
+      "price": 354
+    },
+    "day_chuyen_thach_quy": {
+      "name": "Dây chuyền Thạch Vương",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 19,
+      "minQ": 3,
+      "stats": {"hp": 140, "mp": 55},
+      "price": 678
+    },
+    "day_chuyen_bang_long": {
+      "name": "Dây chuyền Băng Long",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 29,
+      "minQ": 3,
+      "stats": {"hp": 230, "mp": 90},
+      "price": 1380
+    },
+    "day_chuyen_luu_tru": {
+      "name": "Dây chuyền Lưu Trữ",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 39,
+      "minQ": 3,
+      "stats": {"hp": 340, "mp": 130},
+      "price": 3100
+    },
+    "day_chuyen_vinh_hang": {
+      "name": "Dây chuyền Vĩnh Hằng",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 49,
+      "minQ": 3,
+      "stats": {"hp": 480, "mp": 180},
+      "price": 13700
+    },
+    "day_chuyen_thien_khoi": {
+      "name": "Dây chuyền Thiên Khôi",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 59,
+      "minQ": 3,
+      "stats": {"hp": 520, "mp": 200},
+      "price": 36400
+    },
+    "day_chuyen_long_mach": {
+      "name": "Dây chuyền Long Mạch",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 69,
+      "minQ": 3,
+      "stats": {"hp": 640, "mp": 235},
+      "price": 43000
+    },
+    "day_chuyen_tinh_van": {
+      "name": "Dây chuyền Tinh Vân",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 79,
+      "minQ": 3,
+      "stats": {"hp": 760, "mp": 270},
+      "price": 49600
+    },
+    "day_chuyen_than_mong": {
+      "name": "Dây chuyền Thần Mộng",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 89,
+      "minQ": 3,
+      "stats": {"hp": 880, "mp": 305},
+      "price": 56300
+    },
+    "day_chuyen_sang_the": {
+      "name": "Dây chuyền Sáng Thế",
+      "kind": "armor",
+      "slot": "day_chuyen",
+      "level": 99,
+      "minQ": 3,
+      "stats": {"hp": 1000, "mp": 340},
+      "price": 62900
+    },
+    "ngoc_boi_luc": {
+      "name": "Ngọc bội lục bảo",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 10,
+      "stats": {"hp": 55, "mp": 40, "crit": 1},
+      "price": 383
+    },
+    "ngoc_boi_thach_quy": {
+      "name": "Ngọc bội Thạch Vương",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 20,
+      "minQ": 3,
+      "stats": {"hp": 110, "mp": 70, "crit": 2},
+      "price": 705
+    },
+    "ngoc_boi_bang_long": {
+      "name": "Ngọc bội Băng Long",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 30,
+      "minQ": 3,
+      "stats": {"hp": 180, "mp": 110, "crit": 3},
+      "price": 1440
+    },
+    "ngoc_boi_luu_tru": {
+      "name": "Ngọc bội Lưu Trữ",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 40,
+      "minQ": 3,
+      "stats": {"hp": 270, "mp": 160, "crit": 4},
+      "price": 3240
+    },
+    "ngoc_boi_vinh_hang": {
+      "name": "Ngọc bội Vĩnh Hằng",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 50,
+      "minQ": 3,
+      "stats": {"hp": 380, "mp": 230, "crit": 6},
+      "price": 14100
+    },
+    "ngoc_boi_thien_khoi": {
+      "name": "Ngọc bội Thiên Khôi",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 60,
+      "minQ": 3,
+      "stats": {"def": 31, "hp": 390, "mp": 144, "crit": 7},
+      "price": 36400
+    },
+    "ngoc_boi_long_mach": {
+      "name": "Ngọc bội Long Mạch",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 70,
+      "minQ": 3,
+      "stats": {"def": 37, "hp": 480, "mp": 167, "crit": 8},
+      "price": 43000
+    },
+    "ngoc_boi_tinh_van": {
+      "name": "Ngọc bội Tinh Vân",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 80,
+      "minQ": 3,
+      "stats": {"def": 43, "hp": 570, "mp": 192, "crit": 9},
+      "price": 49600
+    },
+    "ngoc_boi_than_mong": {
+      "name": "Ngọc bội Thần Mộng",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 90,
+      "minQ": 3,
+      "stats": {"def": 50, "hp": 660, "mp": 218, "crit": 10},
+      "price": 56300
+    },
+    "ngoc_boi_sang_the": {
+      "name": "Ngọc bội Sáng Thế",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 100,
+      "minQ": 3,
+      "stats": {"def": 57, "hp": 750, "mp": 244, "crit": 11},
+      "price": 62900
+    },
+    "huy_hieu_binh_minh": {
+      "name": "Huy Hiệu Bình Minh",
+      "kind": "armor",
+      "slot": "ngoc_boi",
+      "level": 12,
+      "minQ": 3,
+      "stats": {"atk": 10, "hp": 80, "mp": 40},
+      "price": 3000,
+      "grantsSkill": "tl1",
+      "desc": "Huy hiệu đội Bình Minh: tăng tấn công, máu và năng lượng. Đeo là dùng được Chữa Lành của Trị Liệu Sư (ô kỹ năng F)."
+    },
+    "kn_bat_tu": {
+      "name": "Kỳ Nguyên · Bất Tử",
+      "kind": "ky_nguyen",
+      "kyNguyen": true,
+      "level": 10,
+      "priceNgoc": 40,
+      "price": 0,
+      "ngocGroup": "ky_nguyen",
+      "stats": {"hp": 120, "def": 8},
+      "fx": {"kind": "undying", "dur": 5, "cd": 60},
+      "fxText": "Bất Tử: máu tụt xuống 0 thì không chết, giữ nguyên 1 máu trong 5 giây. Hết 5 giây mà vẫn chưa hồi máu thì mới gục. Hồi lại sau 60 giây. Không cần bấm gì.",
+      "desc": "Kỳ Nguyên — mở khóa ở cấp 10. Mua bằng Linh Ngọc tại Lầu Trân Bảo, sau đó bật/tắt trong bảng Nhân vật. Không chiếm ô trang bị, không cường hóa được. Bất Tử: máu tụt xuống 0 thì không chết, giữ nguyên 1 máu trong 5 giây. Hết 5 giây mà vẫn chưa hồi máu thì mới gục. Hồi lại sau 60 giây. Không cần bấm gì."
+    },
+    "kn_sat_kiep": {
+      "name": "Kỳ Nguyên · Sát Kiếp",
+      "kind": "ky_nguyen",
+      "kyNguyen": true,
+      "level": 30,
+      "priceNgoc": 90,
+      "price": 0,
+      "ngocGroup": "ky_nguyen",
+      "stats": {"atk": 22, "crit": 5},
+      "fx": {"kind": "everyNth", "n": 5, "mult": 1.35},
+      "fxText": "Sát Kiếp: cứ 5 đòn đánh trúng thì đòn thứ 5 gây thêm 35% sát thương. Đếm riêng theo từng mục tiêu, đổi mục tiêu thì đếm lại từ đầu.",
+      "desc": "Kỳ Nguyên — mở khóa ở cấp 30. Mua bằng Linh Ngọc tại Lầu Trân Bảo, sau đó bật/tắt trong bảng Nhân vật. Không chiếm ô trang bị, không cường hóa được. Sát Kiếp: cứ 5 đòn đánh trúng thì đòn thứ 5 gây thêm 35% sát thương. Đếm riêng theo từng mục tiêu, đổi mục tiêu thì đếm lại từ đầu."
+    },
+    "kn_phiu_dieu": {
+      "name": "Kỳ Nguyên · Phiêu Diêu",
+      "kind": "ky_nguyen",
+      "kyNguyen": true,
+      "level": 50,
+      "priceNgoc": 180,
+      "price": 0,
+      "ngocGroup": "ky_nguyen",
+      "stats": {"speed": 20, "def": 12, "sta": 120, "staRegen": 35},
+      "fx": {"kind": "dodge", "chance": 0.1},
+      "fxText": "Phiêu Diêu: 10% cơ hội né hoàn toàn một đòn đánh. Né được thì không mất máu, không mất khiên, hiện chữ \"Né\".",
+      "desc": "Kỳ Nguyên — mở khóa ở cấp 50. Mua bằng Linh Ngọc tại Lầu Trân Bảo, sau đó bật/tắt trong bảng Nhân vật. Không chiếm ô trang bị, không cường hóa được. Phiêu Diêu: 10% cơ hội né hoàn toàn một đòn đánh. Né được thì không mất máu, không mất khiên, hiện chữ \"Né\"."
+    },
+    "kn_tu_linh": {
+      "name": "Kỳ Nguyên · Tụ Linh",
+      "kind": "ky_nguyen",
+      "kyNguyen": true,
+      "level": 70,
+      "priceNgoc": 320,
+      "price": 0,
+      "ngocGroup": "ky_nguyen",
+      "stats": {"mp": 270, "cdr": 4, "skill": 14},
+      "fx": {"kind": "skillPower", "mul": 0.14},
+      "fxText": "Tụ Linh: kỹ năng gây thêm 14% sát thương. Cộng thẳng vào sát thương kỹ năng, ngoài điểm Tinh thần.",
+      "desc": "Kỳ Nguyên — mở khóa ở cấp 70. Mua bằng Linh Ngọc tại Lầu Trân Bảo, sau đó bật/tắt trong bảng Nhân vật. Không chiếm ô trang bị, không cường hóa được. Tụ Linh: kỹ năng gây thêm 14% sát thương. Cộng thẳng vào sát thương kỹ năng, ngoài điểm Tinh thần."
+    },
+    "kn_tran_hon": {
+      "name": "Kỳ Nguyên · Trấn Hồn",
+      "kind": "ky_nguyen",
+      "kyNguyen": true,
+      "level": 90,
+      "priceNgoc": 500,
+      "price": 0,
+      "ngocGroup": "ky_nguyen",
+      "stats": {"goldfind": 22, "expfind": 12, "lifesteal": 3},
+      "fx": {"kind": "onKill", "hp": 0.04, "mp": 0.04},
+      "fxText": "Trấn Hồn: mỗi khi hạ quái, hồi 4% máu tối đa và 4% năng lượng tối đa.",
+      "desc": "Kỳ Nguyên — mở khóa ở cấp 90. Mua bằng Linh Ngọc tại Lầu Trân Bảo, sau đó bật/tắt trong bảng Nhân vật. Không chiếm ô trang bị, không cường hóa được. Trấn Hồn: mỗi khi hạ quái, hồi 4% máu tối đa và 4% năng lượng tối đa."
+    },
+    "song_dao_sat": {
+      "name": "Song Đao thép",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 1,
+      "stats": {"atk": 13, "crit": 3},
+      "price": 153
+    },
+    "chuy_sat": {
+      "name": "Chùy thép",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 1,
+      "stats": {"atk": 13, "def": 4},
+      "price": 153
+    },
+    "than_binh_sat": {
+      "name": "Thần Binh thép",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 1,
+      "stats": {"atk": 14, "crit": 1},
+      "price": 153
+    },
+    "thanh_truong_sat": {
+      "name": "Thánh Trượng thép",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 1,
+      "stats": {"atk": 10, "mp": 26},
+      "price": 153
+    },
+    "linh_chau_sat": {
+      "name": "Linh Châu thép",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 1,
+      "stats": {"atk": 10, "mp": 23},
+      "price": 153
+    },
+    "song_dao_thach_vuong": {
+      "name": "Song Đao Thạch Vương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 11,
+      "minQ": 3,
+      "stats": {"atk": 33, "crit": 4, "hp": 40},
+      "price": 813
+    },
+    "chuy_thach_vuong": {
+      "name": "Chùy Thạch Vương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 11,
+      "minQ": 3,
+      "stats": {"atk": 34, "def": 8, "hp": 65},
+      "price": 813
+    },
+    "than_binh_thach_vuong": {
+      "name": "Thần Binh Thạch Vương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 11,
+      "minQ": 3,
+      "stats": {"atk": 36, "crit": 2, "hp": 50},
+      "price": 813
+    },
+    "thanh_truong_thach_vuong": {
+      "name": "Thánh Trượng Thạch Vương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 11,
+      "minQ": 3,
+      "stats": {"atk": 26, "mp": 91, "hp": 88},
+      "price": 813
+    },
+    "linh_chau_thach_vuong": {
+      "name": "Linh Châu Thạch Vương",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 11,
+      "minQ": 3,
+      "stats": {"atk": 28, "mp": 81, "hp": 80},
+      "price": 813
+    },
+    "song_dao_bang_long": {
+      "name": "Song Đao Băng Long",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 21,
+      "minQ": 3,
+      "stats": {"atk": 50, "crit": 6, "hp": 64},
+      "price": 1440
+    },
+    "chuy_bang_long": {
+      "name": "Chùy Băng Long",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 21,
+      "minQ": 3,
+      "stats": {"atk": 51, "def": 12, "hp": 104},
+      "price": 1440
+    },
+    "than_binh_bang_long": {
+      "name": "Thần Binh Băng Long",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 21,
+      "minQ": 3,
+      "stats": {"atk": 54, "crit": 2, "hp": 80},
+      "price": 1440
+    },
+    "thanh_truong_bang_long": {
+      "name": "Thánh Trượng Băng Long",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 21,
+      "minQ": 3,
+      "stats": {"atk": 39, "mp": 130, "hp": 132},
+      "price": 1440
+    },
+    "linh_chau_bang_long": {
+      "name": "Linh Châu Băng Long",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 21,
+      "minQ": 3,
+      "stats": {"atk": 41, "mp": 115, "hp": 120},
+      "price": 1440
+    },
+    "song_dao_luu_tru": {
+      "name": "Song Đao Lưu Trữ",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 31,
+      "minQ": 3,
+      "stats": {"atk": 72, "crit": 7, "hp": 96},
+      "price": 3170
+    },
+    "chuy_luu_tru": {
+      "name": "Chùy Lưu Trữ",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 31,
+      "minQ": 3,
+      "stats": {"atk": 74, "def": 16, "hp": 156},
+      "price": 3170
+    },
+    "than_binh_luu_tru": {
+      "name": "Thần Binh Lưu Trữ",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 31,
+      "minQ": 3,
+      "stats": {"atk": 78, "crit": 3, "hp": 120},
+      "price": 3170
+    },
+    "thanh_truong_luu_tru": {
+      "name": "Thánh Trượng Lưu Trữ",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 31,
+      "minQ": 3,
+      "stats": {"atk": 56, "mp": 182, "hp": 187},
+      "price": 3170
+    },
+    "linh_chau_luu_tru": {
+      "name": "Linh Châu Lưu Trữ",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 31,
+      "minQ": 3,
+      "stats": {"atk": 59, "mp": 161, "hp": 170},
+      "price": 3170
+    },
+    "song_dao_vinh_hang": {
+      "name": "Song Đao Vĩnh Hằng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 41,
+      "minQ": 3,
+      "stats": {"atk": 101, "crit": 8, "hp": 144},
+      "price": 14100
+    },
+    "chuy_vinh_hang": {
+      "name": "Chùy Vĩnh Hằng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 41,
+      "minQ": 3,
+      "stats": {"atk": 105, "def": 21, "hp": 234},
+      "price": 14100
+    },
+    "than_binh_vinh_hang": {
+      "name": "Thần Binh Vĩnh Hằng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 41,
+      "minQ": 3,
+      "stats": {"atk": 110, "crit": 3, "hp": 180},
+      "price": 14100
+    },
+    "thanh_truong_vinh_hang": {
+      "name": "Thánh Trượng Vĩnh Hằng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 41,
+      "minQ": 3,
+      "stats": {"atk": 79, "mp": 247, "hp": 264},
+      "price": 14100
+    },
+    "linh_chau_vinh_hang": {
+      "name": "Linh Châu Vĩnh Hằng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 41,
+      "minQ": 3,
+      "stats": {"atk": 84, "mp": 218, "hp": 240},
+      "price": 14100
+    },
+    "song_dao_thien_khoi": {
+      "name": "Song Đao Thiên Khôi",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 51,
+      "minQ": 3,
+      "stats": {"atk": 133, "crit": 9, "hp": 174},
+      "price": 36400
+    },
+    "chuy_thien_khoi": {
+      "name": "Chùy Thiên Khôi",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 51,
+      "minQ": 3,
+      "stats": {"atk": 138, "def": 16, "hp": 282},
+      "price": 36400
+    },
+    "than_binh_thien_khoi": {
+      "name": "Thần Binh Thiên Khôi",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 51,
+      "minQ": 3,
+      "stats": {"atk": 145, "crit": 4, "hp": 217},
+      "price": 36400
+    },
+    "thanh_truong_thien_khoi": {
+      "name": "Thánh Trượng Thiên Khôi",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 51,
+      "minQ": 3,
+      "stats": {"atk": 104, "mp": 281, "hp": 239},
+      "price": 36400
+    },
+    "linh_chau_thien_khoi": {
+      "name": "Linh Châu Thiên Khôi",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 51,
+      "minQ": 3,
+      "stats": {"atk": 110, "mp": 248, "hp": 217},
+      "price": 36400
+    },
+    "song_dao_long_mach": {
+      "name": "Song Đao Long Mạch",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 61,
+      "minQ": 3,
+      "stats": {"atk": 152, "crit": 10, "hp": 214},
+      "price": 43000
+    },
+    "chuy_long_mach": {
+      "name": "Chùy Long Mạch",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 61,
+      "minQ": 3,
+      "stats": {"atk": 157, "def": 18, "hp": 347},
+      "price": 43000
+    },
+    "than_binh_long_mach": {
+      "name": "Thần Binh Long Mạch",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 61,
+      "minQ": 3,
+      "stats": {"atk": 165, "crit": 5, "hp": 267},
+      "price": 43000
+    },
+    "thanh_truong_long_mach": {
+      "name": "Thánh Trượng Long Mạch",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 61,
+      "minQ": 3,
+      "stats": {"atk": 119, "mp": 346, "hp": 294},
+      "price": 43000
+    },
+    "linh_chau_long_mach": {
+      "name": "Linh Châu Long Mạch",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 61,
+      "minQ": 3,
+      "stats": {"atk": 125, "mp": 306, "hp": 267},
+      "price": 43000
+    },
+    "song_dao_tinh_van": {
+      "name": "Song Đao Tinh Vân",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 71,
+      "minQ": 3,
+      "stats": {"atk": 170, "crit": 12, "hp": 254},
+      "price": 49600
+    },
+    "chuy_tinh_van": {
+      "name": "Chùy Tinh Vân",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 71,
+      "minQ": 3,
+      "stats": {"atk": 176, "def": 21, "hp": 412},
+      "price": 49600
+    },
+    "than_binh_tinh_van": {
+      "name": "Thần Binh Tinh Vân",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 71,
+      "minQ": 3,
+      "stats": {"atk": 185, "crit": 5, "hp": 317},
+      "price": 49600
+    },
+    "thanh_truong_tinh_van": {
+      "name": "Thánh Trượng Tinh Vân",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 71,
+      "minQ": 3,
+      "stats": {"atk": 133, "mp": 412, "hp": 349},
+      "price": 49600
+    },
+    "linh_chau_tinh_van": {
+      "name": "Linh Châu Tinh Vân",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 71,
+      "minQ": 3,
+      "stats": {"atk": 141, "mp": 365, "hp": 317},
+      "price": 49600
+    },
+    "song_dao_than_mong": {
+      "name": "Song Đao Thần Mộng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 81,
+      "minQ": 3,
+      "stats": {"atk": 189, "crit": 13, "hp": 294},
+      "price": 56300
+    },
+    "chuy_than_mong": {
+      "name": "Chùy Thần Mộng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 81,
+      "minQ": 3,
+      "stats": {"atk": 195, "def": 24, "hp": 477},
+      "price": 56300
+    },
+    "than_binh_than_mong": {
+      "name": "Thần Binh Thần Mộng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 81,
+      "minQ": 3,
+      "stats": {"atk": 205, "crit": 6, "hp": 367},
+      "price": 56300
+    },
+    "thanh_truong_than_mong": {
+      "name": "Thánh Trượng Thần Mộng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 81,
+      "minQ": 3,
+      "stats": {"atk": 148, "mp": 476, "hp": 404},
+      "price": 56300
+    },
+    "linh_chau_than_mong": {
+      "name": "Linh Châu Thần Mộng",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 81,
+      "minQ": 3,
+      "stats": {"atk": 156, "mp": 421, "hp": 367},
+      "price": 56300
+    },
+    "song_dao_sang_the": {
+      "name": "Song Đao Sáng Thế",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "song_dao",
+      "school": "sat_thu",
+      "level": 91,
+      "minQ": 3,
+      "stats": {"atk": 207, "crit": 14, "hp": 334},
+      "price": 62900
+    },
+    "chuy_sang_the": {
+      "name": "Chùy Sáng Thế",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "chuy",
+      "school": "tanker",
+      "level": 91,
+      "minQ": 3,
+      "stats": {"atk": 214, "def": 28, "hp": 542},
+      "price": 62900
+    },
+    "than_binh_sang_the": {
+      "name": "Thần Binh Sáng Thế",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "than_binh",
+      "school": "toan_nang",
+      "level": 91,
+      "minQ": 3,
+      "stats": {"atk": 225, "crit": 6, "hp": 417},
+      "price": 62900
+    },
+    "thanh_truong_sang_the": {
+      "name": "Thánh Trượng Sáng Thế",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "thanh_truong",
+      "school": "tri_lieu_su",
+      "level": 91,
+      "minQ": 3,
+      "stats": {"atk": 162, "mp": 541, "hp": 459},
+      "price": 62900
+    },
+    "linh_chau_sang_the": {
+      "name": "Linh Châu Sáng Thế",
+      "kind": "weapon",
+      "slot": "weapon",
+      "wtype": "linh_chau",
+      "school": "trieu_hoi_su",
+      "level": 91,
+      "minQ": 3,
+      "stats": {"atk": 171, "mp": 478, "hp": 417},
+      "price": 62900
+    },
+    "sach_tk_pa5": {
+      "name": "Sách Tuyệt Kỹ: Thiên Kiếm Giáng",
+      "kind": "ult_book",
+      "skill": "pa5",
+      "level": 20,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Thiên Kiếm Giáng. Dành cho: Kiếm Sĩ. Cần cấp 20. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 50,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_hl5": {
+      "name": "Sách Tuyệt Kỹ: Mưa Tên",
+      "kind": "ult_book",
+      "skill": "hl5",
+      "level": 20,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Mưa Tên. Dành cho: Cung Thủ. Cần cấp 20. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 50,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_tn5": {
+      "name": "Sách Tuyệt Kỹ: Thiên Thạch",
+      "kind": "ult_book",
+      "skill": "tn5",
+      "level": 20,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Thiên Thạch. Dành cho: Pháp Sư. Cần cấp 20. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 50,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_vn1": {
+      "name": "Sách Tuyệt Kỹ: Thức Tỉnh Tối Thượng",
+      "kind": "ult_book",
+      "skill": "vn1",
+      "level": 20,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Thức Tỉnh Tối Thượng. Dành cho: Toàn Năng. Cần cấp 20. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 50,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_st5": {
+      "name": "Sách Tuyệt Kỹ: Trăm Nhát Phân Tán",
+      "kind": "ult_book",
+      "skill": "st5",
+      "level": 20,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Trăm Nhát Phân Tán. Dành cho: Sát Thủ. Cần cấp 20. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 50,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_tk5": {
+      "name": "Sách Tuyệt Kỹ: Sóng Thép",
+      "kind": "ult_book",
+      "skill": "tk5",
+      "level": 20,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Sóng Thép. Dành cho: Tanker. Cần cấp 20. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 50,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_tl5": {
+      "name": "Sách Tuyệt Kỹ: Phép Thánh Toàn Trị",
+      "kind": "ult_book",
+      "skill": "tl5",
+      "level": 20,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Phép Thánh Toàn Trị. Dành cho: Trị Liệu Sư. Cần cấp 20. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 50,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_nl5": {
+      "name": "Sách Tuyệt Kỹ: Cổng Âm Giới",
+      "kind": "ult_book",
+      "skill": "nl5",
+      "level": 20,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Cổng Âm Giới. Dành cho: Tử Linh Thuật Sư. Cần cấp 20. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 50,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_th11": {
+      "name": "Sách Tuyệt Kỹ: Vạn Linh Quy Tụ",
+      "kind": "ult_book",
+      "skill": "th11",
+      "level": 20,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Vạn Linh Quy Tụ. Dành cho: Triệu Hồi Sư, Tử Linh Thuật Sư. Cần cấp 20. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 50,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulKiem1": {
+      "name": "Sách Tuyệt Kỹ: Kiếm Trận Hủy Diệt",
+      "kind": "ult_book",
+      "skill": "ulKiem1",
+      "level": 30,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Kiếm Trận Hủy Diệt. Dành cho: Kiếm Sĩ, Tanker. Cần cấp 30. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 90,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulKiem2": {
+      "name": "Sách Tuyệt Kỹ: Kiếm Vũ Tuyệt Diệt",
+      "kind": "ult_book",
+      "skill": "ulKiem2",
+      "level": 35,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Kiếm Vũ Tuyệt Diệt. Dành cho: Kiếm Sĩ, Sát Thủ. Cần cấp 35. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 110,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulSat1": {
+      "name": "Sách Tuyệt Kỹ: Huyết Ảnh Vạn Đao",
+      "kind": "ult_book",
+      "skill": "ulSat1",
+      "level": 30,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Huyết Ảnh Vạn Đao. Dành cho: Sát Thủ. Cần cấp 30. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 90,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulTank1": {
+      "name": "Sách Tuyệt Kỹ: Thành Đồng Bất Hoại",
+      "kind": "ult_book",
+      "skill": "ulTank1",
+      "level": 30,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Thành Đồng Bất Hoại. Dành cho: Tanker, Kiếm Sĩ. Cần cấp 30. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 90,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulTank2": {
+      "name": "Sách Tuyệt Kỹ: Địa Chấn Thiên Hạ",
+      "kind": "ult_book",
+      "skill": "ulTank2",
+      "level": 35,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Địa Chấn Thiên Hạ. Dành cho: Tanker. Cần cấp 35. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 110,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulCung1": {
+      "name": "Sách Tuyệt Kỹ: Tinh Vân Tuyệt Xạ",
+      "kind": "ult_book",
+      "skill": "ulCung1",
+      "level": 30,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Tinh Vân Tuyệt Xạ. Dành cho: Cung Thủ. Cần cấp 30. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 90,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulCung2": {
+      "name": "Sách Tuyệt Kỹ: Thiên Hỏa Mưa Tên",
+      "kind": "ult_book",
+      "skill": "ulCung2",
+      "level": 38,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Thiên Hỏa Mưa Tên. Dành cho: Cung Thủ, Sát Thủ. Cần cấp 38. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 120,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulPhap1": {
+      "name": "Sách Tuyệt Kỹ: Lôi Đế Giáng Thế",
+      "kind": "ult_book",
+      "skill": "ulPhap1",
+      "level": 30,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Lôi Đế Giáng Thế. Dành cho: Pháp Sư. Cần cấp 30. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 90,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulPhap2": {
+      "name": "Sách Tuyệt Kỹ: Băng Hải Phong Thiên",
+      "kind": "ult_book",
+      "skill": "ulPhap2",
+      "level": 35,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Băng Hải Phong Thiên. Dành cho: Pháp Sư, Trị Liệu Sư. Cần cấp 35. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 110,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulTri1": {
+      "name": "Sách Tuyệt Kỹ: Thánh Quang Hồi Sinh",
+      "kind": "ult_book",
+      "skill": "ulTri1",
+      "level": 30,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Thánh Quang Hồi Sinh. Dành cho: Trị Liệu Sư. Cần cấp 30. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 90,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulLinh1": {
+      "name": "Sách Tuyệt Kỹ: Vạn Linh Bùng Nổ",
+      "kind": "ult_book",
+      "skill": "ulLinh1",
+      "level": 30,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Vạn Linh Bùng Nổ. Dành cho: Triệu Hồi Sư, Tử Linh Thuật Sư. Cần cấp 30. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 90,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulLinh2": {
+      "name": "Sách Tuyệt Kỹ: U Minh Cuồng Triều",
+      "kind": "ult_book",
+      "skill": "ulLinh2",
+      "level": 35,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ U Minh Cuồng Triều. Dành cho: Tử Linh Thuật Sư, Triệu Hồi Sư. Cần cấp 35. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 110,
+      "ngocGroup": "ult"
+    },
+    "sach_tk_ulChung1": {
+      "name": "Sách Tuyệt Kỹ: Thiên Địa Chấn Động",
+      "kind": "ult_book",
+      "skill": "ulChung1",
+      "level": 25,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Thiên Địa Chấn Động. Dành cho: mọi class. Cần cấp 25. Nhận từ nhiệm vụ Khảo hạch Tuyệt Kỹ."
+    },
+    "sach_tk_ulChung2": {
+      "name": "Sách Tuyệt Kỹ: Ý Chí Bất Diệt",
+      "kind": "ult_book",
+      "skill": "ulChung2",
+      "level": 30,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Ý Chí Bất Diệt. Dành cho: mọi class. Cần cấp 30. Nhận từ nhiệm vụ Khảo hạch Tuyệt Kỹ."
+    },
+    "sach_tk_ulChung3": {
+      "name": "Sách Tuyệt Kỹ: Hư Không Tuyệt Trảm",
+      "kind": "ult_book",
+      "skill": "ulChung3",
+      "level": 40,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt kỹ Hư Không Tuyệt Trảm. Dành cho: mọi class. Cần cấp 40. Nhận từ nhiệm vụ Khảo hạch Tuyệt Kỹ."
+    },
+    "sach_tk_ulSinhTu": {
+      "name": "Sách Tuyệt Phẩm: Sinh Tử Đồng Quy",
+      "kind": "ult_book",
+      "skill": "ulSinhTu",
+      "level": 70,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt phẩm Sinh Tử Đồng Quy. Dành cho: mọi class. Cần cấp 70. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 420,
+      "ngocGroup": "superult"
+    },
+    "sach_tk_ulTuLinhDungHop": {
+      "name": "Sách Tuyệt Phẩm: Tử Linh Dung Hợp",
+      "kind": "ult_book",
+      "skill": "ulTuLinhDungHop",
+      "level": 70,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt phẩm Tử Linh Dung Hợp. Dành cho: Tử Linh Thuật Sư. Cần cấp 70. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 420,
+      "ngocGroup": "superult"
+    },
+    "sach_tk_ulTankSuper": {
+      "name": "Sách Tuyệt Phẩm: Thiết Bích Vĩnh Cửu",
+      "kind": "ult_book",
+      "skill": "ulTankSuper",
+      "level": 70,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt phẩm Thiết Bích Vĩnh Cửu. Dành cho: Tanker, Hộ Vệ Bất Khuất. Cần cấp 70. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 420,
+      "ngocGroup": "superult"
+    },
+    "sach_tk_ulPhapSuper": {
+      "name": "Sách Tuyệt Phẩm: Cấm Chú Giải Phóng",
+      "kind": "ult_book",
+      "skill": "ulPhapSuper",
+      "level": 70,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt phẩm Cấm Chú Giải Phóng. Dành cho: Pháp Sư, Đại Pháp Sư. Cần cấp 70. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 420,
+      "ngocGroup": "superult"
+    },
+    "sach_tk_ulToanNangSuper": {
+      "name": "Sách Tuyệt Phẩm: Vạn Pháp Quy Nhất",
+      "kind": "ult_book",
+      "skill": "ulToanNangSuper",
+      "level": 70,
+      "stack": true,
+      "price": 0,
+      "desc": "Đọc để học tuyệt phẩm Vạn Pháp Quy Nhất. Dành cho: Toàn Năng. Cần cấp 70. Mua ở Lầu Trân Bảo hoặc nhận qua mật mã.",
+      "priceNgoc": 420,
+      "ngocGroup": "superult"
+    },
+    "sach_kn_pa1": {
+      "name": "Sách Kỹ Năng: Trảm Kích Lướt",
+      "kind": "skill_book",
+      "skill": "pa1",
+      "level": 5,
+      "stack": true,
+      "price": 1500,
+      "desc": "Đọc để học kỹ năng Trảm Kích Lướt. Dành cho: Kiếm Sĩ. Cần cấp 5."
+    },
+    "sach_kn_pa2": {
+      "name": "Sách Kỹ Năng: Liên Trảm",
+      "kind": "skill_book",
+      "skill": "pa2",
+      "level": 8,
+      "stack": true,
+      "price": 3840,
+      "desc": "Đọc để học kỹ năng Liên Trảm. Dành cho: Kiếm Sĩ. Cần cấp 8."
+    },
+    "sach_kn_pa4": {
+      "name": "Sách Kỹ Năng: Khiên Ý Chí",
+      "kind": "skill_book",
+      "skill": "pa4",
+      "level": 12,
+      "stack": true,
+      "price": 8640,
+      "desc": "Đọc để học kỹ năng Khiên Ý Chí. Dành cho: Kiếm Sĩ. Cần cấp 12."
+    },
+    "sach_kn_pa3": {
+      "name": "Sách Kỹ Năng: Cuồng Nộ",
+      "kind": "skill_book",
+      "skill": "pa3",
+      "level": 15,
+      "stack": true,
+      "price": 13500,
+      "desc": "Đọc để học kỹ năng Cuồng Nộ. Dành cho: Kiếm Sĩ. Cần cấp 15."
+    },
+    "sach_kn_pa6": {
+      "name": "Sách Kỹ Năng: Kiếm Vũ Liên Hoàn",
+      "kind": "skill_book",
+      "skill": "pa6",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Kiếm Vũ Liên Hoàn. Dành cho: Kiếm Sĩ. Cần cấp 25."
+    },
+    "sach_kn_pa7": {
+      "name": "Sách Kỹ Năng: Phá Quân Trảm",
+      "kind": "skill_book",
+      "skill": "pa7",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Phá Quân Trảm. Dành cho: Kiếm Sĩ. Cần cấp 35."
+    },
+    "sach_kn_pa8": {
+      "name": "Sách Kỹ Năng: Đâm Xuyên",
+      "kind": "skill_book",
+      "skill": "pa8",
+      "level": 10,
+      "stack": true,
+      "price": 6000,
+      "desc": "Đọc để học kỹ năng Đâm Xuyên. Dành cho: Kiếm Sĩ. Cần cấp 10."
+    },
+    "sach_kn_pa9": {
+      "name": "Sách Kỹ Năng: Kiếm Phản Kích",
+      "kind": "skill_book",
+      "skill": "pa9",
+      "level": 18,
+      "stack": true,
+      "price": 19440,
+      "desc": "Đọc để học kỹ năng Kiếm Phản Kích. Dành cho: Kiếm Sĩ. Cần cấp 18."
+    },
+    "sach_kn_pa10": {
+      "name": "Sách Kỹ Năng: Cuồng Phong Trảm",
+      "kind": "skill_book",
+      "skill": "pa10",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Cuồng Phong Trảm. Dành cho: Kiếm Sĩ. Cần cấp 30."
+    },
+    "sach_kn_pa11": {
+      "name": "Sách Kỹ Năng: Kiếm Khí Tung Hoành",
+      "kind": "skill_book",
+      "skill": "pa11",
+      "level": 40,
+      "stack": true,
+      "price": 96000,
+      "desc": "Đọc để học kỹ năng Kiếm Khí Tung Hoành. Dành cho: Kiếm Sĩ. Cần cấp 40."
+    },
+    "sach_kn_hl1": {
+      "name": "Sách Kỹ Năng: Tiễn Xuyên Phá",
+      "kind": "skill_book",
+      "skill": "hl1",
+      "level": 5,
+      "stack": true,
+      "price": 1500,
+      "desc": "Đọc để học kỹ năng Tiễn Xuyên Phá. Dành cho: Cung Thủ. Cần cấp 5."
+    },
+    "sach_kn_hl2": {
+      "name": "Sách Kỹ Năng: Tam Tiễn",
+      "kind": "skill_book",
+      "skill": "hl2",
+      "level": 8,
+      "stack": true,
+      "price": 3840,
+      "desc": "Đọc để học kỹ năng Tam Tiễn. Dành cho: Cung Thủ. Cần cấp 8."
+    },
+    "sach_kn_hl4": {
+      "name": "Sách Kỹ Năng: Lùi Né",
+      "kind": "skill_book",
+      "skill": "hl4",
+      "level": 12,
+      "stack": true,
+      "price": 8640,
+      "desc": "Đọc để học kỹ năng Lùi Né. Dành cho: Cung Thủ. Cần cấp 12."
+    },
+    "sach_kn_hl3": {
+      "name": "Sách Kỹ Năng: Mắt Ưng",
+      "kind": "skill_book",
+      "skill": "hl3",
+      "level": 15,
+      "stack": true,
+      "price": 13500,
+      "desc": "Đọc để học kỹ năng Mắt Ưng. Dành cho: Cung Thủ. Cần cấp 15."
+    },
+    "sach_kn_hl6": {
+      "name": "Sách Kỹ Năng: Tam Tiễn Truy Kích",
+      "kind": "skill_book",
+      "skill": "hl6",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Tam Tiễn Truy Kích. Dành cho: Cung Thủ. Cần cấp 25."
+    },
+    "sach_kn_hl7": {
+      "name": "Sách Kỹ Năng: Bão Tên Định Mệnh",
+      "kind": "skill_book",
+      "skill": "hl7",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Bão Tên Định Mệnh. Dành cho: Cung Thủ. Cần cấp 35."
+    },
+    "sach_kn_hl8": {
+      "name": "Sách Kỹ Năng: Tên Băng",
+      "kind": "skill_book",
+      "skill": "hl8",
+      "level": 10,
+      "stack": true,
+      "price": 6000,
+      "desc": "Đọc để học kỹ năng Tên Băng. Dành cho: Cung Thủ. Cần cấp 10."
+    },
+    "sach_kn_hl9": {
+      "name": "Sách Kỹ Năng: Xạ Liên Hoàn",
+      "kind": "skill_book",
+      "skill": "hl9",
+      "level": 18,
+      "stack": true,
+      "price": 19440,
+      "desc": "Đọc để học kỹ năng Xạ Liên Hoàn. Dành cho: Cung Thủ. Cần cấp 18."
+    },
+    "sach_kn_hl10": {
+      "name": "Sách Kỹ Năng: Tiễn Xuyên Tâm",
+      "kind": "skill_book",
+      "skill": "hl10",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Tiễn Xuyên Tâm. Dành cho: Cung Thủ. Cần cấp 30."
+    },
+    "sach_kn_hl11": {
+      "name": "Sách Kỹ Năng: Hỏa Vũ Liên Châu",
+      "kind": "skill_book",
+      "skill": "hl11",
+      "level": 40,
+      "stack": true,
+      "price": 96000,
+      "desc": "Đọc để học kỹ năng Hỏa Vũ Liên Châu. Dành cho: Cung Thủ. Cần cấp 40."
+    },
+    "sach_kn_tn1": {
+      "name": "Sách Kỹ Năng: Sóng Băng",
+      "kind": "skill_book",
+      "skill": "tn1",
+      "level": 5,
+      "stack": true,
+      "price": 1500,
+      "desc": "Đọc để học kỹ năng Sóng Băng. Dành cho: Pháp Sư. Cần cấp 5."
+    },
+    "sach_kn_tn2": {
+      "name": "Sách Kỹ Năng: Hồi Phục",
+      "kind": "skill_book",
+      "skill": "tn2",
+      "level": 8,
+      "stack": true,
+      "price": 3840,
+      "desc": "Đọc để học kỹ năng Hồi Phục. Dành cho: Pháp Sư. Cần cấp 8."
+    },
+    "sach_kn_tn4": {
+      "name": "Sách Kỹ Năng: Khiên Năng Lượng",
+      "kind": "skill_book",
+      "skill": "tn4",
+      "level": 12,
+      "stack": true,
+      "price": 8640,
+      "desc": "Đọc để học kỹ năng Khiên Năng Lượng. Dành cho: Pháp Sư. Cần cấp 12."
+    },
+    "sach_kn_tn3": {
+      "name": "Sách Kỹ Năng: Băng Ngục",
+      "kind": "skill_book",
+      "skill": "tn3",
+      "level": 15,
+      "stack": true,
+      "price": 13500,
+      "desc": "Đọc để học kỹ năng Băng Ngục. Dành cho: Pháp Sư. Cần cấp 15."
+    },
+    "sach_kn_tn6": {
+      "name": "Sách Kỹ Năng: Băng Lưu Bạo",
+      "kind": "skill_book",
+      "skill": "tn6",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Băng Lưu Bạo. Dành cho: Pháp Sư. Cần cấp 25."
+    },
+    "sach_kn_tn7": {
+      "name": "Sách Kỹ Năng: Hỏa Tinh Bạo Liệt",
+      "kind": "skill_book",
+      "skill": "tn7",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Hỏa Tinh Bạo Liệt. Dành cho: Pháp Sư. Cần cấp 35."
+    },
+    "sach_kn_tn8": {
+      "name": "Sách Kỹ Năng: Hỏa Cầu",
+      "kind": "skill_book",
+      "skill": "tn8",
+      "level": 10,
+      "stack": true,
+      "price": 6000,
+      "desc": "Đọc để học kỹ năng Hỏa Cầu. Dành cho: Pháp Sư. Cần cấp 10."
+    },
+    "sach_kn_tn9": {
+      "name": "Sách Kỹ Năng: Tia Sét Xuyên",
+      "kind": "skill_book",
+      "skill": "tn9",
+      "level": 18,
+      "stack": true,
+      "price": 19440,
+      "desc": "Đọc để học kỹ năng Tia Sét Xuyên. Dành cho: Pháp Sư. Cần cấp 18."
+    },
+    "sach_kn_tn10": {
+      "name": "Sách Kỹ Năng: Dịch Chuyển Nguyên Tố",
+      "kind": "skill_book",
+      "skill": "tn10",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Dịch Chuyển Nguyên Tố. Dành cho: Pháp Sư. Cần cấp 30."
+    },
+    "sach_kn_tn11": {
+      "name": "Sách Kỹ Năng: Địa Ngục Liệt Hỏa",
+      "kind": "skill_book",
+      "skill": "tn11",
+      "level": 40,
+      "stack": true,
+      "price": 96000,
+      "desc": "Đọc để học kỹ năng Địa Ngục Liệt Hỏa. Dành cho: Pháp Sư. Cần cấp 40."
+    },
+    "sach_kn_vn2": {
+      "name": "Sách Kỹ Năng: Hợp Nhất Nguyên Tố",
+      "kind": "skill_book",
+      "skill": "vn2",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Hợp Nhất Nguyên Tố. Dành cho: Toàn Năng. Cần cấp 30."
+    },
+    "sach_kn_vn3": {
+      "name": "Sách Kỹ Năng: Dòng Chảy Toàn Năng",
+      "kind": "skill_book",
+      "skill": "vn3",
+      "level": 40,
+      "stack": true,
+      "price": 96000,
+      "desc": "Đọc để học kỹ năng Dòng Chảy Toàn Năng. Dành cho: Toàn Năng. Cần cấp 40."
+    },
+    "sach_kn_vn4": {
+      "name": "Sách Kỹ Năng: Thế Cân Bằng",
+      "kind": "skill_book",
+      "skill": "vn4",
+      "level": 15,
+      "stack": true,
+      "price": 13500,
+      "desc": "Đọc để học kỹ năng Thế Cân Bằng. Dành cho: Toàn Năng. Cần cấp 15."
+    },
+    "sach_kn_vn5": {
+      "name": "Sách Kỹ Năng: Tinh Lực Dồi Dào",
+      "kind": "skill_book",
+      "skill": "vn5",
+      "level": 22,
+      "stack": true,
+      "price": 29040,
+      "desc": "Đọc để học kỹ năng Tinh Lực Dồi Dào. Dành cho: Toàn Năng. Cần cấp 22."
+    },
+    "sach_kn_vn6": {
+      "name": "Sách Kỹ Năng: Thủ Ấn Toàn Năng",
+      "kind": "skill_book",
+      "skill": "vn6",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Thủ Ấn Toàn Năng. Dành cho: Toàn Năng. Cần cấp 35."
+    },
+    "sach_kn_vn7": {
+      "name": "Sách Kỹ Năng: Trảm Hợp Nhất",
+      "kind": "skill_book",
+      "skill": "vn7",
+      "level": 45,
+      "stack": true,
+      "price": 121500,
+      "desc": "Đọc để học kỹ năng Trảm Hợp Nhất. Dành cho: Toàn Năng. Cần cấp 45."
+    },
+    "sach_kn_st1": {
+      "name": "Sách Kỹ Năng: Lướt Bóng",
+      "kind": "skill_book",
+      "skill": "st1",
+      "level": 5,
+      "stack": true,
+      "price": 1500,
+      "desc": "Đọc để học kỹ năng Lướt Bóng. Dành cho: Sát Thủ. Cần cấp 5."
+    },
+    "sach_kn_st2": {
+      "name": "Sách Kỹ Năng: Nhát Kép",
+      "kind": "skill_book",
+      "skill": "st2",
+      "level": 8,
+      "stack": true,
+      "price": 3840,
+      "desc": "Đọc để học kỹ năng Nhát Kép. Dành cho: Sát Thủ. Cần cấp 8."
+    },
+    "sach_kn_st4": {
+      "name": "Sách Kỹ Năng: Ẩn Thân",
+      "kind": "skill_book",
+      "skill": "st4",
+      "level": 12,
+      "stack": true,
+      "price": 8640,
+      "desc": "Đọc để học kỹ năng Ẩn Thân. Dành cho: Sát Thủ. Cần cấp 12."
+    },
+    "sach_kn_st3": {
+      "name": "Sách Kỹ Năng: Cuồng Sát",
+      "kind": "skill_book",
+      "skill": "st3",
+      "level": 15,
+      "stack": true,
+      "price": 13500,
+      "desc": "Đọc để học kỹ năng Cuồng Sát. Dành cho: Sát Thủ. Cần cấp 15."
+    },
+    "sach_kn_st6": {
+      "name": "Sách Kỹ Năng: Ảnh Trảm Liên Kích",
+      "kind": "skill_book",
+      "skill": "st6",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Ảnh Trảm Liên Kích. Dành cho: Sát Thủ. Cần cấp 25."
+    },
+    "sach_kn_st7": {
+      "name": "Sách Kỹ Năng: Huyết Ảnh Truy Sát",
+      "kind": "skill_book",
+      "skill": "st7",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Huyết Ảnh Truy Sát. Dành cho: Sát Thủ. Cần cấp 35."
+    },
+    "sach_kn_st8": {
+      "name": "Sách Kỹ Năng: Phi Tiêu Độc",
+      "kind": "skill_book",
+      "skill": "st8",
+      "level": 10,
+      "stack": true,
+      "price": 6000,
+      "desc": "Đọc để học kỹ năng Phi Tiêu Độc. Dành cho: Sát Thủ. Cần cấp 10."
+    },
+    "sach_kn_st9": {
+      "name": "Sách Kỹ Năng: Xóa Dấu",
+      "kind": "skill_book",
+      "skill": "st9",
+      "level": 18,
+      "stack": true,
+      "price": 19440,
+      "desc": "Đọc để học kỹ năng Xóa Dấu. Dành cho: Sát Thủ. Cần cấp 18."
+    },
+    "sach_kn_st10": {
+      "name": "Sách Kỹ Năng: Tử Huyệt",
+      "kind": "skill_book",
+      "skill": "st10",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Tử Huyệt. Dành cho: Sát Thủ. Cần cấp 30."
+    },
+    "sach_kn_st11": {
+      "name": "Sách Kỹ Năng: Bóng Đêm Bao Phủ",
+      "kind": "skill_book",
+      "skill": "st11",
+      "level": 40,
+      "stack": true,
+      "price": 96000,
+      "desc": "Đọc để học kỹ năng Bóng Đêm Bao Phủ. Dành cho: Sát Thủ. Cần cấp 40."
+    },
+    "sach_kn_tk1": {
+      "name": "Sách Kỹ Năng: Khiên Phá",
+      "kind": "skill_book",
+      "skill": "tk1",
+      "level": 5,
+      "stack": true,
+      "price": 1500,
+      "desc": "Đọc để học kỹ năng Khiên Phá. Dành cho: Tanker. Cần cấp 5."
+    },
+    "sach_kn_tk2": {
+      "name": "Sách Kỹ Năng: Vòng Thép",
+      "kind": "skill_book",
+      "skill": "tk2",
+      "level": 8,
+      "stack": true,
+      "price": 3840,
+      "desc": "Đọc để học kỹ năng Vòng Thép. Dành cho: Tanker. Cần cấp 8."
+    },
+    "sach_kn_tk4": {
+      "name": "Sách Kỹ Năng: Giáp Sắt",
+      "kind": "skill_book",
+      "skill": "tk4",
+      "level": 12,
+      "stack": true,
+      "price": 8640,
+      "desc": "Đọc để học kỹ năng Giáp Sắt. Dành cho: Tanker. Cần cấp 12."
+    },
+    "sach_kn_tk3": {
+      "name": "Sách Kỹ Năng: Thịnh Nộ",
+      "kind": "skill_book",
+      "skill": "tk3",
+      "level": 15,
+      "stack": true,
+      "price": 13500,
+      "desc": "Đọc để học kỹ năng Thịnh Nộ. Dành cho: Tanker. Cần cấp 15."
+    },
+    "sach_kn_tk6": {
+      "name": "Sách Kỹ Năng: Địa Chấn",
+      "kind": "skill_book",
+      "skill": "tk6",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Địa Chấn. Dành cho: Tanker. Cần cấp 25."
+    },
+    "sach_kn_tk7": {
+      "name": "Sách Kỹ Năng: Pháo Đài Bất Khuất",
+      "kind": "skill_book",
+      "skill": "tk7",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Pháo Đài Bất Khuất. Dành cho: Tanker. Cần cấp 35."
+    },
+    "sach_kn_tk8": {
+      "name": "Sách Kỹ Năng: Xung Phong",
+      "kind": "skill_book",
+      "skill": "tk8",
+      "level": 10,
+      "stack": true,
+      "price": 6000,
+      "desc": "Đọc để học kỹ năng Xung Phong. Dành cho: Tanker. Cần cấp 10."
+    },
+    "sach_kn_tk9": {
+      "name": "Sách Kỹ Năng: Tiếng Gầm Uy Hiếp",
+      "kind": "skill_book",
+      "skill": "tk9",
+      "level": 18,
+      "stack": true,
+      "price": 19440,
+      "desc": "Đọc để học kỹ năng Tiếng Gầm Uy Hiếp. Dành cho: Tanker. Cần cấp 18."
+    },
+    "sach_kn_tk10": {
+      "name": "Sách Kỹ Năng: Phản Giáp",
+      "kind": "skill_book",
+      "skill": "tk10",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Phản Giáp. Dành cho: Tanker. Cần cấp 30."
+    },
+    "sach_kn_tk11": {
+      "name": "Sách Kỹ Năng: Búa Thiên Lôi",
+      "kind": "skill_book",
+      "skill": "tk11",
+      "level": 40,
+      "stack": true,
+      "price": 96000,
+      "desc": "Đọc để học kỹ năng Búa Thiên Lôi. Dành cho: Tanker. Cần cấp 40."
+    },
+    "sach_kn_tl1": {
+      "name": "Sách Kỹ Năng: Chữa Lành",
+      "kind": "skill_book",
+      "skill": "tl1",
+      "level": 5,
+      "stack": true,
+      "price": 1500,
+      "desc": "Đọc để học kỹ năng Chữa Lành. Dành cho: Trị Liệu Sư. Cần cấp 5."
+    },
+    "sach_kn_tl2": {
+      "name": "Sách Kỹ Năng: Sóng Thánh",
+      "kind": "skill_book",
+      "skill": "tl2",
+      "level": 8,
+      "stack": true,
+      "price": 3840,
+      "desc": "Đọc để học kỹ năng Sóng Thánh. Dành cho: Trị Liệu Sư. Cần cấp 8."
+    },
+    "sach_kn_tl4": {
+      "name": "Sách Kỹ Năng: Khiên Ánh Sáng",
+      "kind": "skill_book",
+      "skill": "tl4",
+      "level": 12,
+      "stack": true,
+      "price": 8640,
+      "desc": "Đọc để học kỹ năng Khiên Ánh Sáng. Dành cho: Trị Liệu Sư. Cần cấp 12."
+    },
+    "sach_kn_tl3": {
+      "name": "Sách Kỹ Năng: Ân Sủng",
+      "kind": "skill_book",
+      "skill": "tl3",
+      "level": 15,
+      "stack": true,
+      "price": 13500,
+      "desc": "Đọc để học kỹ năng Ân Sủng. Dành cho: Trị Liệu Sư. Cần cấp 15."
+    },
+    "sach_kn_tl6": {
+      "name": "Sách Kỹ Năng: Thánh Quang Hộ Thể",
+      "kind": "skill_book",
+      "skill": "tl6",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Thánh Quang Hộ Thể. Dành cho: Trị Liệu Sư. Cần cấp 25."
+    },
+    "sach_kn_tl7": {
+      "name": "Sách Kỹ Năng: Kết Giới Sinh Mệnh",
+      "kind": "skill_book",
+      "skill": "tl7",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Kết Giới Sinh Mệnh. Dành cho: Trị Liệu Sư. Cần cấp 35."
+    },
+    "sach_kn_tl8": {
+      "name": "Sách Kỹ Năng: Giọt Thánh",
+      "kind": "skill_book",
+      "skill": "tl8",
+      "level": 10,
+      "stack": true,
+      "price": 6000,
+      "desc": "Đọc để học kỹ năng Giọt Thánh. Dành cho: Trị Liệu Sư. Cần cấp 10."
+    },
+    "sach_kn_tl9": {
+      "name": "Sách Kỹ Năng: Thánh Ấn",
+      "kind": "skill_book",
+      "skill": "tl9",
+      "level": 18,
+      "stack": true,
+      "price": 19440,
+      "desc": "Đọc để học kỹ năng Thánh Ấn. Dành cho: Trị Liệu Sư. Cần cấp 18."
+    },
+    "sach_kn_tl10": {
+      "name": "Sách Kỹ Năng: Thanh Tẩy",
+      "kind": "skill_book",
+      "skill": "tl10",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Thanh Tẩy. Dành cho: Trị Liệu Sư. Cần cấp 30."
+    },
+    "sach_kn_tl11": {
+      "name": "Sách Kỹ Năng: Quang Vũ Tái Sinh",
+      "kind": "skill_book",
+      "skill": "tl11",
+      "level": 40,
+      "stack": true,
+      "price": 96000,
+      "desc": "Đọc để học kỹ năng Quang Vũ Tái Sinh. Dành cho: Trị Liệu Sư. Cần cấp 40."
+    },
+    "sach_kn_th1": {
+      "name": "Sách Kỹ Năng: Linh Tiễn",
+      "kind": "skill_book",
+      "skill": "th1",
+      "level": 5,
+      "stack": true,
+      "price": 1500,
+      "desc": "Đọc để học kỹ năng Linh Tiễn. Dành cho: Triệu Hồi Sư. Cần cấp 5."
+    },
+    "sach_kn_th2": {
+      "name": "Sách Kỹ Năng: Linh Thể Hộ Vệ",
+      "kind": "skill_book",
+      "skill": "th2",
+      "level": 8,
+      "stack": true,
+      "price": 3840,
+      "desc": "Đọc để học kỹ năng Linh Thể Hộ Vệ. Dành cho: Triệu Hồi Sư. Cần cấp 8."
+    },
+    "sach_kn_th3": {
+      "name": "Sách Kỹ Năng: Nổ Linh Lực",
+      "kind": "skill_book",
+      "skill": "th3",
+      "level": 12,
+      "stack": true,
+      "price": 8640,
+      "desc": "Đọc để học kỹ năng Nổ Linh Lực. Dành cho: Triệu Hồi Sư. Cần cấp 12."
+    },
+    "sach_kn_th4": {
+      "name": "Sách Kỹ Năng: Hiệu Lệnh Triệu Hồi",
+      "kind": "skill_book",
+      "skill": "th4",
+      "level": 18,
+      "stack": true,
+      "price": 19440,
+      "desc": "Đọc để học kỹ năng Hiệu Lệnh Triệu Hồi. Dành cho: Triệu Hồi Sư. Cần cấp 18."
+    },
+    "sach_kn_th5": {
+      "name": "Sách Kỹ Năng: Triệu Hồi Linh Thú",
+      "kind": "skill_book",
+      "skill": "th5",
+      "level": 5,
+      "stack": true,
+      "price": 1500,
+      "desc": "Đọc để học kỹ năng Triệu Hồi Linh Thú. Dành cho: Triệu Hồi Sư. Cần cấp 5."
+    },
+    "sach_kn_nl1": {
+      "name": "Sách Kỹ Năng: Lời Nguyền Tàn Lụi",
+      "kind": "skill_book",
+      "skill": "nl1",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Lời Nguyền Tàn Lụi. Dành cho: Tử Linh Thuật Sư. Cần cấp 25."
+    },
+    "sach_kn_nl2": {
+      "name": "Sách Kỹ Năng: Triệu Hồi Bóng",
+      "kind": "skill_book",
+      "skill": "nl2",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Triệu Hồi Bóng. Dành cho: Tử Linh Thuật Sư. Cần cấp 25."
+    },
+    "sach_kn_nl3": {
+      "name": "Sách Kỹ Năng: Hút Linh",
+      "kind": "skill_book",
+      "skill": "nl3",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Hút Linh. Dành cho: Tử Linh Thuật Sư. Cần cấp 30."
+    },
+    "sach_kn_nl4": {
+      "name": "Sách Kỹ Năng: Đội Quân U Ảnh",
+      "kind": "skill_book",
+      "skill": "nl4",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Đội Quân U Ảnh. Dành cho: Tử Linh Thuật Sư. Cần cấp 35."
+    },
+    "sach_kn_nl6": {
+      "name": "Sách Kỹ Năng: Phân Hồn",
+      "kind": "skill_book",
+      "skill": "nl6",
+      "level": 40,
+      "stack": true,
+      "price": 96000,
+      "desc": "Đọc để học kỹ năng Phân Hồn. Dành cho: Tử Linh Thuật Sư. Cần cấp 40."
+    },
+    "sach_kn_th6": {
+      "name": "Sách Kỹ Năng: Tiếng Gọi Linh Hồn",
+      "kind": "skill_book",
+      "skill": "th6",
+      "level": 10,
+      "stack": true,
+      "price": 6000,
+      "desc": "Đọc để học kỹ năng Tiếng Gọi Linh Hồn. Dành cho: Triệu Hồi Sư. Cần cấp 10."
+    },
+    "sach_kn_th7": {
+      "name": "Sách Kỹ Năng: Linh Giới Hộ Thân",
+      "kind": "skill_book",
+      "skill": "th7",
+      "level": 22,
+      "stack": true,
+      "price": 29040,
+      "desc": "Đọc để học kỹ năng Linh Giới Hộ Thân. Dành cho: Triệu Hồi Sư. Cần cấp 22."
+    },
+    "sach_kn_th8": {
+      "name": "Sách Kỹ Năng: Linh Điểu Truy Kích",
+      "kind": "skill_book",
+      "skill": "th8",
+      "level": 28,
+      "stack": true,
+      "price": 47040,
+      "desc": "Đọc để học kỹ năng Linh Điểu Truy Kích. Dành cho: Triệu Hồi Sư. Cần cấp 28."
+    },
+    "sach_kn_th9": {
+      "name": "Sách Kỹ Năng: Cộng Hưởng Linh Thú",
+      "kind": "skill_book",
+      "skill": "th9",
+      "level": 32,
+      "stack": true,
+      "price": 61440,
+      "desc": "Đọc để học kỹ năng Cộng Hưởng Linh Thú. Dành cho: Triệu Hồi Sư. Cần cấp 32."
+    },
+    "sach_kn_th10": {
+      "name": "Sách Kỹ Năng: Linh Long Xung",
+      "kind": "skill_book",
+      "skill": "th10",
+      "level": 38,
+      "stack": true,
+      "price": 86640,
+      "desc": "Đọc để học kỹ năng Linh Long Xung. Dành cho: Triệu Hồi Sư. Cần cấp 38."
+    },
+    "sach_kn_nl7": {
+      "name": "Sách Kỹ Năng: Vuốt Quỷ",
+      "kind": "skill_book",
+      "skill": "nl7",
+      "level": 27,
+      "stack": true,
+      "price": 43740,
+      "desc": "Đọc để học kỹ năng Vuốt Quỷ. Dành cho: Tử Linh Thuật Sư. Cần cấp 27."
+    },
+    "sach_kn_nl8": {
+      "name": "Sách Kỹ Năng: Xiềng Xích Âm Hồn",
+      "kind": "skill_book",
+      "skill": "nl8",
+      "level": 28,
+      "stack": true,
+      "price": 47040,
+      "desc": "Đọc để học kỹ năng Xiềng Xích Âm Hồn. Dành cho: Tử Linh Thuật Sư. Cần cấp 28."
+    },
+    "sach_kn_nl9": {
+      "name": "Sách Kỹ Năng: Hồn Phách Hộ Thể",
+      "kind": "skill_book",
+      "skill": "nl9",
+      "level": 32,
+      "stack": true,
+      "price": 61440,
+      "desc": "Đọc để học kỹ năng Hồn Phách Hộ Thể. Dành cho: Tử Linh Thuật Sư. Cần cấp 32."
+    },
+    "sach_kn_nl10": {
+      "name": "Sách Kỹ Năng: Hồn Nổ Dây Chuyền",
+      "kind": "skill_book",
+      "skill": "nl10",
+      "level": 38,
+      "stack": true,
+      "price": 86640,
+      "desc": "Đọc để học kỹ năng Hồn Nổ Dây Chuyền. Dành cho: Tử Linh Thuật Sư. Cần cấp 38."
+    },
+    "sach_kn_nl11": {
+      "name": "Sách Kỹ Năng: Tử Khí Tràn Ngập",
+      "kind": "skill_book",
+      "skill": "nl11",
+      "level": 42,
+      "stack": true,
+      "price": 105840,
+      "desc": "Đọc để học kỹ năng Tử Khí Tràn Ngập. Dành cho: Tử Linh Thuật Sư. Cần cấp 42."
+    },
+    "sach_kn_ks25": {
+      "name": "Sách Kỹ Năng: Kiếm Khí Hoành Tảo",
+      "kind": "skill_book",
+      "skill": "ks25",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Kiếm Khí Hoành Tảo. Dành cho: Kiếm Thánh. Cần cấp 25."
+    },
+    "sach_kn_ks30": {
+      "name": "Sách Kỹ Năng: Kiếm Tâm Phản Kích",
+      "kind": "skill_book",
+      "skill": "ks30",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Kiếm Tâm Phản Kích. Dành cho: Kiếm Thánh. Cần cấp 25."
+    },
+    "sach_kn_ks35": {
+      "name": "Sách Kỹ Năng: Long Ảnh Liên Trảm",
+      "kind": "skill_book",
+      "skill": "ks35",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Long Ảnh Liên Trảm. Dành cho: Kiếm Thánh. Cần cấp 30."
+    },
+    "sach_kn_ks40": {
+      "name": "Sách Kỹ Năng: Vạn Kiếm Quy Tông",
+      "kind": "skill_book",
+      "skill": "ks40",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Vạn Kiếm Quy Tông. Dành cho: Kiếm Thánh. Cần cấp 35."
+    },
+    "sach_kn_ks27": {
+      "name": "Sách Kỹ Năng: Nhất Kiếm Thiên Phong",
+      "kind": "skill_book",
+      "skill": "ks27",
+      "level": 27,
+      "stack": true,
+      "price": 43740,
+      "desc": "Đọc để học kỹ năng Nhất Kiếm Thiên Phong. Dành cho: Kiếm Thánh. Cần cấp 27."
+    },
+    "sach_kn_ks32": {
+      "name": "Sách Kỹ Năng: Kiếm Ý Hộ Thân",
+      "kind": "skill_book",
+      "skill": "ks32",
+      "level": 32,
+      "stack": true,
+      "price": 61440,
+      "desc": "Đọc để học kỹ năng Kiếm Ý Hộ Thân. Dành cho: Kiếm Thánh. Cần cấp 32."
+    },
+    "sach_kn_ks37": {
+      "name": "Sách Kỹ Năng: Tam Kiếm Hợp Nhất",
+      "kind": "skill_book",
+      "skill": "ks37",
+      "level": 37,
+      "stack": true,
+      "price": 82140,
+      "desc": "Đọc để học kỹ năng Tam Kiếm Hợp Nhất. Dành cho: Kiếm Thánh. Cần cấp 37."
+    },
+    "sach_kn_ks38": {
+      "name": "Sách Kỹ Năng: Kiếm Khí Trường Hà",
+      "kind": "skill_book",
+      "skill": "ks38",
+      "level": 38,
+      "stack": true,
+      "price": 86640,
+      "desc": "Đọc để học kỹ năng Kiếm Khí Trường Hà. Dành cho: Kiếm Thánh. Cần cấp 38."
+    },
+    "sach_kn_ks42": {
+      "name": "Sách Kỹ Năng: Phong Vân Kiếm Vũ",
+      "kind": "skill_book",
+      "skill": "ks42",
+      "level": 42,
+      "stack": true,
+      "price": 105840,
+      "desc": "Đọc để học kỹ năng Phong Vân Kiếm Vũ. Dành cho: Kiếm Thánh. Cần cấp 42."
+    },
+    "sach_kn_ks45": {
+      "name": "Sách Kỹ Năng: Chân Kiếm Thức Tỉnh",
+      "kind": "skill_book",
+      "skill": "ks45",
+      "level": 45,
+      "stack": true,
+      "price": 121500,
+      "desc": "Đọc để học kỹ năng Chân Kiếm Thức Tỉnh. Dành cho: Kiếm Thánh. Cần cấp 45."
+    },
+    "sach_kn_xa25": {
+      "name": "Sách Kỹ Năng: Ấn Tâm Tiễn",
+      "kind": "skill_book",
+      "skill": "xa25",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Ấn Tâm Tiễn. Dành cho: Thần Xạ. Cần cấp 25."
+    },
+    "sach_kn_xa30": {
+      "name": "Sách Kỹ Năng: Bước Lùi Liên Xạ",
+      "kind": "skill_book",
+      "skill": "xa30",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Bước Lùi Liên Xạ. Dành cho: Thần Xạ. Cần cấp 25."
+    },
+    "sach_kn_xa35": {
+      "name": "Sách Kỹ Năng: Thần Nhãn",
+      "kind": "skill_book",
+      "skill": "xa35",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Thần Nhãn. Dành cho: Thần Xạ. Cần cấp 30."
+    },
+    "sach_kn_xa40": {
+      "name": "Sách Kỹ Năng: Thiên Võng Xạ Kích",
+      "kind": "skill_book",
+      "skill": "xa40",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Thiên Võng Xạ Kích. Dành cho: Thần Xạ. Cần cấp 35."
+    },
+    "sach_kn_xa27": {
+      "name": "Sách Kỹ Năng: Tiễn Thần Tốc",
+      "kind": "skill_book",
+      "skill": "xa27",
+      "level": 27,
+      "stack": true,
+      "price": 43740,
+      "desc": "Đọc để học kỹ năng Tiễn Thần Tốc. Dành cho: Thần Xạ. Cần cấp 27."
+    },
+    "sach_kn_xa32": {
+      "name": "Sách Kỹ Năng: Tên Phá Giáp",
+      "kind": "skill_book",
+      "skill": "xa32",
+      "level": 32,
+      "stack": true,
+      "price": 61440,
+      "desc": "Đọc để học kỹ năng Tên Phá Giáp. Dành cho: Thần Xạ. Cần cấp 32."
+    },
+    "sach_kn_xa37": {
+      "name": "Sách Kỹ Năng: Liên Châu Ngũ Tiễn",
+      "kind": "skill_book",
+      "skill": "xa37",
+      "level": 37,
+      "stack": true,
+      "price": 82140,
+      "desc": "Đọc để học kỹ năng Liên Châu Ngũ Tiễn. Dành cho: Thần Xạ. Cần cấp 37."
+    },
+    "sach_kn_xa38": {
+      "name": "Sách Kỹ Năng: Bẫy Linh Quang",
+      "kind": "skill_book",
+      "skill": "xa38",
+      "level": 38,
+      "stack": true,
+      "price": 86640,
+      "desc": "Đọc để học kỹ năng Bẫy Linh Quang. Dành cho: Thần Xạ. Cần cấp 38."
+    },
+    "sach_kn_xa42": {
+      "name": "Sách Kỹ Năng: Tinh Tú Truy Hồn",
+      "kind": "skill_book",
+      "skill": "xa42",
+      "level": 42,
+      "stack": true,
+      "price": 105840,
+      "desc": "Đọc để học kỹ năng Tinh Tú Truy Hồn. Dành cho: Thần Xạ. Cần cấp 42."
+    },
+    "sach_kn_xa45": {
+      "name": "Sách Kỹ Năng: Thiên Hỏa Thần Tiễn",
+      "kind": "skill_book",
+      "skill": "xa45",
+      "level": 45,
+      "stack": true,
+      "price": 121500,
+      "desc": "Đọc để học kỹ năng Thiên Hỏa Thần Tiễn. Dành cho: Thần Xạ. Cần cấp 45."
+    },
+    "sach_kn_ps25": {
+      "name": "Sách Kỹ Năng: Lôi Xà",
+      "kind": "skill_book",
+      "skill": "ps25",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Lôi Xà. Dành cho: Đại Pháp Sư. Cần cấp 25."
+    },
+    "sach_kn_ps30": {
+      "name": "Sách Kỹ Năng: Hỏa Tường",
+      "kind": "skill_book",
+      "skill": "ps30",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Hỏa Tường. Dành cho: Đại Pháp Sư. Cần cấp 25."
+    },
+    "sach_kn_ps35": {
+      "name": "Sách Kỹ Năng: Tinh Thạch Hộ Thể",
+      "kind": "skill_book",
+      "skill": "ps35",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Tinh Thạch Hộ Thể. Dành cho: Đại Pháp Sư. Cần cấp 30."
+    },
+    "sach_kn_ps40": {
+      "name": "Sách Kỹ Năng: Bão Nguyên Tố",
+      "kind": "skill_book",
+      "skill": "ps40",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Bão Nguyên Tố. Dành cho: Đại Pháp Sư. Cần cấp 35."
+    },
+    "sach_kn_ps27": {
+      "name": "Sách Kỹ Năng: Hỏa Cầu Nổ",
+      "kind": "skill_book",
+      "skill": "ps27",
+      "level": 27,
+      "stack": true,
+      "price": 43740,
+      "desc": "Đọc để học kỹ năng Hỏa Cầu Nổ. Dành cho: Đại Pháp Sư. Cần cấp 27."
+    },
+    "sach_kn_ps32": {
+      "name": "Sách Kỹ Năng: Băng Phong Trận",
+      "kind": "skill_book",
+      "skill": "ps32",
+      "level": 32,
+      "stack": true,
+      "price": 61440,
+      "desc": "Đọc để học kỹ năng Băng Phong Trận. Dành cho: Đại Pháp Sư. Cần cấp 32."
+    },
+    "sach_kn_ps37": {
+      "name": "Sách Kỹ Năng: Lôi Cầu Xoáy",
+      "kind": "skill_book",
+      "skill": "ps37",
+      "level": 37,
+      "stack": true,
+      "price": 82140,
+      "desc": "Đọc để học kỹ năng Lôi Cầu Xoáy. Dành cho: Đại Pháp Sư. Cần cấp 37."
+    },
+    "sach_kn_ps38": {
+      "name": "Sách Kỹ Năng: Hồi Nguyên",
+      "kind": "skill_book",
+      "skill": "ps38",
+      "level": 38,
+      "stack": true,
+      "price": 86640,
+      "desc": "Đọc để học kỹ năng Hồi Nguyên. Dành cho: Đại Pháp Sư. Cần cấp 38."
+    },
+    "sach_kn_ps42": {
+      "name": "Sách Kỹ Năng: Dịch Chuyển Tức Thời",
+      "kind": "skill_book",
+      "skill": "ps42",
+      "level": 42,
+      "stack": true,
+      "price": 105840,
+      "desc": "Đọc để học kỹ năng Dịch Chuyển Tức Thời. Dành cho: Đại Pháp Sư. Cần cấp 42."
+    },
+    "sach_kn_ps45": {
+      "name": "Sách Kỹ Năng: Thiên Địa Hợp Nhất Pháp",
+      "kind": "skill_book",
+      "skill": "ps45",
+      "level": 45,
+      "stack": true,
+      "price": 121500,
+      "desc": "Đọc để học kỹ năng Thiên Địa Hợp Nhất Pháp. Dành cho: Đại Pháp Sư. Cần cấp 45."
+    },
+    "sach_kn_av25": {
+      "name": "Sách Kỹ Năng: Ảnh Bộ Đoạt Mệnh",
+      "kind": "skill_book",
+      "skill": "av25",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Ảnh Bộ Đoạt Mệnh. Dành cho: Ảnh Vương. Cần cấp 25."
+    },
+    "sach_kn_av30": {
+      "name": "Sách Kỹ Năng: Phi Đao U Ảnh",
+      "kind": "skill_book",
+      "skill": "av30",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Phi Đao U Ảnh. Dành cho: Ảnh Vương. Cần cấp 25."
+    },
+    "sach_kn_av35": {
+      "name": "Sách Kỹ Năng: Thế Thân Bóng Tối",
+      "kind": "skill_book",
+      "skill": "av35",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Thế Thân Bóng Tối. Dành cho: Ảnh Vương. Cần cấp 30."
+    },
+    "sach_kn_av40": {
+      "name": "Sách Kỹ Năng: Bách Ảnh Sát",
+      "kind": "skill_book",
+      "skill": "av40",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Bách Ảnh Sát. Dành cho: Ảnh Vương. Cần cấp 35."
+    },
+    "sach_kn_av27": {
+      "name": "Sách Kỹ Năng: Ảnh Độn",
+      "kind": "skill_book",
+      "skill": "av27",
+      "level": 27,
+      "stack": true,
+      "price": 43740,
+      "desc": "Đọc để học kỹ năng Ảnh Độn. Dành cho: Ảnh Vương. Cần cấp 27."
+    },
+    "sach_kn_av32": {
+      "name": "Sách Kỹ Năng: Ảnh Phân Thân",
+      "kind": "skill_book",
+      "skill": "av32",
+      "level": 32,
+      "stack": true,
+      "price": 61440,
+      "desc": "Đọc để học kỹ năng Ảnh Phân Thân. Dành cho: Ảnh Vương. Cần cấp 32."
+    },
+    "sach_kn_av37": {
+      "name": "Sách Kỹ Năng: Mưa Phi Đao Bóng",
+      "kind": "skill_book",
+      "skill": "av37",
+      "level": 37,
+      "stack": true,
+      "price": 82140,
+      "desc": "Đọc để học kỹ năng Mưa Phi Đao Bóng. Dành cho: Ảnh Vương. Cần cấp 37."
+    },
+    "sach_kn_av38": {
+      "name": "Sách Kỹ Năng: Sát Ý Dâng Trào",
+      "kind": "skill_book",
+      "skill": "av38",
+      "level": 38,
+      "stack": true,
+      "price": 86640,
+      "desc": "Đọc để học kỹ năng Sát Ý Dâng Trào. Dành cho: Ảnh Vương. Cần cấp 38."
+    },
+    "sach_kn_av42": {
+      "name": "Sách Kỹ Năng: Huyết Ảnh Liên Hoàn",
+      "kind": "skill_book",
+      "skill": "av42",
+      "level": 42,
+      "stack": true,
+      "price": 105840,
+      "desc": "Đọc để học kỹ năng Huyết Ảnh Liên Hoàn. Dành cho: Ảnh Vương. Cần cấp 42."
+    },
+    "sach_kn_av45": {
+      "name": "Sách Kỹ Năng: Vạn Ảnh Tuyệt Sát",
+      "kind": "skill_book",
+      "skill": "av45",
+      "level": 45,
+      "stack": true,
+      "price": 121500,
+      "desc": "Đọc để học kỹ năng Vạn Ảnh Tuyệt Sát. Dành cho: Ảnh Vương. Cần cấp 45."
+    },
+    "sach_kn_hv25": {
+      "name": "Sách Kỹ Năng: Khiên Phi Trảm",
+      "kind": "skill_book",
+      "skill": "hv25",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Khiên Phi Trảm. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 25."
+    },
+    "sach_kn_hv30": {
+      "name": "Sách Kỹ Năng: Thuẫn Trận Phản Chấn",
+      "kind": "skill_book",
+      "skill": "hv30",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Thuẫn Trận Phản Chấn. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 25."
+    },
+    "sach_kn_hv35": {
+      "name": "Sách Kỹ Năng: Chấn Địa",
+      "kind": "skill_book",
+      "skill": "hv35",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Chấn Địa. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 30."
+    },
+    "sach_kn_hv40": {
+      "name": "Sách Kỹ Năng: Pháo Đài Tiến Quân",
+      "kind": "skill_book",
+      "skill": "hv40",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Pháo Đài Tiến Quân. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 35."
+    },
+    "sach_kn_hv27": {
+      "name": "Sách Kỹ Năng: Thuẫn Kích",
+      "kind": "skill_book",
+      "skill": "hv27",
+      "level": 27,
+      "stack": true,
+      "price": 43740,
+      "desc": "Đọc để học kỹ năng Thuẫn Kích. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 27."
+    },
+    "sach_kn_hv32": {
+      "name": "Sách Kỹ Năng: Ý Chí Hộ Vệ",
+      "kind": "skill_book",
+      "skill": "hv32",
+      "level": 32,
+      "stack": true,
+      "price": 61440,
+      "desc": "Đọc để học kỹ năng Ý Chí Hộ Vệ. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 32."
+    },
+    "sach_kn_hv37": {
+      "name": "Sách Kỹ Năng: Khiên Xoáy",
+      "kind": "skill_book",
+      "skill": "hv37",
+      "level": 37,
+      "stack": true,
+      "price": 82140,
+      "desc": "Đọc để học kỹ năng Khiên Xoáy. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 37."
+    },
+    "sach_kn_hv38": {
+      "name": "Sách Kỹ Năng: Thành Lũy Bất Diệt",
+      "kind": "skill_book",
+      "skill": "hv38",
+      "level": 38,
+      "stack": true,
+      "price": 86640,
+      "desc": "Đọc để học kỹ năng Thành Lũy Bất Diệt. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 38."
+    },
+    "sach_kn_hv42": {
+      "name": "Sách Kỹ Năng: Phản Chấn Địa Long",
+      "kind": "skill_book",
+      "skill": "hv42",
+      "level": 42,
+      "stack": true,
+      "price": 105840,
+      "desc": "Đọc để học kỹ năng Phản Chấn Địa Long. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 42."
+    },
+    "sach_kn_hv45": {
+      "name": "Sách Kỹ Năng: Tuyên Chiến",
+      "kind": "skill_book",
+      "skill": "hv45",
+      "level": 45,
+      "stack": true,
+      "price": 121500,
+      "desc": "Đọc để học kỹ năng Tuyên Chiến. Dành cho: Hộ Vệ Bất Khuất. Cần cấp 45."
+    },
+    "sach_kn_tl30": {
+      "name": "Sách Kỹ Năng: Quang Tiễn",
+      "kind": "skill_book",
+      "skill": "tl30",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Quang Tiễn. Dành cho: Thánh Linh. Cần cấp 25."
+    },
+    "sach_kn_tl25": {
+      "name": "Sách Kỹ Năng: Thánh Vực",
+      "kind": "skill_book",
+      "skill": "tl25",
+      "level": 25,
+      "stack": true,
+      "price": 37500,
+      "desc": "Đọc để học kỹ năng Thánh Vực. Dành cho: Thánh Linh. Cần cấp 25."
+    },
+    "sach_kn_tl35": {
+      "name": "Sách Kỹ Năng: Kết Giới Thánh Quang",
+      "kind": "skill_book",
+      "skill": "tl35",
+      "level": 30,
+      "stack": true,
+      "price": 54000,
+      "desc": "Đọc để học kỹ năng Kết Giới Thánh Quang. Dành cho: Thánh Linh. Cần cấp 30."
+    },
+    "sach_kn_tl40": {
+      "name": "Sách Kỹ Năng: Bình Minh Tái Sinh",
+      "kind": "skill_book",
+      "skill": "tl40",
+      "level": 35,
+      "stack": true,
+      "price": 73500,
+      "desc": "Đọc để học kỹ năng Bình Minh Tái Sinh. Dành cho: Thánh Linh. Cần cấp 35."
+    },
+    "sach_kn_tg27": {
+      "name": "Sách Kỹ Năng: Thánh Quang Chiếu",
+      "kind": "skill_book",
+      "skill": "tg27",
+      "level": 27,
+      "stack": true,
+      "price": 43740,
+      "desc": "Đọc để học kỹ năng Thánh Quang Chiếu. Dành cho: Thánh Linh. Cần cấp 27."
+    },
+    "sach_kn_tg32": {
+      "name": "Sách Kỹ Năng: Phước Lành",
+      "kind": "skill_book",
+      "skill": "tg32",
+      "level": 32,
+      "stack": true,
+      "price": 61440,
+      "desc": "Đọc để học kỹ năng Phước Lành. Dành cho: Thánh Linh. Cần cấp 32."
+    },
+    "sach_kn_tg37": {
+      "name": "Sách Kỹ Năng: Thiên Sứ Hộ Tống",
+      "kind": "skill_book",
+      "skill": "tg37",
+      "level": 37,
+      "stack": true,
+      "price": 82140,
+      "desc": "Đọc để học kỹ năng Thiên Sứ Hộ Tống. Dành cho: Thánh Linh. Cần cấp 37."
+    },
+    "sach_kn_tg38": {
+      "name": "Sách Kỹ Năng: Thánh Dụ",
+      "kind": "skill_book",
+      "skill": "tg38",
+      "level": 38,
+      "stack": true,
+      "price": 86640,
+      "desc": "Đọc để học kỹ năng Thánh Dụ. Dành cho: Thánh Linh. Cần cấp 38."
+    },
+    "sach_kn_tg42": {
+      "name": "Sách Kỹ Năng: Ánh Sáng Phán Xét",
+      "kind": "skill_book",
+      "skill": "tg42",
+      "level": 42,
+      "stack": true,
+      "price": 105840,
+      "desc": "Đọc để học kỹ năng Ánh Sáng Phán Xét. Dành cho: Thánh Linh. Cần cấp 42."
+    },
+    "sach_kn_tg45": {
+      "name": "Sách Kỹ Năng: Phục Sinh Ánh Quang",
+      "kind": "skill_book",
+      "skill": "tg45",
+      "level": 45,
+      "stack": true,
+      "price": 121500,
+      "desc": "Đọc để học kỹ năng Phục Sinh Ánh Quang. Dành cho: Thánh Linh. Cần cấp 45."
+    }
+  }
+}

@@ -260,3 +260,9 @@ func send_trade(action: String, params: Dictionary = {}) -> bool:
 func send_who() -> bool: return send({"t": "who"})
 func send_chlist() -> bool: return send({"t": "chlist"})
 func send_channel(n: int) -> bool: return send({"t": "ch", "n": n})
+
+## Độ bền giáp: báo quái vừa đánh trúng mình (sau khi đã trừ máu). Server tự tra cấp/hạng quái và tự tính hao.
+## Server chặn hai cú cách nhau < HURT_GAP_MS (300ms); client bất tử 700ms sau mỗi cú trúng nên không lo bị chặn.
+func send_hurt(mob_uid: int) -> bool:
+	if mob_uid <= 0 or mob_uid == 900001: return false   # 900001 = quái cục bộ, server không có
+	return send({"t": "hurt", "u": mob_uid})

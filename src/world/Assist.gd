@@ -25,7 +25,7 @@ func _wanted() -> Dictionary:
 	var out := {}
 	var p: Dictionary = Game.player
 	if p.is_empty(): return out
-	for id in w._companion_ids():
+	for id in w.pets._companion_ids():
 		var d: Dictionary = Data.monster(str(id))
 		var md: Dictionary = Data.mount(str(id))
 		out["c:%s" % id] = {"kind": "pet", "id": str(id), "look": str(md.get("look", d.get("look", ""))), "mob": str(id), "sprite": str(d.get("sprite", "")), "tint": md.get("tint", null)}
@@ -110,6 +110,7 @@ func tick(delta: float) -> void:
 	var tnow := Time.get_ticks_msec()
 	if _sync_at == 0 or tnow - _sync_at > 500:
 		_sync_at = tnow
+		_refresh_inputs_sig()
 		sync()
 	if units.is_empty(): return
 	var now := Time.get_ticks_msec()
@@ -155,11 +156,17 @@ func tick(delta: float) -> void:
 	if _batch.size() > 0 and now >= _flush_at: _flush()
 
 ## Cache chỉ số theo id + các đầu vào hiếm đổi. Tránh tạo Dictionary + duyệt gear.keys() 60 lần/giây cho mỗi unit.
-func _cached_stats(kind: String, id: String) -> Dictionary:
-	var key := "%s|%s|%s|%s|%s|%s" % [kind, id, str(Game.player.get("petGear", {})), str(Game.player.get("level", 1)),
+## Chữ ký đầu vào của chỉ số — chỉ dựng lại mỗi 0,5s (cùng nhịp sync), không dựng chuỗi từ Dictionary mỗi khung.
+var _inputs_sig := ""
+
+func _refresh_inputs_sig() -> void:
+	_inputs_sig = "%s|%s|%s|%s" % [str(Game.player.get("petGear", {})), str(Game.player.get("level", 1)),
 		str(Game._as_dict(Game.player.get("skills", {})).get("th5", 1)), str(Game._as_dict(Game.player.get("summons", {})).get("units", {}))]
+
+func _cached_stats(kind: String, id: String) -> Dictionary:
+	var key := kind + "|" + id + "|" + _inputs_sig
 	if _stats_cache.has(key): return _stats_cache[key]
-	var st: Dictionary = w._companion_stats(id) if kind == "pet" else summon_stats(id)
+	var st: Dictionary = w.pets._companion_stats(id) if kind == "pet" else summon_stats(id)
 	if _stats_cache.size() > 64: _stats_cache.clear()
 	_stats_cache[key] = st
 	return st
@@ -167,7 +174,7 @@ func _cached_stats(kind: String, id: String) -> Dictionary:
 func _state_of(u: Dictionary) -> Dictionary:
 	var id := str(u["id"])
 	match str(u["kind"]):
-		"pet": return w._pet_state(id, _cached_stats("pet", id))
+		"pet": return w.pets._pet_state(id, _cached_stats("pet", id))
 		"summon":
 			var sm: Dictionary = Game._as_dict(Game.player.get("summons", {}))
 			if typeof(sm.get("states", null)) != TYPE_DICTIONARY:
@@ -241,8 +248,8 @@ func _attack(u: Dictionary, state: Dictionary, target: Node2D, dx: float, now: i
 	var node: Node2D = u["node"]
 	var dir := 1 if dx >= 0.0 else -1
 	var armor := 1.0 - Formulas.def_reduce(float(target.def_stat), target.mob_level)
-	var rage: Dictionary = w._buff_on("rage")
-	var frenzy: Dictionary = w._buff_on("frenzy")
+	var rage: Dictionary = w.buffs._buff_on("rage")
+	var frenzy: Dictionary = w.buffs._buff_on("frenzy")
 	var class_mul := 1.1 if Game.has_passive("trieu_hoi_su") else 1.0
 	if kind == "shadow":
 		var boost := frenzy if not frenzy.is_empty() else rage
@@ -261,7 +268,7 @@ func _attack(u: Dictionary, state: Dictionary, target: Node2D, dx: float, now: i
 	var atk_mul := 1.0
 	var skills: Array = []
 	if kind == "pet":
-		pstats = w._companion_stats(id)
+		pstats = w.pets._companion_stats(id)
 		atk_mul = float(Game._as_dict(Data.calc.get("MOUNT_ATK", {})).get(id, 1.0))
 		var ms: Dictionary = Game._as_dict(Game.player.get("mounts", {}))
 		var sk_id := str(Game._as_dict(ms.get("skills", {})).get(id, ms.get("skill", "bite")))
@@ -298,7 +305,7 @@ func _attack(u: Dictionary, state: Dictionary, target: Node2D, dx: float, now: i
 				if o.position.distance_to(target.position) <= float(cast["radius"]):
 					var ar := 1.0 - Formulas.def_reduce(float(o.def_stat), o.mob_level)
 					_queue(o, maxi(1, int(roundf(float(pstats["atk"]) * mult2 * 0.8 * ar))), "pet", float(cast.get("slow", 0.0)), dir)
-		if float(cast.get("heal", 0.0)) > 0.0: w._skill_heal(float(cast["heal"]))
+		if float(cast.get("heal", 0.0)) > 0.0: w.buffs._skill_heal(float(cast["heal"]))
 		u["last_combat"] = now
 		FloatText.spawn(w._fx, node.position + Vector2(0, -32), str(cast.get("name", "")), Color(0.55, 0.91, 1.0), 11)
 	elif float(state.get("sta", 0)) >= 4.0:

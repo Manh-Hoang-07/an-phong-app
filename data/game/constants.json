@@ -1,0 +1,12 @@
+{
+  "CONSTANTS": {
+    "MAX_LEVEL": 100,
+    "BAG_SIZE": 40,
+    "STORAGE_SIZE": 30,
+    "STAT_POINTS_PER_LEVEL": 3,
+    "START_MAP": "lang",
+    "TILE": 32,
+    "DEF_REDUCE_MAX": 0.75,
+    "RANK_ORDER": ["E", "D", "C", "B", "A", "S", "SS", "SSS", "X", "EX"]
+  }
+}

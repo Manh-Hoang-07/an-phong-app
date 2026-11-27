@@ -2,13 +2,14 @@
 ## Dựng bản đồ như web: ô đất ĐẶC (mặt cỏ/đá, thân đất có vân, lõi sâu tối hơn) có viền + bo góc theo hàng xóm,
 ## bục gỗ, cỏ/hoa/sỏi rải trên mặt đất, nhà/đèn/cây/pha lê/nhũ đá, thác và hồ nước.
 ## Ô đất được "nướng" thành các ảnh 1024px một lần khi vào map (không vẽ từng ô mỗi khung hình).
-## Hình ô đất / cảnh trí xuất từ web bằng tools/export_art.js; diện mạo từng map từ tools/export_looks.js.
+## Hình ô đất / cảnh trí xuất từ web bằng tools/export/export_art.js; diện mạo từng map từ tools/export/export_looks.js.
 
 const ART := "res://assets/art/"
 const PROPS := "res://assets/props/"
 const ROCK_SCALE := 0.6   # đá nền thu nhỏ còn 60% kích thước cũ
 const TILE := 32
 const CHUNK := 1024
+const MapTileArt := preload("res://src/world/MapTileArt.gd")
 
 var _grid: Array = []
 var _rows := 0
@@ -159,19 +160,114 @@ func build_grid(grid: Array, theme: String, tile_size: float, map_id: String = "
 	_cols = (grid[0] as Array).size() if _rows > 0 else 0
 	_theme = theme if theme in ["city", "forest", "cave", "redgate"] else "city"
 	_look = Data.look(map_id)
+	_map_id = map_id
 	_tile_cache = _tile_cache.duplicate()
 	_edge_cache.clear()
 	_bake_tiles()
 	_build_decor()
 	_build_water()
 
+const CACHE_DIR := "res://assets/mapcache/"
+## Tăng số này khi đổi ảnh ô mẫu (assets/art), MapTileArt.gd hoặc thuật toán dựng nền: ảnh bake cũ sẽ bị bỏ qua
+## (game tự dựng lại như trước) cho tới khi chạy lại tools/export/bake_maps.ps1.
+const CACHE_VER := 1
+
+var _map_id := ""
+
+func _cache_key() -> String:
+	var rows := PackedStringArray()
+	for r in _grid: rows.append("".join(PackedStringArray(r)))
+	var sig := "%d|%s|%s|%s" % [CACHE_VER, _theme, JSON.stringify(_look), "\n".join(rows)]
+	return "%08x" % (sig.hash() & 0xffffffff)
+
+func _cache_path(kind: String, i: int, key: String) -> String:
+	return CACHE_DIR + "%s_%s_%s%d.png" % [_map_id, key, kind, i]
+
+func _chunk_count() -> int:
+	return int(ceil(float(_cols * TILE) / float(CHUNK)))
+
+## Nền đất: ưu tiên ảnh đã bake sẵn trong assets/mapcache (chỉ nạp PNG, gần như tức thì);
+## không có (hoặc map/theme/look/CACHE_VER đã đổi nên khoá không khớp) thì dựng bằng CPU như cũ.
 func _bake_tiles() -> void:
+	var n_chunks := _chunk_count()
+	var t_tex: Array[Texture2D] = []
+	var b_tex: Array[Texture2D] = []
+	if _map_id != "" and n_chunks > 0:
+		var key := _cache_key()
+		for i in range(n_chunks):
+			var tp := _cache_path("t", i, key)
+			var tt: Texture2D = load(tp) as Texture2D if ResourceLoader.exists(tp) else null
+			if tt == null:
+				t_tex.clear()
+				b_tex.clear()
+				break
+			t_tex.append(tt)
+			var bp := _cache_path("b", i, key)
+			b_tex.append(load(bp) as Texture2D if ResourceLoader.exists(bp) else null)
+	if t_tex.size() != n_chunks or n_chunks == 0:
+		t_tex.clear()
+		b_tex.clear()
+		var d := _compose()
+		if d.is_empty(): return
+		var tiles_img: Array = d["tiles"]
+		var bits_img: Array = d["bits"]
+		for i in range(tiles_img.size()):
+			t_tex.append(ImageTexture.create_from_image(tiles_img[i]))
+			b_tex.append(ImageTexture.create_from_image(bits_img[i]))
+	for i in range(t_tex.size()):
+		var spr := Sprite2D.new()
+		spr.texture = t_tex[i]
+		spr.centered = false
+		spr.position = Vector2(i * CHUNK, 0)
+		spr.z_index = -2
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(spr)
+		if b_tex[i] != null:
+			var spb := Sprite2D.new()
+			spb.texture = b_tex[i]
+			spb.centered = false
+			spb.position = Vector2(i * CHUNK, 0)
+			spb.z_index = -1
+			spb.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(spb)
+
+## Dành cho tool bake (tools/export/bake_maps.gd): dựng ảnh nền map rồi ghi PNG vào CACHE_DIR, xoá bản bake cũ của map này.
+## Trả số file PNG đã ghi (0 nếu không dựng được).
+func export_bake(grid: Array, theme: String, map_id: String) -> int:
+	_grid = grid
+	_rows = grid.size()
+	_cols = (grid[0] as Array).size() if _rows > 0 else 0
+	_theme = theme if theme in ["city", "forest", "cave", "redgate"] else "city"
+	_look = Data.look(map_id)
+	_map_id = map_id
+	_edge_cache.clear()
+	var d := _compose()
+	if d.is_empty(): return 0
+	var abs_dir := ProjectSettings.globalize_path(CACHE_DIR)
+	DirAccess.make_dir_recursive_absolute(abs_dir)
+	var rx := RegEx.new()
+	rx.compile("^[0-9a-f]{8}_[tb][0-9]+[.]png([.]import)?$")   # phần đuôi sau "<map_id>_"
+	var da := DirAccess.open(abs_dir)
+	for fn in da.get_files():
+		if fn.begins_with(map_id + "_") and rx.search(fn.substr(map_id.length() + 1)) != null: da.remove(fn)
+	var key := _cache_key()
+	var n := 0
+	var tiles_img: Array = d["tiles"]
+	var bits_img: Array = d["bits"]
+	for i in range(tiles_img.size()):
+		if (tiles_img[i] as Image).save_png(ProjectSettings.globalize_path(_cache_path("t", i, key))) == OK: n += 1
+		if not (bits_img[i] as Image).is_invisible():
+			if (bits_img[i] as Image).save_png(ProjectSettings.globalize_path(_cache_path("b", i, key))) == OK: n += 1
+	return n
+
+## Dựng ảnh nền bằng CPU: {tiles: Array[Image], bits: Array[Image]} mỗi phần tử một mảnh CHUNK px (rỗng nếu thiếu ảnh ô mẫu).
+func _compose() -> Dictionary:
 	var ts := _tile_set()
 	var top: Image = ts["top"]
 	var fills: Array = ts["fills"]
 	var deeps: Array = ts["deeps"]
 	var plank: Image = ts["plank"]
-	if top == null: return
+	if top == null: return {}
 	var W := _cols * TILE
 	var H := _rows * TILE
 	var n_chunks := int(ceil(float(W) / float(CHUNK)))
@@ -198,15 +294,15 @@ func _bake_tiles() -> void:
 				var base: Image = top if is_top else (fills[(c * 7 + r * 13) % fills.size()] as Image)
 				var bkey := "top" if is_top else "fill%d" % ((c * 7 + r * 13) % fills.size())
 				src = _edge(base, bkey, mask, 10)
-				_blit(tiles_img, src, x, y)
+				MapTileArt._blit(tiles_img, src, x, y)
 				if tall and not deeps.is_empty() and _is_deep(r, c):
 					var dm := (0 if _is_deep(r - 1, c) else 1) | (0 if _is_deep(r, c + 1) else 2) | (0 if _is_deep(r + 1, c) else 4) | (0 if _is_deep(r, c - 1) else 8)
 					var di := (c * 5 + r * 3) % deeps.size()
-					_blit(tiles_img, _edge(deeps[di] as Image, "deep%d" % di, dm, 12, true), x, y)
+					MapTileArt._blit(tiles_img, _edge(deeps[di] as Image, "deep%d" % di, dm, 12, true), x, y)
 			elif ch == "=" and plank != null:
 				var mask2 := 1 | 4 | (0 if _cell(r, c + 1) == "=" else 2) | (0 if _cell(r, c - 1) == "=" else 8)
-				_blit(tiles_img, _edge(plank, "plank", mask2, 4), x, y)
-	_decorate(tiles_img, _avg_color(fills[0] as Image) if not fills.is_empty() else Color(0.4, 0.28, 0.16), plank.get_height() if plank != null else 12)
+				MapTileArt._blit(tiles_img, _edge(plank, "plank", mask2, 4), x, y)
+	_decorate(tiles_img, MapTileArt._avg_color(fills[0] as Image) if not fills.is_empty() else Color(0.4, 0.28, 0.16), plank.get_height() if plank != null else 12)
 	# cỏ / hoa / sỏi trên mặt đất
 	var bits :={"city": ["d_rubble", "d_pebble", "d_pebble"], "forest": ["d_grass", "d_flower", "d_grass"], "cave": ["d_pebble", "d_rubble"], "redgate": ["d_pebble", "d_rubble"]}
 	var list: Array = bits.get(_theme, bits["forest"])
@@ -223,22 +319,8 @@ func _bake_tiles() -> void:
 			if not bit_set.is_empty() and prop_sets.has(bit_set):
 				continue   # bộ 'bits' ảnh được dựng bằng sprite ở _build_decor
 			var bi := _img(str(list[h % list.size()]))
-			if bi != null: _blit(bits_img, bi, gx - bi.get_width() / 2, gy - bi.get_height())
-	for i in range(n_chunks):
-		var spr := Sprite2D.new()
-		spr.texture = ImageTexture.create_from_image(tiles_img[i])
-		spr.centered = false
-		spr.position = Vector2(i * CHUNK, 0)
-		spr.z_index = -2
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(spr)
-		var spb := Sprite2D.new()
-		spb.texture = ImageTexture.create_from_image(bits_img[i])
-		spb.centered = false
-		spb.position = Vector2(i * CHUNK, 0)
-		spb.z_index = -1
-		spb.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(spb)
+			if bi != null: MapTileArt._blit(bits_img, bi, gx - bi.get_width() / 2, gy - bi.get_height())
+	return {"tiles": tiles_img, "bits": bits_img}
 
 # ------------------------------------------------------------------ Hoàn thiện mặt đất (procedural, nướng 1 lần)
 ## Bảng màu lớp phủ mặt đất theo chủ đề map: light/mid/dark, cover = tỉ lệ ô được phủ, depth = độ dày (px).
@@ -265,397 +347,6 @@ func _cap_palette() -> Dictionary:
 	var k := t if P.has(t) else str(by_theme.get(_theme, "stone"))
 	var a: Array = P[k]
 	return {"light": a[0], "mid": a[1], "dark": a[2], "cover": a[3], "depth": a[4]}
-
-func _hash2(a: int, b: int) -> int:
-	var h := (a * 73856093) ^ (b * 19349663)
-	h = (h ^ (h >> 13)) * 1274126177
-	return absi(h ^ (h >> 16))
-
-## Lớp phủ mặt đất (cỏ/rêu/tuyết/bụi): viền dưới gợn sóng, ngọn nhô lên; mép trái/phải trùng nhau giữa các biến thể.
-func _make_cap(seed_i: int, pal: Dictionary) -> Image:
-	var W := 32
-	var H := 22
-	var TOP := 8
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 9000 + seed_i
-	var im := Image.create(W, H, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	var a1 := rng.randf_range(0.8, 2.2)
-	var a2 := rng.randf_range(0.5, 1.6)
-	var k1 := rng.randi_range(1, 2)
-	var k2 := rng.randi_range(3, 5)
-	var base_d: float = float(pal["depth"])
-	var light: Color = pal["light"]
-	var mid: Color = pal["mid"]
-	var dark: Color = pal["dark"]
-	for x in range(W):
-		var u := float(x) / float(W)
-		var depth := base_d + a1 * sin(TAU * k1 * u) + a2 * sin(TAU * k2 * u)
-		var hb := rng.randi_range(2, 5) if rng.randf() < 0.32 else rng.randi_range(0, 1)
-		if x == 0 or x == W - 1: hb = 0
-		for y in range(H):
-			var ty := float(y - TOP)
-			if ty < -float(hb) or ty >= depth + 1.0: continue
-			var al := clampf(depth - ty, 0.0, 1.0)
-			var t := (ty + float(hb)) / (depth + float(hb))
-			var col := light.lerp(mid, clampf(t * 1.6, 0.0, 1.0)).lerp(dark, clampf((t - 0.55) * 2.2, 0.0, 1.0))
-			if ty < 0.0:
-				col = light.lerp(mid, 0.35 + 0.15 * float((x + y) % 3))
-			var n := float(_hash2(x + seed_i * 31, y) % 100) / 100.0
-			if n < 0.12: col = col.lightened(0.07)
-			elif n > 0.9: col = col.darkened(0.1)
-			col.a = al
-			im.set_pixel(x, y, col)
-	return im
-
-## Dải rêu/tuyết bám mép bên của ô mặt đất (left=true: mép trái).
-func _make_side(seed_i: int, left: bool, pal: Dictionary) -> Image:
-	var W := 6
-	var H := 20
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7000 + seed_i
-	var im := Image.create(W, H, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	var light: Color = pal["light"]
-	var mid: Color = pal["mid"]
-	var dark: Color = pal["dark"]
-	for y in range(H):
-		var wd := clampf(float(W) - 1.0 - float(y) * 0.16 + float(rng.randi_range(-1, 1)), 0.0, float(W))
-		for x in range(W):
-			if float(x) >= wd: continue
-			var edge := (wd - float(x)) < 1.5
-			var c := mid.lerp(dark, float(y) / float(H)) if edge else light.lerp(mid, float(x) / float(W) + float(y) / float(H))
-			var px := x if left else (W - 1 - x)
-			im.set_pixel(px, y, c)
-	return im
-
-func _make_blotch(seed_i: int, light_blob: bool) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 5000 + seed_i + (500 if light_blob else 0)
-	var im := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	for _b in range(3):
-		var cx := rng.randf_range(10.0, 22.0)
-		var cy := rng.randf_range(10.0, 22.0)
-		var rx := rng.randf_range(3.0, 7.0)
-		var ry := rng.randf_range(2.5, 6.0)
-		for y in range(int(cy - ry) - 1, int(cy + ry) + 2):
-			for x in range(int(cx - rx) - 1, int(cx + rx) + 2):
-				if x < 2 or y < 2 or x > TILE - 3 or y > TILE - 3: continue
-				var d := sqrt(pow((float(x) - cx) / rx, 2.0) + pow((float(y) - cy) / ry, 2.0))
-				if d >= 1.0: continue
-				var al := (1.0 - d) * (0.10 if light_blob else 0.16)
-				var o := im.get_pixel(x, y)
-				var na := minf(0.3, o.a + al)
-				im.set_pixel(x, y, Color(1, 1, 1, na) if light_blob else Color(0.04, 0.02, 0.0, na))
-	return im
-
-func _make_crack(seed_i: int) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 3000 + seed_i
-	var im := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	var x := rng.randi_range(8, 24)
-	var y := rng.randi_range(5, 10)
-	var dx := rng.randi_range(-1, 1)
-	var n := rng.randi_range(9, 16)
-	for i in range(n):
-		if x < 3 or x > TILE - 4 or y < 3 or y > TILE - 4: break
-		im.set_pixel(x, y, Color(0.03, 0.02, 0.01, 0.55))
-		im.set_pixel(x + 1, y, Color(1, 1, 1, 0.1))
-		y += 1
-		if rng.randf() < 0.55: dx = rng.randi_range(-1, 1)
-		x += dx
-		if i == 6:   # nhánh phụ
-			var bx := x
-			var by := y
-			for _j in range(4):
-				bx += 1 if dx >= 0 else -1
-				by += 1
-				if bx < 3 or bx > TILE - 4 or by > TILE - 4: break
-				im.set_pixel(bx, by, Color(0.03, 0.02, 0.01, 0.4))
-	return im
-
-func _make_shadow(h: int, strength: float) -> Image:
-	var im := Image.create(TILE, h, false, Image.FORMAT_RGBA8)
-	for y in range(h):
-		var k := 1.0 - float(y) / float(h)
-		var c := Color(0.02, 0.01, 0.0, strength * k * k)
-		for x in range(TILE): im.set_pixel(x, y, c)
-	return im
-
-func _avg_color(im: Image) -> Color:
-	if im == null: return Color(0.4, 0.28, 0.16)
-	var r := 0.0
-	var g := 0.0
-	var b := 0.0
-	var n := 0
-	for y in range(0, im.get_height(), 2):
-		for x in range(0, im.get_width(), 2):
-			var p := im.get_pixel(x, y)
-			if p.a < 0.5: continue
-			r += p.r
-			g += p.g
-			b += p.b
-			n += 1
-	if n == 0: return Color(0.4, 0.28, 0.16)
-	return Color(r / n, g / n, b / n)
-
-## Một viên đá có khối: mặt sáng phía trên-trái, tối phía dưới-phải, viền tối, vết nứt, rêu bám phía trên.
-func _stone_into(im: Image, cx: float, cy: float, rx: float, ry: float, sd: int, moss: bool, crack: bool, pal: Dictionary) -> void:
-	var lit_c := Color(0.76, 0.72, 0.64)
-	var dark_c := Color(0.2, 0.18, 0.2)
-	var W := im.get_width()
-	var H := im.get_height()
-	var mid: Color = pal["mid"]
-	var light: Color = pal["light"]
-	# quầng tối quanh viên đá (đất bị ép)
-	for y in range(int(cy - ry) - 2, int(cy + ry) + 3):
-		for x in range(int(cx - rx) - 2, int(cx + rx) + 3):
-			if x < 0 or y < 0 or x >= W or y >= H: continue
-			var hx := (float(x) + 0.5 - cx) / (rx + 1.6)
-			var hy := (float(y) + 0.5 - cy - 1.0) / (ry + 1.6)
-			if hx * hx + hy * hy < 1.0 and im.get_pixel(x, y).a < 0.01:
-				im.set_pixel(x, y, Color(0.03, 0.02, 0.01, 0.32))
-	for y in range(int(cy - ry) - 1, int(cy + ry) + 2):
-		for x in range(int(cx - rx) - 1, int(cx + rx) + 2):
-			if x < 0 or y < 0 or x >= W or y >= H: continue
-			var nx := (float(x) + 0.5 - cx) / rx
-			var ny := (float(y) + 0.5 - cy) / ry
-			var d := pow(pow(absf(nx), 2.6) + pow(absf(ny), 2.6), 1.0 / 2.6)
-			if d >= 1.0: continue
-			var n := float(_hash2(x * 3 + sd, y * 5 + sd) % 100) / 100.0
-			var lit := clampf(0.55 - ny * 0.5 - nx * 0.25 + (n - 0.5) * 0.16, 0.0, 1.0)
-			var col := dark_c.lerp(lit_c, lit)
-			if d > 0.72 and ny < -0.25 and nx < 0.5: col = col.lightened(0.18)
-			if moss and ny < -0.2 + (n - 0.5) * 0.7:
-				col = mid.lerp(light, n)
-				if d > 0.85: col = col.darkened(0.3)
-			if d > 0.88: col = Color(0.08, 0.07, 0.08)
-			im.set_pixel(x, y, col)
-	if crack:
-		var x := int(cx) + 1
-		var y := int(cy - ry * 0.5)
-		for _i in range(int(ry * 1.2)):
-			if x < 0 or y < 0 or x >= W or y >= H: break
-			if im.get_pixel(x, y).a > 0.9: im.set_pixel(x, y, Color(0.07, 0.06, 0.07))
-			y += 1
-			x += (_hash2(x + sd, y) % 3) - 1
-
-func _make_stone_tile(seed_i: int, pal: Dictionary) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 11000 + seed_i
-	var im := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	var moss := float(pal["cover"]) >= 0.7 and seed_i % 3 == 0
-	_stone_into(im, rng.randf_range(11.0, 21.0), rng.randf_range(13.0, 20.0), rng.randf_range(4.5, 7.5), rng.randf_range(3.5, 5.5), seed_i, moss, true, pal)
-	if seed_i % 3 == 0:
-		_stone_into(im, rng.randf_range(4.0, 8.0), rng.randf_range(22.0, 27.0), 2.6, 2.0, seed_i + 7, false, false, pal)
-	return im
-
-## Sỏi/đá cuội nhỏ lẫn trong đất.
-func _make_gravel(seed_i: int, pal: Dictionary) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 12000 + seed_i
-	var im := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	for _i in range(rng.randi_range(4, 6)):
-		_stone_into(im, rng.randf_range(3.0, 29.0), rng.randf_range(3.0, 29.0), rng.randf_range(1.5, 2.6), rng.randf_range(1.2, 2.0), rng.randi(), false, false, pal)
-	return im
-
-func _make_grain(seed_i: int) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 13000 + seed_i
-	var im := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	for _i in range(46):
-		var x := rng.randi_range(0, TILE - 1)
-		var y := rng.randi_range(0, TILE - 1)
-		if rng.randf() < 0.5: im.set_pixel(x, y, Color(1.0, 0.92, 0.75, 0.13))
-		else: im.set_pixel(x, y, Color(0.04, 0.02, 0.0, 0.2))
-	return im
-
-## Mảng màu loang lớn (ấm/lạnh/sáng) làm đất có nhiều tông.
-func _make_patch(seed_i: int, col: Color, amax: float) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 14000 + seed_i
-	var im := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	for _b in range(2):
-		var cx := rng.randf_range(6.0, 26.0)
-		var cy := rng.randf_range(6.0, 26.0)
-		var rx := rng.randf_range(6.0, 12.0)
-		var ry := rng.randf_range(4.0, 9.0)
-		for y in range(maxi(0, int(cy - ry)), mini(TILE, int(cy + ry) + 1)):
-			for x in range(maxi(0, int(cx - rx)), mini(TILE, int(cx + rx) + 1)):
-				var d := sqrt(pow((float(x) - cx) / rx, 2.0) + pow((float(y) - cy) / ry, 2.0))
-				if d >= 1.0: continue
-				var n := float(_hash2(x + seed_i * 17, y * 3) % 100) / 100.0
-				var al := (1.0 - d) * amax * (0.7 + 0.5 * n)
-				var o := im.get_pixel(x, y)
-				im.set_pixel(x, y, Color(col.r, col.g, col.b, minf(amax, o.a + al)))
-	return im
-
-## Địa tầng ngang (lượn sóng, tuần hoàn theo x để nối liền giữa các ô).
-func _make_strata(seed_i: int) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 15000 + seed_i
-	var im := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	var y0 := rng.randi_range(5, 24)
-	var amp := rng.randf_range(0.8, 2.2)
-	var kk := rng.randi_range(1, 2)
-	var ph := rng.randf_range(0.0, TAU)
-	for x in range(TILE):
-		var yy := int(round(float(y0) + amp * sin(TAU * kk * float(x) / float(TILE) + ph)))
-		for t in range(1, 5):
-			if yy + t < TILE: im.set_pixel(x, yy + t, Color(0.5, 0.32, 0.14, 0.07))
-		if yy >= 0 and yy < TILE: im.set_pixel(x, yy, Color(0.04, 0.02, 0.0, 0.34))
-		if yy + 1 < TILE: im.set_pixel(x, yy + 1, Color(1.0, 0.9, 0.7, 0.1))
-	return im
-
-## Độ tối dần theo độ sâu: gradient dọc từ độ sâu d tới d+1.
-func _make_depth(d: int) -> Image:
-	var im := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
-	var a0 := clampf(float(d - 1) * 0.085, 0.0, 0.58)
-	var a1 := clampf(float(d) * 0.085, 0.0, 0.58)
-	for y in range(TILE):
-		var a := lerpf(a0, a1, float(y) / float(TILE))
-		var c := Color(0.05, 0.035, 0.08, a)
-		for x in range(TILE): im.set_pixel(x, y, c)
-	return im
-
-func _make_root(seed_i: int) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 16000 + seed_i
-	var im := Image.create(TILE, 48, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	var rc := Color(0.36, 0.24, 0.12)
-	var x := rng.randi_range(6, 25)
-	var y := 0
-	var len := rng.randi_range(16, 40)
-	var dx := 0
-	for i in range(len):
-		if x < 2 or x > TILE - 3 or y >= 48: break
-		var fade := 1.0 - maxf(0.0, float(i) / float(len) - 0.6) * 2.0
-		var c := rc.lerp(Color(0.2, 0.13, 0.07), float(i) / float(len))
-		c.a = clampf(fade, 0.2, 1.0)
-		im.set_pixel(x, y, c)
-		if i < len * 3 / 5:
-			im.set_pixel(x + 1, y, Color(0.04, 0.02, 0.0, 0.5 * c.a))
-			im.set_pixel(x - 1, y, Color(0.6, 0.45, 0.25, 0.45 * c.a))
-		y += 1
-		if rng.randf() < 0.4: dx = rng.randi_range(-1, 1)
-		x += dx
-		if i == len / 2:
-			var bx := x
-			var by := y
-			var bd := 1 if rng.randf() < 0.5 else -1
-			for j in range(rng.randi_range(4, 8)):
-				bx += bd if j % 2 == 0 else 0
-				by += 1
-				if bx < 1 or bx > TILE - 2 or by >= 48: break
-				im.set_pixel(bx, by, Color(rc.r, rc.g, rc.b, 0.8 - float(j) * 0.08))
-	return im
-
-## Cỏ/rêu rủ xuống dưới lớp phủ mặt đất.
-func _make_drip(seed_i: int, pal: Dictionary) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 17000 + seed_i
-	var im := Image.create(TILE, 14, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	var cols: Array = [pal["light"], pal["mid"], pal["mid"], pal["dark"]]
-	var x := 1
-	while x < TILE - 1:
-		var ln := rng.randi_range(2, 9)
-		var c: Color = cols[rng.randi() % cols.size()]
-		var px := x
-		for y in range(ln):
-			if y < 14:
-				var cc := c.darkened(0.12 * float(y) / float(ln)) if y < ln - 1 else c.darkened(0.35)
-				im.set_pixel(px, y, cc)
-			if rng.randf() < 0.25: px = clampi(px + rng.randi_range(-1, 1), 0, TILE - 1)
-		x += rng.randi_range(2, 4)
-	return im
-
-func _make_lip() -> Image:
-	var im := Image.create(TILE, 8, false, Image.FORMAT_RGBA8)
-	for y in range(8):
-		var k := 1.0 - float(y) / 8.0
-		var c := Color(0.03, 0.02, 0.0, 0.4 * k * k)
-		for x in range(TILE): im.set_pixel(x, y, c)
-	return im
-
-func _make_bevel() -> Image:
-	var im := Image.create(TILE, 4, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	for x in range(TILE):
-		im.set_pixel(x, 0, Color(1.0, 0.95, 0.8, 0.34))
-		im.set_pixel(x, 1, Color(1.0, 0.95, 0.8, 0.16))
-		im.set_pixel(x, 3, Color(0.03, 0.02, 0.0, 0.18))
-	return im
-
-## Vách đứng: viền sáng + bóng tối phía trong + vụn đất sụt ra ngoài (dạng cho vách TRÁI, vách phải lật ngang). Rộng 12: 4 ngoài + 8 trong.
-func _make_wall(seed_i: int, earth: Color) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 18000 + seed_i
-	var im := Image.create(12, TILE, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	for y in range(TILE):
-		for e in range(8):
-			var a := 0.3 * (1.0 - float(e) / 8.0)
-			im.set_pixel(4 + e, y, Color(0.04, 0.02, 0.0, a))
-		im.set_pixel(5, y, Color(1.0, 0.9, 0.7, 0.16))
-	var y := 0
-	while y < TILE:
-		if rng.randf() < 0.3:
-			var w := rng.randi_range(1, 3)
-			var h := rng.randi_range(2, 4)
-			for yy in range(h):
-				for xx in range(w):
-					if y + yy >= TILE: continue
-					var px := 3 - xx
-					var c := earth.darkened(0.1 + 0.1 * float(yy) / float(h))
-					if yy == 0: c = earth.lightened(0.12)
-					im.set_pixel(px, y + yy, c)
-			y += h + 1
-		else:
-			y += 1
-	return im
-
-## Mép dưới lởm chởm của khối đất hẫng (không có đất bên dưới).
-func _make_under(seed_i: int, earth: Color) -> Image:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 19000 + seed_i
-	var im := Image.create(TILE, 8, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	var ln := 2
-	for x in range(TILE):
-		ln = clampi(ln + rng.randi_range(-1, 1), 1, 6)
-		if x == 0 or x == TILE - 1: ln = 1
-		for y in range(ln):
-			im.set_pixel(x, y, earth.darkened(0.18 + 0.12 * float(y) / float(ln)))
-		im.set_pixel(x, ln, Color(0.06, 0.04, 0.03, 0.85))
-	return im
-
-## Mặt bục gỗ/đá: mép sáng trên, mặt trước tối dưới, khe ván + đinh.
-func _make_plank_face(h: int, seed_i: int) -> Image:
-	var im := Image.create(TILE, h, false, Image.FORMAT_RGBA8)
-	im.fill(Color(0, 0, 0, 0))
-	for x in range(TILE):
-		im.set_pixel(x, 1, Color(1.0, 0.95, 0.8, 0.4))
-		if h > 3: im.set_pixel(x, 2, Color(1.0, 0.95, 0.8, 0.14))
-		for t in range(4):
-			var yy := h - 4 + t
-			if yy > 3: im.set_pixel(x, yy, Color(0.04, 0.02, 0.0, 0.1 + 0.1 * float(t)))
-	var sx := 15 + (seed_i % 2)
-	for y in range(3, h - 2):
-		im.set_pixel(sx, y, Color(0.04, 0.02, 0.0, 0.4))
-		im.set_pixel(sx + 1, y, Color(1.0, 0.95, 0.8, 0.12))
-	if h > 6:
-		im.set_pixel(5, h / 2, Color(0.04, 0.02, 0.0, 0.5))
-		im.set_pixel(26, h / 2, Color(0.04, 0.02, 0.0, 0.5))
-	return im
 
 ## Số ô đất liên tiếp phía trên (độ sâu tính từ mặt đất).
 func _depth_of(r: int, c: int) -> int:
@@ -686,80 +377,80 @@ func _decorate(chunks: Array[Image], earth: Color = Color(0.4, 0.28, 0.16), plan
 	var walls_r: Array[Image] = []
 	var unders: Array[Image] = []
 	var plank_faces: Array[Image] = []
-	for i in range(6): caps.append(_make_cap(i, pal))
+	for i in range(6): caps.append(MapTileArt._make_cap(i, pal))
 	for i in range(3):
-		sides_l.append(_make_side(i, true, pal))
-		sides_r.append(_make_side(i, false, pal))
+		sides_l.append(MapTileArt._make_side(i, true, pal))
+		sides_r.append(MapTileArt._make_side(i, false, pal))
 	for i in range(5):
-		dark_b.append(_make_blotch(i, false))
-		light_b.append(_make_blotch(i, true))
-	for i in range(4): cracks.append(_make_crack(i))
+		dark_b.append(MapTileArt._make_blotch(i, false))
+		light_b.append(MapTileArt._make_blotch(i, true))
+	for i in range(4): cracks.append(MapTileArt._make_crack(i))
 	for i in range(4):
-		warm.append(_make_patch(i, earth.lightened(0.25).lerp(Color(0.85, 0.55, 0.25), 0.4), 0.2))
-		cool.append(_make_patch(i + 10, Color(0.1, 0.07, 0.13), 0.26))
-		grains.append(_make_grain(i))
-	for i in range(5): gravels.append(_make_gravel(i, pal))
-	for i in range(5): stones.append(_make_stone_tile(i, pal))
-	for i in range(6): stratas.append(_make_strata(i))
-	for i in range(13): depths.append(_make_depth(i))
-	for i in range(5): roots.append(_make_root(i))
-	for i in range(4): drips.append(_make_drip(i, pal))
+		warm.append(MapTileArt._make_patch(i, earth.lightened(0.25).lerp(Color(0.85, 0.55, 0.25), 0.4), 0.2))
+		cool.append(MapTileArt._make_patch(i + 10, Color(0.1, 0.07, 0.13), 0.26))
+		grains.append(MapTileArt._make_grain(i))
+	for i in range(5): gravels.append(MapTileArt._make_gravel(i, pal))
+	for i in range(5): stones.append(MapTileArt._make_stone_tile(i, pal))
+	for i in range(6): stratas.append(MapTileArt._make_strata(i))
+	for i in range(13): depths.append(MapTileArt._make_depth(i))
+	for i in range(5): roots.append(MapTileArt._make_root(i))
+	for i in range(4): drips.append(MapTileArt._make_drip(i, pal))
 	for i in range(3):
-		var wl := _make_wall(i, earth)
+		var wl := MapTileArt._make_wall(i, earth)
 		var wr := wl.duplicate() as Image
 		wr.flip_x()
 		walls_l.append(wl)
 		walls_r.append(wr)
-		unders.append(_make_under(i, earth))
-	for i in range(2): plank_faces.append(_make_plank_face(plank_h, i))
-	var sh_solid := _make_shadow(14, 0.5)
-	var lip := _make_lip()
-	var bevel := _make_bevel()
+		unders.append(MapTileArt._make_under(i, earth))
+	for i in range(2): plank_faces.append(MapTileArt._make_plank_face(plank_h, i))
+	var sh_solid := MapTileArt._make_shadow(14, 0.5)
+	var lip := MapTileArt._make_lip()
+	var bevel := MapTileArt._make_bevel()
 	var cover: float = float(pal["cover"])
 	for r in range(_rows):
 		for c in range(_cols):
 			var ch := _cell(r, c)
 			var x := c * TILE
 			var y := r * TILE
-			var h := _hash2(c, r)
+			var h := MapTileArt._hash2(c, r)
 			if ch == "#":
 				var is_top := not _solid(r - 1, c)
 				var d := 0 if is_top else _depth_near(r, c)
 				# tông màu loang + hạt
-				if (h >> 1) % 3 == 0: _blit(chunks, warm[(h >> 3) % warm.size()], x, y)
-				if (h >> 2) % 3 == 0: _blit(chunks, cool[(h >> 5) % cool.size()], x, y)
-				if h % 3 == 0: _blit(chunks, dark_b[(h >> 3) % dark_b.size()], x, y)
-				if (h >> 5) % 4 == 0: _blit(chunks, light_b[(h >> 7) % light_b.size()], x, y)
-				_blit(chunks, grains[(h >> 6) % grains.size()], x, y)
+				if (h >> 1) % 3 == 0: MapTileArt._blit(chunks, warm[(h >> 3) % warm.size()], x, y)
+				if (h >> 2) % 3 == 0: MapTileArt._blit(chunks, cool[(h >> 5) % cool.size()], x, y)
+				if h % 3 == 0: MapTileArt._blit(chunks, dark_b[(h >> 3) % dark_b.size()], x, y)
+				if (h >> 5) % 4 == 0: MapTileArt._blit(chunks, light_b[(h >> 7) % light_b.size()], x, y)
+				MapTileArt._blit(chunks, grains[(h >> 6) % grains.size()], x, y)
 				# địa tầng ngang: cùng hàng dùng cùng kiểu để vạch nối liền
-				if not is_top and d >= 1 and _hash2(r, 77) % 5 < 3:
-					_blit(chunks, stratas[_hash2(r, 31) % stratas.size()], x, y)
+				if not is_top and d >= 1 and MapTileArt._hash2(r, 77) % 5 < 3:
+					MapTileArt._blit(chunks, stratas[MapTileArt._hash2(r, 31) % stratas.size()], x, y)
 				# sỏi + đá nhỏ có khối
-				if not is_top and (h >> 8) % 100 < 26: _blit(chunks, gravels[(h >> 12) % gravels.size()], x, y)
-				if not is_top and d >= 1 and (h >> 10) % 100 < 11: _blit(chunks, stones[(h >> 14) % stones.size()], x, y)
-				if not is_top and (h >> 9) % 9 == 0: _blit(chunks, cracks[(h >> 11) % cracks.size()], x, y)
+				if not is_top and (h >> 8) % 100 < 26: MapTileArt._blit(chunks, gravels[(h >> 12) % gravels.size()], x, y)
+				if not is_top and d >= 1 and (h >> 10) % 100 < 11: MapTileArt._blit(chunks, stones[(h >> 14) % stones.size()], x, y)
+				if not is_top and (h >> 9) % 9 == 0: MapTileArt._blit(chunks, cracks[(h >> 11) % cracks.size()], x, y)
 				# rễ cây thò từ dưới lớp cỏ
 				if is_top and (h >> 12) % 100 < 28:
-					_blit(chunks, roots[(h >> 14) % roots.size()], x, y + 8)
+					MapTileArt._blit(chunks, roots[(h >> 14) % roots.size()], x, y + 8)
 				# tối dần theo độ sâu (hoà vào nền ở đáy)
-				if d >= 1: _blit(chunks, depths[mini(d, 12)], x, y)
+				if d >= 1: MapTileArt._blit(chunks, depths[mini(d, 12)], x, y)
 				if is_top:
-					_blit(chunks, bevel, x, y)
+					MapTileArt._blit(chunks, bevel, x, y)
 				# vách đứng sụt lở
-				if not _solid(r, c - 1): _blit(chunks, walls_l[(h >> 4) % walls_l.size()], x - 4, y)
-				if not _solid(r, c + 1): _blit(chunks, walls_r[(h >> 6) % walls_r.size()], x + TILE - 8, y)
+				if not _solid(r, c - 1): MapTileArt._blit(chunks, walls_l[(h >> 4) % walls_l.size()], x - 4, y)
+				if not _solid(r, c + 1): MapTileArt._blit(chunks, walls_r[(h >> 6) % walls_r.size()], x + TILE - 8, y)
 				if is_top and float((h >> 4) % 100) / 100.0 < cover:
-					_blit(chunks, lip, x, y + 6)
-					_blit(chunks, caps[(h >> 2) % caps.size()], x, y - 8)
-					if (h >> 7) % 100 < 70: _blit(chunks, drips[(h >> 9) % drips.size()], x, y + 5)
-					if not _solid(r, c - 1): _blit(chunks, sides_l[h % sides_l.size()], x, y + 4)
-					if not _solid(r, c + 1): _blit(chunks, sides_r[h % sides_r.size()], x + TILE - 6, y + 4)
+					MapTileArt._blit(chunks, lip, x, y + 6)
+					MapTileArt._blit(chunks, caps[(h >> 2) % caps.size()], x, y - 8)
+					if (h >> 7) % 100 < 70: MapTileArt._blit(chunks, drips[(h >> 9) % drips.size()], x, y + 5)
+					if not _solid(r, c - 1): MapTileArt._blit(chunks, sides_l[h % sides_l.size()], x, y + 4)
+					if not _solid(r, c + 1): MapTileArt._blit(chunks, sides_r[h % sides_r.size()], x + TILE - 6, y + 4)
 				if not _stand(r + 1, c):
-					_blit(chunks, unders[(h >> 3) % unders.size()], x, y + TILE - 1)
-					_blit(chunks, sh_solid, x, y + TILE)
+					MapTileArt._blit(chunks, unders[(h >> 3) % unders.size()], x, y + TILE - 1)
+					MapTileArt._blit(chunks, sh_solid, x, y + TILE)
 			elif ch == "=":
-				if h % 4 == 0: _blit(chunks, dark_b[(h >> 3) % dark_b.size()], x, y)
-				_blit(chunks, plank_faces[(h >> 2) % plank_faces.size()], x, y)
+				if h % 4 == 0: MapTileArt._blit(chunks, dark_b[(h >> 3) % dark_b.size()], x, y)
+				MapTileArt._blit(chunks, plank_faces[(h >> 2) % plank_faces.size()], x, y)
 				# Bậc gỗ lơ lửng không đổ bóng xuống bên dưới (nhìn vô lý).
 
 func _is_deep(r: int, c: int) -> bool:
@@ -768,24 +459,6 @@ func _is_deep(r: int, c: int) -> bool:
 			if _cell(r + dr, c + dc) != "#": return false
 	return true
 
-## Dán ảnh vào các mảnh 1024px tương ứng.
-func _blit(chunks: Array[Image], src: Image, x: int, y: int) -> void:
-	if src == null: return
-	var w := src.get_width()
-	var i0 := maxi(0, int(floor(float(x) / CHUNK)))
-	var i1 := mini(chunks.size() - 1, int(floor(float(x + w - 1) / CHUNK)))
-	for i in range(i0, i1 + 1):
-		var dst: Image = chunks[i]
-		var dx := x - i * CHUNK
-		# blend_rect cần vùng nguồn nằm trong ảnh; cắt phần ngoài chunk
-		var sx := maxi(0, -dx)
-		var ex := mini(w, dst.get_width() - dx)
-		var sy := maxi(0, -y)
-		var ey := mini(src.get_height(), dst.get_height() - y)
-		if ex <= sx or ey <= sy: continue
-		dst.blend_rect(src, Rect2i(sx, sy, ex - sx, ey - sy), Vector2i(dx + sx, y + sy))
-
-# ------------------------------------------------------------------ Cảnh trí
 func _tint() -> Color:
 	var decor: Dictionary = _look.get("decor", {})
 	if decor.has("tint"):
@@ -871,6 +544,7 @@ func _build_decor() -> void:
 					if cr and _theme == "redgate": cr.modulate = Color(1.0, 0.55, 0.6)
 	# bộ 'bits' ảnh của map (đá nhỏ...) thay cho cỏ/sỏi vẽ code
 	var bit_set := str(D.get("bits", ""))
+	var bit_tex: Dictionary = {}   # đường dẫn -> Texture2D: mỗi ảnh chỉ tra/nạp một lần, không mỗi viên đá
 	if not bit_set.is_empty() and prop_sets.has(bit_set):
 		var n := int((prop_sets[bit_set] as Dictionary).get("n", 1))
 		for r in range(_rows):
@@ -879,8 +553,10 @@ func _build_decor() -> void:
 				var h := (r * 71 + c * 137) % 100
 				if h > 44: continue
 				var path := "%s%s/%d.png" % [PROPS, bit_set, 1 + (h % n)]
-				if not ResourceLoader.exists(path): continue
-				var tex := load(path) as Texture2D
+				if not bit_tex.has(path):
+					bit_tex[path] = load(path) as Texture2D if ResourceLoader.exists(path) else null
+				var tex: Texture2D = bit_tex[path]
+				if tex == null: continue
 				var sc := ROCK_SCALE * 0.5 * (0.8 + float(h % 5) / 10.0)
 				var spr := Sprite2D.new()
 				spr.texture = tex
@@ -922,17 +598,25 @@ func _build_water() -> void:
 				continue
 			var e2 := c
 			while e2 + 1 < _cols and _cell(r, e2 + 1) == "\"": e2 += 1
-			_fx.pools.append([Rect2(c * TILE, r * TILE, (e2 - c + 1) * TILE, TILE), 0.4 if _cell(r - 1, c) == "\"" else 0.6])
+			_fx.pools.append([Rect2(c * TILE, r * TILE, (e2 - c + 1) * TILE, TILE), 0.4 if _cell(r - 1, c) == "\"" else 0.6, _cell(r + 1, c) != "\""])   # [vùng, độ đậm, là hàng nước dưới cùng (chỗ nhân vật đứng)]
 			c = e2 + 1
 	if not _fx.falls.is_empty() or not _fx.pools.is_empty():
 		_fx.z_index = -1   # sau nhân vật/quái (trước đây z=4 che mất người đứng trước thác)
 		add_child(_fx)
+		if not _fx.pools.is_empty():
+			# Lớp nước PHÍA TRƯỚC nhân vật: phủ phần chân để nhân vật trông như đang lội trong nước thay vì đứng đè lên mặt nước.
+			var front := _WaterFront.new()
+			front.fx = _fx
+			front.z_index = 4   # trên nhân vật/quái/thú (0..3), dưới đạn và hiệu ứng kỹ năng (7+)
+			add_child(front)
+			_fx.front = front
 
 class _WaterFx extends Node2D:
 	var fall_tex: Texture2D
 	var pool_tex: Texture2D
 	var falls: Array = []
 	var pools: Array = []
+	var front: Node2D = null   # _WaterFront: lớp nước phủ chân nhân vật, vẽ lại cùng nhịp
 	var _t := 0.0
 	var _redraw_acc := 0.0
 	func _process(d: float) -> void:
@@ -941,6 +625,7 @@ class _WaterFx extends Node2D:
 		if _redraw_acc >= 1.0 / 30.0:
 			_redraw_acc = 0.0
 			queue_redraw()
+			if front != null: front.queue_redraw()
 	func _draw() -> void:
 		# Chỉ vẽ phần nằm trong khung nhìn camera (map rộng có rất nhiều thác/hồ ngoài màn hình).
 		var vis := get_canvas_transform().affine_inverse() * get_viewport_rect()
@@ -960,19 +645,69 @@ class _WaterFx extends Node2D:
 						var src_y := y0 - y
 						draw_texture_rect_region(fall_tex, Rect2(rect.position.x, y0, rect.size.x, y1 - y0), Rect2(0, src_y, fall_tex.get_width(), y1 - y0), Color(1, 1, 1, 0.88))
 					y += th
-		if pool_tex != null:
-			var tw := float(pool_tex.get_width())
-			for p in pools:
-				var rect2: Rect2 = p[0]
-				if not rect2.intersects(vis): continue
-				var off2 := fmod(_t * 15.0, tw)
-				var x := rect2.position.x - off2
-				while x < rect2.end.x:
-					var x0 := maxf(x, rect2.position.x)
-					var x1 := minf(x + tw, rect2.end.x)
-					if x1 > x0:
-						draw_texture_rect_region(pool_tex, Rect2(x0, rect2.position.y, x1 - x0, rect2.size.y), Rect2(x0 - x, 0, x1 - x0, pool_tex.get_height()), Color(1, 1, 1, float(p[1])))
-					x += tw
+		# Hồ/ao: nước dựng bằng code (không dùng ảnh cuộn ngang): màu chuyển sắc theo độ sâu, mặt gợn sóng, ánh lấp lánh trôi chậm.
+		for p in pools:
+			var rect2: Rect2 = p[0]
+			if not rect2.intersects(vis): continue
+			var k := float(p[1]) / 0.6   # hàng nước trên cùng = 1.0, hàng dưới = đậm/đục hơn
+			var top_c := Color(0.6, 0.88, 0.96, 0.34 * k)
+			var bot_c := Color(0.1, 0.36, 0.52, 0.82 * k)
+			var step := 8.0
+			var nseg := int(ceil(rect2.size.x / step))
+			var prev_x := rect2.position.x
+			var prev_y := rect2.position.y + wave(prev_x, _t)
+			var surf := PackedVector2Array([Vector2(prev_x, prev_y)])
+			for i in range(1, nseg + 1):
+				var px := minf(rect2.position.x + float(i) * step, rect2.end.x)
+				var py := rect2.position.y + wave(px, _t)
+				draw_polygon(PackedVector2Array([Vector2(prev_x, prev_y), Vector2(px, py), Vector2(px, rect2.end.y), Vector2(prev_x, rect2.end.y)]),
+					PackedColorArray([top_c, top_c, bot_c, bot_c]))
+				surf.append(Vector2(px, py))
+				prev_x = px
+				prev_y = py
+			draw_polyline(surf, Color(0.9, 0.98, 1.0, 0.55 * k), 1.5)
+			# Vệt sáng lấp lánh trôi ngang, nhấp nháy theo sin
+			var nsh := int(rect2.size.x / 90.0) + 1
+			for s in range(nsh):
+				var sx := rect2.position.x + fposmod(float(s) * 97.0 + _t * (9.0 + float(s % 3) * 4.0), rect2.size.x)
+				var sy := rect2.position.y + 6.0 + fposmod(float(s) * 53.0, maxf(1.0, rect2.size.y - 12.0))
+				var sa := 0.22 * k * (0.5 + 0.5 * sin(_t * 2.3 + float(s) * 1.7))
+				draw_line(Vector2(sx, sy), Vector2(minf(sx + 12.0, rect2.end.x), sy), Color(1, 1, 1, sa), 1.0)
+
+	## Độ cao mặt sóng tại hoành độ px (px) ở thời điểm t: hai sóng sin chồng nhau; lớp trước và lớp sau dùng chung để khớp nhau.
+	static func wave(px: float, t: float) -> float:
+		return sin(px * 0.11 + t * 3.1) * 1.3 + sin(px * 0.27 - t * 2.2) * 0.6
+
+## Lớp nước phủ phía TRƯỚC nhân vật (z cao hơn nhân vật): một dải nước hơi đục ở sát mặt đất + gợn sóng sáng trên mặt,
+## nên chân nhân vật chìm trong nước thay vì đứng đè lên mặt hồ. Chỉ vẽ ở hàng nước dưới cùng và trong khung nhìn.
+class _WaterFront extends Node2D:
+	const DEPTH := 15.0       # bề dày dải nước phủ chân (px)
+	var fx: Node2D = null     # _WaterFx: lấy danh sách hồ và đồng hồ chung
+	func _draw() -> void:
+		if fx == null: return
+		var vis := get_canvas_transform().affine_inverse() * get_viewport_rect()
+		vis = vis.grow(64.0)
+		var t: float = fx._t
+		for p in fx.pools:
+			if not bool(p[2]): continue
+			var rect: Rect2 = p[0]
+			if not rect.intersects(vis): continue
+			var h := minf(rect.size.y, DEPTH)
+			var y0 := rect.end.y - h
+			# Thân nước phủ chân: trong ở mặt, đậm dần xuống đáy (không ảnh cuộn)
+			var top_c := Color(0.55, 0.85, 0.95, 0.0)   # mép trên trong suốt: dải phủ chân hoà vào mặt hồ, không tạo thêm đường sóng thứ hai
+			var bot_c := Color(0.06, 0.28, 0.42, 0.55)
+			var step := 8.0
+			var nseg := int(ceil(rect.size.x / step))
+			var prev_x := rect.position.x
+			var prev_y := y0 + _WaterFx.wave(prev_x, t)
+			for i in range(1, nseg + 1):
+				var px := minf(rect.position.x + float(i) * step, rect.end.x)
+				var py := y0 + _WaterFx.wave(px, t)
+				draw_polygon(PackedVector2Array([Vector2(prev_x, prev_y), Vector2(px, py), Vector2(px, rect.end.y), Vector2(prev_x, rect.end.y)]),
+					PackedColorArray([top_c, top_c, bot_c, bot_c]))
+				prev_x = px
+				prev_y = py
 
 ## Độ sâu làm mượt theo 5 cột lân cận (tránh vệt tối gãy ở chân cột đất cao); cột không phải đất dùng độ sâu của chính ô.
 func _depth_near(r: int, c: int) -> int:

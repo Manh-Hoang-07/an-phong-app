@@ -61,6 +61,9 @@ var _song_key: String = ""
 var _song_bar: int = 0
 var _song_next: float = 0.0
 var _song_timer: Timer = null
+var _bar_mutex := Mutex.new()
+var _bar_pending: Dictionary = {}   # ck -> true: đã giao luồng phụ dựng (chỉ luồng chính đụng)
+var _bar_done: Dictionary = {}      # ck -> PackedByteArray: luồng phụ dựng xong, chờ luồng chính nhận (khoá bằng _bar_mutex)
 
 func _ready() -> void:
 	volume = Settings.volume
@@ -190,6 +193,7 @@ func music(map_id: String, theme: String = "") -> void:
 	_song_next = 0.25
 	for p in _music_players: p.stop()
 	if not SONGS.has(key): return
+	for bi in range((SONGS[key]["chords"] as Array).size()): _request_bar(key, bi)   # dựng trước cả 4 bar ở luồng phụ
 	_song_timer.start()
 	_on_song_tick()
 
@@ -201,34 +205,43 @@ func stop_music() -> void:
 func _midi(n: int) -> float:
 	return 440.0 * pow(2.0, float(n - 69) / 12.0)
 
-## Tổng hợp 1 bar (4 nhịp) của một bản nhạc thành AudioStreamWAV rồi phát.
-func _make_bar(song: Dictionary, bar_idx: int) -> AudioStreamWAV:
+## Tổng hợp 1 bar (4 nhịp) thành mảng byte PCM 16-bit. Hàm THUẦN (chỉ đọc hằng số) nên chạy được ở luồng phụ.
+## Mỗi giọng chỉ lặp trong đoạn thời gian của chính nó (không duyệt mọi giọng ở mọi mẫu như trước) và cộng vào bộ đệm float.
+func _mix_bar(song: Dictionary, bar_idx: int) -> PackedByteArray:
 	var beat := 60.0 / float(song.get("bpm", 84))
 	var bar_len := beat * 4.0
 	var n := int(bar_len * MIX_RATE)
-	var data := PackedByteArray()
-	data.resize(n * 2)
 	var chords: Array = song.get("chords", [[57, 60, 64]])
 	var ch: Array = chords[bar_idx % chords.size()]
 	# hợp âm pad + bass; mỗi nốt là sin có bao hình riêng
 	var voices: Array = []
 	for note in ch:
-		voices.append({"f": _midi(int(note)), "amp": 0.16, "delay": 0.0, "dur": bar_len})
-	voices.append({"f": _midi(int(ch[0]) - 12), "amp": 0.30, "delay": 0.0, "dur": beat * 1.6})
-	voices.append({"f": _midi(int(ch[0]) - 12), "amp": 0.22, "delay": beat * 2.0, "dur": beat * 1.6})
+		voices.append([_midi(int(note)), 0.16, 0.0, bar_len])
+	voices.append([_midi(int(ch[0]) - 12), 0.30, 0.0, beat * 1.6])
+	voices.append([_midi(int(ch[0]) - 12), 0.22, beat * 2.0, beat * 1.6])
 	for i in range(8):
 		var note := int(ch[i % ch.size()]) + 12
-		voices.append({"f": _midi(note), "amp": 0.10, "delay": beat * 0.5 * float(i), "dur": beat * 0.9})
+		voices.append([_midi(note), 0.10, beat * 0.5 * float(i), beat * 0.9])
+	var mix := PackedFloat32Array()
+	mix.resize(n)
+	for voice in voices:
+		var w := TAU * float(voice[0])
+		var amp := float(voice[1])
+		var delay := float(voice[2])
+		var dur := float(voice[3])
+		var i0 := maxi(0, int(ceil(delay * MIX_RATE)))
+		var i1 := mini(n - 1, int(floor((delay + dur) * MIX_RATE)))
+		for i in range(i0, i1 + 1):
+			var dt := float(i) / float(MIX_RATE) - delay
+			if dt < 0.0 or dt > dur: continue
+			mix[i] += sin(w * dt) * minf(1.0, dt * 30.0) * pow(1.0 - dt / dur, 1.4) * amp
+	var data := PackedByteArray()
+	data.resize(n * 2)
 	for i in range(n):
-		var t := float(i) / float(MIX_RATE)
-		var v := 0.0
-		for voice in voices:
-			var dt := t - float(voice["delay"])
-			if dt < 0.0 or dt > float(voice["dur"]): continue
-			var env := minf(1.0, dt * 30.0) * pow(1.0 - dt / float(voice["dur"]), 1.4)
-			v += sin(TAU * float(voice["f"]) * dt) * env * float(voice["amp"])
-		var sample := int(clampf(v, -1.0, 1.0) * 26000.0)
-		data.encode_s16(i * 2, sample)
+		data.encode_s16(i * 2, int(clampf(mix[i], -1.0, 1.0) * 26000.0))
+	return data
+
+func _wav_from(data: PackedByteArray) -> AudioStreamWAV:
 	var w := AudioStreamWAV.new()
 	w.format = AudioStreamWAV.FORMAT_16_BITS
 	w.mix_rate = MIX_RATE
@@ -236,7 +249,30 @@ func _make_bar(song: Dictionary, bar_idx: int) -> AudioStreamWAV:
 	w.data = data
 	return w
 
+## Giao việc dựng một bar cho luồng phụ (nếu chưa có / chưa đang dựng) — luồng chính không bị đứng khi vào map mới.
+func _request_bar(song_key: String, slot: int) -> void:
+	var ck := "%s|%d" % [song_key, slot]
+	if _bar_cache.has(ck) or _bar_pending.has(ck): return
+	_bar_pending[ck] = true
+	var song: Dictionary = SONGS[song_key]
+	WorkerThreadPool.add_task(func() -> void:
+		var data := _mix_bar(song, slot)
+		_bar_mutex.lock()
+		_bar_done[ck] = data
+		_bar_mutex.unlock())
+
+## Nhận các bar luồng phụ đã dựng xong (chạy ở luồng chính, mỗi tick nhạc).
+func _collect_bars() -> void:
+	_bar_mutex.lock()
+	var done := _bar_done
+	_bar_done = {}
+	_bar_mutex.unlock()
+	for ck in done.keys():
+		_bar_cache[ck] = _wav_from(done[ck])
+		_bar_pending.erase(ck)
+
 func _on_song_tick() -> void:
+	_collect_bars()
 	if not music_enabled or _song_key.is_empty() or not SONGS.has(_song_key): return
 	var song: Dictionary = SONGS[_song_key]
 	var bar_len := 60.0 / float(song.get("bpm", 84)) * 4.0
@@ -253,8 +289,9 @@ func _on_song_tick() -> void:
 		var ck := "%s|%d" % [_song_key, bar_slot]
 		var stream: AudioStreamWAV = _bar_cache.get(ck, null)
 		if stream == null:
-			stream = _make_bar(song, bar_slot)
-			_bar_cache[ck] = stream
+			_request_bar(_song_key, bar_slot)   # chưa dựng xong ở luồng phụ: đợi tick sau (không đứng hình)
+			_song_next = 0.0
+			break
 		p.stream = stream
 		p.play()
 		_song_bar += 1

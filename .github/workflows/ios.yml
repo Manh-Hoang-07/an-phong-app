@@ -106,7 +106,7 @@ jobs:
           "$GODOT_APP" --headless --path . --import
 
       - name: Kiểm tra cú pháp script
-        run: '"$GODOT_APP" --headless --path . --script res://tools/check_scripts.gd'
+        run: '"$GODOT_APP" --headless --path . --script res://tools/tests/check_scripts.gd'
 
       - name: Xuất dự án Xcode
         run: |

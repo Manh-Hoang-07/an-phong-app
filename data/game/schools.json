@@ -1,0 +1,155 @@
+{
+  "SCHOOLS": {
+    "kiem_si": {
+      "name": "Kiếm Sĩ",
+      "weapon": "kiem",
+      "color": 16734798,
+      "icon": "⚔️",
+      "desc": "Cận chiến bằng kiếm, lướt và chém liên hoàn. Cân bằng công thủ, chỉ số tăng đều theo cấp.",
+      "curve": {"hp": [120, 60], "mp": [40, 5], "atk": [10, 6], "def": [4, 3.25]},
+      "bonus": {}
+    },
+    "cung_thu": {
+      "name": "Cung Thủ",
+      "weapon": "cung",
+      "color": 5230987,
+      "icon": "🏹",
+      "desc": "Bắn cung từ xa. Tấn công tăng nhanh theo cấp, chí mạng +5%, nhưng máu và phòng thủ thấp.",
+      "curve": {"hp": [95, 45], "mp": [45, 6], "atk": [11, 6.75], "def": [2, 2]},
+      "bonus": {"critAdd": 5}
+    },
+    "phap_su": {
+      "name": "Pháp Sư",
+      "weapon": "truong",
+      "color": 7113983,
+      "icon": "🔮",
+      "desc": "Dùng trượng phép khống chế quái, tự hồi máu và đỡ đòn bằng năng lượng. Năng lượng rất dồi dào, máu và phòng thủ thấp.",
+      "curve": {"hp": [100, 47.5], "mp": [70, 11], "atk": [10, 6.25], "def": [2, 2.25]},
+      "bonus": {}
+    },
+    "toan_nang": {
+      "name": "Toàn Năng",
+      "weapon": "than_binh",
+      "color": 16763210,
+      "icon": "✴️",
+      "special": true,
+      "desc": "Class đặc biệt, chỉ thức tỉnh được bằng mật mã. Dùng Thần Binh và mọi vũ khí của các class khác (cầm vũ khí class nào thì hóa thân thành class đó), học mọi kỹ năng của các class, có cả 3 nội tại, thêm 1 ô kỹ năng và tuyệt kỹ riêng. Kỹ năng gây 80% sức mạnh và tốn thêm 20% năng lượng.",
+      "skillPower": 0.8,
+      "skillCost": 1.2,
+      "bonus": {}
+    },
+    "sat_thu": {
+      "name": "Sát Thủ",
+      "weapon": "song_dao",
+      "color": 14696699,
+      "icon": "🗡️",
+      "desc": "Tốc độ cao, chí mạng cực mạnh. Tấn công tăng nhanh nhất, chí mạng +10%, tốc chạy +15%, máu và phòng thủ thấp.",
+      "curve": {"hp": [90, 42.5], "mp": [40, 5], "atk": [12, 7.25], "def": [2, 1.75]},
+      "bonus": {"critAdd": 10, "speed": 1.15}
+    },
+    "tanker": {
+      "name": "Tanker",
+      "weapon": "chuy",
+      "color": 9489145,
+      "icon": "🛡️",
+      "desc": "Hấp thụ đòn, chịu đựng cực tốt. Máu và phòng thủ tăng mạnh theo cấp, hút máu +3%, tấn công thấp.",
+      "curve": {"hp": [150, 80], "mp": [40, 5], "atk": [8, 4.5], "def": [6, 4.75]},
+      "bonus": {"lifestealAdd": 3}
+    },
+    "tri_lieu_su": {
+      "name": "Trị Liệu Sư",
+      "weapon": "thanh_truong",
+      "color": 6942894,
+      "icon": "💚",
+      "desc": "Hồi máu, bảo vệ đồng đội, năng lượng dồi dào. Hồi chiêu kỹ năng -10%, tấn công thấp.",
+      "curve": {"hp": [110, 52.5], "mp": [80, 13], "atk": [7, 4.75], "def": [3, 2.75]},
+      "bonus": {"cdrAdd": 10}
+    },
+    "trieu_hoi_su": {
+      "name": "Triệu Hồi Sư",
+      "weapon": "linh_chau",
+      "color": 9271510,
+      "icon": "🔮",
+      "desc": "Dùng linh lực gọi thực thể hỗ trợ chiến đấu. Năng lượng dồi dào, sức mạnh kỹ năng +8%.",
+      "curve": {"hp": [100, 47.5], "mp": [70, 11], "atk": [8, 5], "def": [2, 2.25]},
+      "bonus": {"skillPower": 1.08}
+    },
+    "kiem_thanh": {
+      "name": "Kiếm Thánh",
+      "weapon": "kiem",
+      "color": 16766287,
+      "icon": "⚔️",
+      "desc": "Chức nghiệp 2 của Kiếm Sĩ. Kiếm khí chém diện rộng, phản kích bằng kiếm tâm, lướt xuyên mục tiêu.",
+      "curve": null,
+      "bonus": {},
+      "base": "kiem_si",
+      "evolved": true
+    },
+    "than_xa": {
+      "name": "Thần Xạ",
+      "weapon": "cung",
+      "color": 4388283,
+      "icon": "🏹",
+      "desc": "Chức nghiệp 2 của Cung Thủ. Bắn nhiều mũi cùng lúc, đặt bẫy và tung một phát xuyên phòng thủ.",
+      "curve": null,
+      "bonus": {"critAdd": 5},
+      "base": "cung_thu",
+      "evolved": true
+    },
+    "dai_phap_su": {
+      "name": "Đại Pháp Sư",
+      "weapon": "truong",
+      "color": 7522559,
+      "icon": "🔮",
+      "desc": "Chức nghiệp 2 của Pháp Sư. Lôi xà, hỏa tường, tinh thạch hộ thân và bão nguyên tố.",
+      "curve": null,
+      "bonus": {},
+      "base": "phap_su",
+      "evolved": true
+    },
+    "anh_vuong": {
+      "name": "Ảnh Vương",
+      "weapon": "song_dao",
+      "color": 13064959,
+      "icon": "🗡️",
+      "desc": "Chức nghiệp 2 của Sát Thủ. Đoạt mệnh, phi đao u ảnh, thế thân bóng tối và bách ảnh sát.",
+      "curve": null,
+      "bonus": {"critAdd": 10, "speed": 1.15},
+      "base": "sat_thu",
+      "evolved": true
+    },
+    "ho_ve_bat_khuat": {
+      "name": "Hộ Vệ Bất Khuất",
+      "weapon": "chuy",
+      "color": 9166079,
+      "icon": "🛡️",
+      "desc": "Chức nghiệp 2 của Tanker. Khiên phi trận, thuẫn trận, chấn địa và pháo đài tiễn.",
+      "curve": null,
+      "bonus": {"lifestealAdd": 3},
+      "base": "tanker",
+      "evolved": true
+    },
+    "thanh_linh": {
+      "name": "Thánh Linh",
+      "weapon": "thanh_truong",
+      "color": 10354640,
+      "icon": "💚",
+      "desc": "Chức nghiệp 2 của Trị Liệu Sư. Hồi máu diện rộng, ban phước và che chở đồng đội.",
+      "curve": null,
+      "bonus": {"cdrAdd": 10},
+      "base": "tri_lieu_su",
+      "evolved": true
+    },
+    "tu_linh_thuat_su": {
+      "name": "Tử Linh Thuật Sư",
+      "weapon": "linh_chau",
+      "color": 11824127,
+      "icon": "☠️",
+      "desc": "Chức nghiệp 2 của Triệu Hồi Sư. Thu phục quái làm bóng ma, lưu tối đa 20 và gọi tối đa 7 cùng lúc.",
+      "curve": null,
+      "bonus": {"skillPower": 1.12},
+      "base": "trieu_hoi_su",
+      "evolved": true
+    }
+  }
+}

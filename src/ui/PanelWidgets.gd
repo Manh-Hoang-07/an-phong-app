@@ -289,7 +289,7 @@ static func empty_cell() -> Control:
 const EQ_CELL := 52.0
 
 ## Ô trang bị: có đồ -> icon + viền độ hiếm; trống -> tên ô mờ ở giữa.
-static func equip_cell(slot_label: String, iid: String, plus: int, selected: bool, cb: Callable) -> Control:
+static func equip_cell(slot_label: String, iid: String, plus: int, selected: bool, cb: Callable, broken: bool = false) -> Control:
 	var cell: Button
 	if iid.is_empty():
 		cell = T.button("", Vector2(EQ_CELL, EQ_CELL))
@@ -306,6 +306,7 @@ static func equip_cell(slot_label: String, iid: String, plus: int, selected: boo
 	else:
 		cell = item_cell(iid, 1, selected, cb, ("+%d" % plus) if plus > 0 else "")
 		cell.custom_minimum_size = Vector2(EQ_CELL, EQ_CELL)
+		if broken: cell.modulate = Color(1.0, 0.55, 0.55)
 	return cell
 
 ## Ảnh thân nhân vật (khung idle đầu tiên, cắt quanh thân) cho màn trang bị.
@@ -448,9 +449,21 @@ static func box_body(p: PanelContainer) -> VBoxContainer:
 
 static func empty_detail(text: String = "Chạm vào một ô để xem chi tiết.") -> PanelContainer:
 	var d := detail_box()
-	var l := T.label(text, T.FS_S, Color(T.C_MUTED, 0.8))
+	var body := box_body(d)
+	body.alignment = BoxContainer.ALIGNMENT_CENTER
+	body.add_theme_constant_override("separation", 12)
+	# Huy hiệu mờ ở giữa để cột chi tiết có "điểm tựa" thị giác, không còn là ô tối trơn.
+	var emblem := T.icon_rect("star", 44.0, Color(T.C_BRASS, 0.42))
+	emblem.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	body.add_child(emblem)
+	var cap := T.label("CHI TIẾT", T.FS_S, Color(T.C_BRASS, 0.85), true)
+	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(cap)
+	var l := T.label(text, T.FS_S, Color(T.C_MUTED, 0.78))
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box_body(d).add_child(l)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(l)
 	return d
 
 ## Thanh chọn kiểu tab: opts = [[id, nhãn], ...].
@@ -570,6 +583,38 @@ static func set_of_item(d: Dictionary) -> Dictionary:
 	return sets[mini(sets.size() - 1, int(floor(float(lv - 1) / float(per))))]
 
 ## Khối thông tin của MỘT món cụ thể (có độ ngẫu nhiên / dòng phụ / cường hóa) — như itemInfo của web.
+## Màu theo độ bền: >=50% xanh, 20-49% vàng, <20% cam, 0% đỏ.
+static func dur_color(pct: int) -> Color:
+	if pct <= 0: return T.C_RED
+	if pct < int(Formulas.DURABILITY["WARN_PCT"]): return Color(1.0, 0.64, 0.25)
+	if pct < 50: return T.C_GOLD
+	return T.C_GREEN
+
+## Nhãn ngắn "Bền 87%" / "HỎNG"; rỗng nếu đồ vô hạn hoặc không phải trang bị.
+static func dur_text(entry: Dictionary) -> String:
+	var pct := Formulas.dur_pct(entry)
+	if pct < 0: return ""
+	return "HỎNG" if pct <= 0 else "Bền %d%%" % pct
+
+## Thanh độ bền + lời nhắc khi hỏng, thêm vào `body`.
+static func dur_block(body: VBoxContainer, entry: Dictionary) -> void:
+	var pct := Formulas.dur_pct(entry)
+	if pct < 0: return
+	var col := dur_color(pct)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var lb := T.label("Độ bền: " + dur_text(entry), T.FS_S, col, true)
+	lb.autowrap_mode = TextServer.AUTOWRAP_OFF
+	row.add_child(lb)
+	var bar := _flat_bar(pct, 100, col, 10)
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(bar)
+	body.add_child(row)
+	if pct <= 0:
+		var w := T.label("Đã hỏng: không cộng chỉ số, không mặc được. Mang đến Thợ rèn để sửa.", 11, T.C_RED)
+		w.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.add_child(w)
+
 static func _inst_block(body: VBoxContainer, d: Dictionary, entry: Dictionary, compare: bool) -> void:
 	var pl: Dictionary = Game.player
 	var q := clampi(int(entry.get("q", d.get("minQ", 1))), 0, 5)
@@ -597,12 +642,13 @@ static func _inst_block(body: VBoxContainer, d: Dictionary, entry: Dictionary, c
 			body.add_child(T.label("◆ %s +%s%s%s" % [stat_label(str(a[0])), fmt_stat(float(a[1])), stat_unit(str(a[0])), " ★" if pp >= 0.8 else ""], T.FS_S, T.C_BLUE))
 	var pf := inst_perfection(entry)
 	body.add_child(T.label("Độ hoàn hảo: %d%%" % pf, T.FS_S, T.C_GOLD if pf >= 80 else (T.C_GREEN if pf >= 50 else T.C_MUTED), true))
+	dur_block(body, entry)
 	if compare:
 		var slot := str(d.get("slot", ""))
 		var cur: Variant = (pl.get("equip", {}) as Dictionary).get(slot, null)
 		if typeof(cur) == TYPE_DICTIONARY and int((cur as Dictionary).get("uid", -1)) != int(entry.get("uid", -2)):
 			var a_all: Dictionary = Game._inst_stats(entry)
-			var b_all: Dictionary = Game._inst_stats(cur)
+			var b_all: Dictionary = {} if Formulas.is_broken(cur) else Game._inst_stats(cur)
 			var keys := {}
 			for k in a_all.keys(): keys[k] = true
 			for k in b_all.keys(): keys[k] = true

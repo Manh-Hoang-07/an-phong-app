@@ -1,12 +1,12 @@
 # Báo cáo rà soát & kế hoạch sửa hiệu ứng kỹ năng
 
-Ngày rà soát: 2026-11-26. Chỉ đọc mã + dữ liệu (`data/skillfx/*.json`, `SkillFx.gd`, `fx/FxExt_a..d.gd`, `World.gd`, `Proj.gd`, `Fx.gd`). **Chưa chạy Godot nên chưa có ảnh chụp**; kết luận dựa trên đọc code. Chưa sửa gì.
+Ngày rà soát: 2026-11-26. Chỉ đọc mã + dữ liệu (`data/skillfx/*.json`, `SkillFx.gd`, `fx/FxSkillOld_AssassinArcher..d.gd`, `World.gd`, `Proj.gd`, `Fx.gd`). **Chưa chạy Godot nên chưa có ảnh chụp**; kết luận dựa trên đọc code. Chưa sửa gì.
 
 Tổng: 175 kỹ năng / 10 nhóm (sát thủ 22, cung thủ 23, tanker 24, kiếm sĩ 23, tử linh 13, pháp sư 24, trị liệu 22, triệu hồi 12, chung 4, toàn năng 8).
 
 ## 1. Kết luận: vì sao nhìn "đâu đâu"
 
-Hình vẽ riêng của từng kỹ năng (`FxExt_*`) **đã có cho 167/175 kỹ năng và tên khớp** (vd. Thiên Kiếm Giáng = kiếm trời trong cột sáng, Khiên Phi Trảm = đĩa khiên xoay). Cái làm sai là **4 lớp hiệu ứng chung chạy chồng lên mọi kỹ năng, không phân biệt class**:
+Hình vẽ riêng của từng kỹ năng (`FxSkill_*`) **đã có cho 167/175 kỹ năng và tên khớp** (vd. Thiên Kiếm Giáng = kiếm trời trong cột sáng, Khiên Phi Trảm = đĩa khiên xoay). Cái làm sai là **4 lớp hiệu ứng chung chạy chồng lên mọi kỹ năng, không phân biệt class**:
 
 | # | Lớp gây lệch | Ở đâu | Biểu hiện |
 |---|---|---|---|

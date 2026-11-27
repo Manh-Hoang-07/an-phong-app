@@ -4,11 +4,18 @@ extends Node2D
 
 const T := preload("res://src/ui/UITheme.gd")
 
+var _live_particles := 0
+
 func _q() -> float:
 	return 0.5 if Settings.quality_low else 1.0
 
 func _particles(pos: Vector2, count: int, color: Color, speed: Vector2, life: float, size: float, gravity: float = 0.0, spread: float = 180.0, dir: Vector2 = Vector2.UP) -> CPUParticles2D:
+	# Trần số cụm hạt đang sống: đánh dồn dập không tạo thêm khi đã quá nhiều (tránh spike + tụt FPS)
+	if _live_particles >= (14 if Settings.quality_low else 28):
+		return null
+	_live_particles += 1
 	var p := CPUParticles2D.new()
+	p.tree_exited.connect(func() -> void: _live_particles = maxi(0, _live_particles - 1))
 	p.position = pos
 	p.z_index = 20
 	p.amount = maxi(2, int(float(count) * _q()))

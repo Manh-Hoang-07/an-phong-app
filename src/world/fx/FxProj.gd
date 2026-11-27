@@ -1,7 +1,7 @@
 extends RefCounted
 ## Hình đạn bay RIÊNG theo từng kỹ năng bắn (thay quả cầu cam chung). Vẽ lên Proj (Node2D): +x = hướng bay, gốc = đầu đạn.
 ## s cần có: _a(al), _k(al), _mix(u, al) và các hàm draw_*; t = giây kể từ lúc bắn.
-const E := preload("res://src/world/fx/FxExt_e.gd")
+const E := preload("res://src/world/fx/FxSkill_Swordsman.gd")
 
 ## id kỹ năng -> kiểu đạn. Kiểu "arrow:<style>:<len>" là mũi tên, các kiểu khác xem draw().
 const SHAPES := {
@@ -49,7 +49,7 @@ static func sprite_shader() -> Shader:
 static func has(id: String) -> bool:
 	return SHAPES.has(id)
 
-# ---- tiện ích (gọi sang bộ nét của FxExt_e)
+# ---- tiện ích (gọi sang bộ nét của FxSkill_Swordsman)
 static func A(s, al: float) -> Color: return E.A(s, al)
 static func K(s, al: float) -> Color: return E.K(s, al)
 static func M(s, u: float, al: float) -> Color: return E.M(s, u, al)

@@ -201,7 +201,21 @@ func _ensure_name() -> void:
 	_name.visible = is_boss   # quái thường chỉ hiện tên khi là mục tiêu (World bật qua show_name); trùm luôn hiện
 	add_child(_name)
 
+var _off_screen := false
+var _vis_check_at := 0
+
 func _process(delta: float) -> void:
+	var tick := Time.get_ticks_msec()
+	if tick >= _vis_check_at:
+		_vis_check_at = tick + 250
+		var vp := get_viewport()
+		if vp != null:
+			var view: Rect2 = vp.get_canvas_transform().affine_inverse() * vp.get_visible_rect()
+			_off_screen = not view.grow(240.0).has_point(position)
+	if _off_screen:
+		# Ngoài màn hình: nhảy thẳng tới đích, bỏ nội suy/đổi màu mỗi khung (tiết kiệm CPU khi map đông quái)
+		if _has_target and alive: position = target
+		return
 	if _has_target and alive:
 		var k := 1.0 - exp(-14.0 * delta)
 		var moving := position.distance_to(target) > 3.0

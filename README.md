@@ -2,7 +2,7 @@
 
 Client điện thoại (Android / iOS) dùng chung tài khoản, thế giới và server với bản web `D:\Source\AnPhong`.
 Luật chơi nằm ở server; app chỉ hiển thị, gửi input/đòn và nhận kết quả.
-Kế hoạch và nhật ký sửa lỗi: [KE_HOACH_SUA.md](KE_HOACH_SUA.md).
+Kế hoạch và nhật ký sửa lỗi: [docs/KE_HOACH_SUA.md](docs/KE_HOACH_SUA.md) (nhật ký lịch sử).
 
 ## Trạng thái (2026-11-23)
 
@@ -21,19 +21,26 @@ fusion / manaburst / allin, thú đồng hành và bóng ma đi theo, export `.a
 AnPhong-App/
 ├── project.godot          # Godot 4, Compatibility, viewport 960x432, landscape, mouse<->touch
 ├── data/
-│   ├── gamedata.json      # do server/tools/export-gamedata.js sinh
-│   ├── quests.json        # tools/export_quests.js
-│   ├── map_looks.json     # tools/export_looks.js (nền, thời tiết, cảnh trí từng map)
-│   ├── maps/<id>.txt      # mỗi bản đồ một file (copy từ shared/maps, tools/sync_maps.ps1)
+│   ├── game/              # skills, items, schools, monsters, npcs, maps, constants, meta (.json) — tách từ gamedata.json của web
+│   ├── quests/            # main, side, awaken (.json) — tools/export/export_quests.js
+│   ├── map_looks.json     # tools/export/export_looks.js (nền, thời tiết, cảnh trí từng map)
+│   ├── (assets/mapcache/)  # ảnh nền map bake sẵn (PNG) — chạy lại tools/export/bake_maps.ps1 khi đổi data/maps, map_looks.json, assets/art hoặc MapTileArt/MapView (đổi ảnh ô mẫu thì tăng MapView.CACHE_VER); thiếu/lệch thì game tự dựng như cũ
+│   ├── maps/<id>.txt      # mỗi bản đồ một file (copy từ shared/maps, tools/sync/sync_maps.ps1)
 │   └── skillfx/           # hiệu ứng kỹ năng, cùng file với web
 ├── assets/                # bg, chars, mobs, npcs, items (svg), fonts (Be Vietnam Pro), ui/icons (svg)
 ├── src/
 │   ├── autoload/          # Settings, Net (HTTP), Socket (WebSocket), Data, Game, Social, Audio
-│   ├── scenes/            # Boot -> Login -> World
+│   ├── scenes/            # Boot -> Login -> World (World.gd = hub: node, trạng thái dùng chung, điều phối)
+│   │   └── world/         # WorldPart + hệ thống: Map, Motor, Target, Buff, Combat, Life, Pet, Loot, Net, Potion, Form
 │   ├── world/             # MapView, Background, CharSprite, MobSprite, RemotePlayer, MapEntities (NPC/cổng),
-│   │                      # LootNode, FloatText, SkillFx
-│   └── ui/                # UITheme (design system), SplashBG, MobileHUD, GamePanels, PanelWidgets
-└── tools/                 # sync_assets.ps1, sync_maps.ps1, compare_formulas.js, check_scripts.gd, ui_smoke.gd
+│   │                      # LootNode, FloatText, SkillFx (điều phối hiệu ứng kỹ năng), MapTileArt (sinh ảnh ô đất cho MapView)
+│   │   └── fx/            # FxExt (sổ đăng ký, thứ tự = ưu tiên), FxShape (node vẽ), FxProj (đạn), AuraOrbit, FxCreature,
+│   │                      # FxSkill_<Class>.gd = bản hiện hành (Swordsman, Archer, Assassin, Tank, Mage,
+│   │                      # Healer, Necromancer, Summoner, CommonOmni); FxSkillOld_*.gd = bản cũ, chỉ còn các kỹ năng chưa viết lại
+│   └── ui/                # UITheme (design system), SplashBG, MobileHUD (hub), GamePanels (hub), PanelWidgets, SkillIcons...
+│       ├── hud/           # HudPart + HudStats/Menu/Controls/Chat/Notices/Panel/Prompts/ScreenFx/Buffs, ActionButton
+│       └── panels/        # PanelBase + PanelBag/Equip/Skills/Quest/World/Shop/Pets/System/Awaken/Social (mỗi file vài build_<tab>)
+└── tools/                 # tests/ (check_scripts, ui_smoke, combat_test, move_test, ...), export/ (export_*.js lấy dữ liệu từ web), sync/ (sync_maps, sync_assets)
 ```
 
 ## Chạy
@@ -44,18 +51,19 @@ godot --headless --path D:\Source\AnPhong-App --import
 godot --path D:\Source\AnPhong-App
 
 # Kiểm tra lỗi parse mọi script
-godot --headless --path D:\Source\AnPhong-App --script res://tools/check_scripts.gd
+godot --headless --path D:\Source\AnPhong-App --script res://tools/tests/check_scripts.gd
 
 # Chụp ảnh giao diện không cần server (dữ liệu nhân vật giả)
-godot --path D:\Source\AnPhong-App --rendering-driver opengl3 --script res://tools/ui_smoke.gd -- <login|boot|hud|world|combat|menu|bag|char|skills|shop|social|trade> out.png
+godot --path D:\Source\AnPhong-App --rendering-driver opengl3 --script res://tools/tests/ui_smoke.gd -- <login|boot|hud|world|combat|menu|bag|char|skills|shop|social|trade> out.png
 ```
 
 Godot 4.7 đang để ở `D:\Source\.godot-validate\`. Đồng bộ dữ liệu từ web:
 
 ```powershell
 node D:\Source\AnPhong\server\tools\export-gamedata.js
-powershell -ExecutionPolicy Bypass -File D:\Source\AnPhong-App\tools\sync_maps.ps1
-powershell -ExecutionPolicy Bypass -File D:\Source\AnPhong-App\tools\sync_assets.ps1
+node D:\Source\AnPhong-App\tools\export\split_gamedata.js
+powershell -ExecutionPolicy Bypass -File D:\Source\AnPhong-App\tools\sync\sync_maps.ps1
+powershell -ExecutionPolicy Bypass -File D:\Source\AnPhong-App\tools\sync\sync_assets.ps1
 ```
 
 ## Giao thức (đã đối chiếu với server)

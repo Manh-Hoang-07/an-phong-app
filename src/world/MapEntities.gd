@@ -1,6 +1,6 @@
 extends Node2D
 ## NPC và cổng dịch chuyển trên bản đồ, đặt theo ký tự marker trong file map (meta.npcs / meta.portals).
-## Hình NPC / cổng lấy từ web (assets/art/npc_*.png, d_portal.png do tools/export_art.js xuất) hoặc ảnh NPC gốc (assets/npcs).
+## Hình NPC / cổng lấy từ web (assets/art/npc_*.png, d_portal.png do tools/export/export_art.js xuất) hoặc ảnh NPC gốc (assets/npcs).
 ## Tương tác bằng nút ngữ cảnh trên HUD khi đứng gần.
 
 const T := preload("res://src/ui/UITheme.gd")
@@ -159,22 +159,30 @@ func _add_npc(id: String, foot: Vector2) -> void:
 	var def: Dictionary = Data.npc(id)
 	var n := Node2D.new()
 	n.position = foot
-	n.z_index = 2
+	n.z_index = 0   # cùng lớp với nhân vật; MapLayer đứng trước Player trong cây nên NPC luôn nằm SAU nhân vật (trước đây z=2 che mất người đứng cạnh)
 	add_child(n)
 	# bóng dưới chân
 	var shadow := _Shadow.new()
-	shadow.z_index = -1
+	shadow.z_index = 0   # bóng vẽ trước (add_child trước ảnh NPC) nên nằm dưới ảnh
 	n.add_child(shadow)
 	var vis := make_npc_visual(id, def, foot.x > _world_w * 0.5)
 	n.add_child(vis)
 	var tw0 := vis.create_tween().set_loops()
 	tw0.tween_property(vis, "scale:y", 1.02, 1.3).set_trans(Tween.TRANS_SINE)
 	tw0.tween_property(vis, "scale:y", 1.0, 1.3).set_trans(Tween.TRANS_SINE)
-	var name_l := T.hud_label(str(def.get("name", id)), 12, Color("ffe9a8"), true)
-	name_l.position = Vector2(-70, -84)
-	name_l.custom_minimum_size = Vector2(140, 0)
+	var name_bg := PanelContainer.new()
+	name_bg.position = Vector2(-70, -84)
+	name_bg.custom_minimum_size = Vector2(140, 0)
+	name_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var name_sb := StyleBoxFlat.new()
+	name_sb.bg_color = Color(0.02, 0.03, 0.06, 0.55)
+	name_sb.set_corner_radius_all(7)
+	name_sb.set_content_margin_all(4)
+	name_bg.add_theme_stylebox_override("panel", name_sb)
+	var name_l := T.label(str(def.get("name", id)), 12, Color("ffe9a8"), true)
 	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	n.add_child(name_l)
+	name_bg.add_child(name_l)
+	n.add_child(name_bg)
 	# Dấu trên đầu: dấu nhiệm vụ (ảnh web) hoặc icon dịch vụ
 	var role := str(def.get("role", ""))
 	var mark := Node2D.new()

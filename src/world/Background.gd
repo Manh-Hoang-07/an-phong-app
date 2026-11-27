@@ -1,6 +1,6 @@
 extends Node2D
 ## Nền parallax riêng từng bản đồ (cùng công thức với web: ghép lớp sky/far/mid/near từ nhiều bộ ảnh + chỉnh màu).
-## Công thức lấy từ data/map_looks.json (tools/export_looks.js). Lớp chỉnh màu bằng shader (hue/sat/lum/tint/mix/gamma),
+## Công thức lấy từ data/map_looks.json (tools/export/export_looks.js). Lớp chỉnh màu bằng shader (hue/sat/lum/tint/mix/gamma),
 ## cảnh tĩnh (lr_*) phủ kín bề ngang và ghép gương để lặp liền mạch. Thiếu ảnh thì dùng nền gradient theo theme.
 
 const BG_DIR := "res://assets/bg"

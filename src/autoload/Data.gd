@@ -1,10 +1,12 @@
 extends Node
-## Nạp data/gamedata.json đóng sẵn trong app; so hash với /api/version (dataHash).
+## Nạp dữ liệu game đóng sẵn trong app (data/game/*.json, tách từ gamedata.json của web bằng tools/export/split_gamedata.js);
+## so hash với /api/version (dataHash).
 ## Expose SKILLS / ITEMS / MAPS (và SCHOOLS / MONSTERS / NPCS) cho phần còn lại.
 
 signal loaded(ok: bool, message: String)
 
-const DATA_PATH := "res://data/gamedata.json"
+const DATA_DIR := "res://data/game"        # meta, skills, items, schools, monsters, npcs, maps, constants
+const QUEST_DIR := "res://data/quests"    # main, side, awaken
 
 var raw: Dictionary = {}
 var SKILLS: Dictionary = {}
@@ -29,20 +31,12 @@ func _ready() -> void:
 	load_local()
 
 func load_local() -> bool:
-	# Autoload _ready() đã nạp một lần; Boot/Boot lại gọi thêm. Tránh parse lại ~581 KB JSON.
+	# Autoload _ready() đã nạp một lần; Boot/Boot lại gọi thêm. Tránh parse lại ~240 KB JSON.
 	# Nếu lần trước thất bại (raw rỗng) thì vẫn cho retry ở đây.
 	if not raw.is_empty(): return true
-	if not FileAccess.file_exists(DATA_PATH):
-		loaded.emit(false, "Thiếu data/gamedata.json — chạy node server/tools/export-gamedata.js")
-		return false
-	var f := FileAccess.open(DATA_PATH, FileAccess.READ)
-	if f == null:
-		loaded.emit(false, "Không mở được gamedata.json")
-		return false
-	var parsed: Variant = JSON.parse_string(f.get_as_text())
-	f.close()
-	if typeof(parsed) != TYPE_DICTIONARY:
-		loaded.emit(false, "gamedata.json không đúng định dạng")
+	var parsed := _read_dataset(DATA_DIR)
+	if parsed.is_empty():
+		loaded.emit(false, "Thiếu data/game/*.json — chạy node server/tools/export-gamedata.js rồi node tools/export/split_gamedata.js")
 		return false
 	raw = parsed
 	SKILLS = _section("SKILLS")
@@ -57,6 +51,28 @@ func load_local() -> bool:
 	_load_looks()
 	loaded.emit(true, "")
 	return true
+
+## Đọc một file JSON; trả null nếu thiếu/lỗi.
+func _read_json(path: String) -> Variant:
+	if not FileAccess.file_exists(path): return null
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null: return null
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	return parsed
+
+## Đọc một bộ dữ liệu chia nhỏ: thư mục chứa nhiều file .json, mỗi file là một object; gộp các khoá lại.
+func _read_dataset(dir: String) -> Dictionary:
+	var out := {}
+	var files := Array(DirAccess.get_files_at(dir))
+	files.sort()
+	for fn in files:
+		var name := str(fn).trim_suffix(".remap")
+		if not name.ends_with(".json"): continue
+		var part: Variant = _read_json(dir + "/" + name)
+		if typeof(part) == TYPE_DICTIONARY: out.merge(part, true)
+		else: push_error("Dữ liệu lỗi: %s/%s" % [dir, name])
+	return out
 
 ## Emoji trong dữ liệu -> token "@họ" (vẽ bằng GlyphArt) để không phải nạp font emoji hệ thống (crash iOS).
 func _fix_icons() -> void:
@@ -120,6 +136,7 @@ func skill_lv(pl: Dictionary, id: String) -> int:
 		for slot in (eq as Dictionary).keys():
 			var it: Variant = (eq as Dictionary)[slot]
 			if typeof(it) != TYPE_DICTIONARY: continue
+			if Formulas.is_broken(it): continue
 			if str(item(str((it as Dictionary).get("id", ""))).get("grantsSkill", "")) == id:
 				return clampi(int(floor(float(int(pl.get("level", 1))) / 8.0)), 1, 10)
 	return 1
@@ -317,7 +334,7 @@ const MAP_DIR := "res://data/maps/"
 var _map_cache: Dictionary = {}
 
 ## Bản đồ ký tự của một map: đọc data/maps/<id>.txt (mỗi map một file, giống shared/maps của web).
-## Thiếu file thì rơi về MAP_TEXTS trong gamedata.json. Trả "" nếu không có.
+## Trả "" nếu không có.
 func map_text(id: String) -> String:
 	if _map_cache.has(id): return _map_cache[id]
 	var text := ""
@@ -325,8 +342,6 @@ func map_text(id: String) -> String:
 	if FileAccess.file_exists(path):
 		var f := FileAccess.open(path, FileAccess.READ)
 		if f: text = f.get_as_text(); f.close()
-	if text.is_empty():
-		text = str(raw.get("MAP_TEXTS", {}).get(id, ""))
 	_map_cache[id] = text
 	return text
 
@@ -341,21 +356,16 @@ func const_arr(key: String) -> Array:
 	var v: Variant = raw.get("CONSTANTS", {}).get(key, [])
 	return v if typeof(v) == TYPE_ARRAY else []
 
-## Nhiệm vụ chính + phụ tuyến (data/quests.json, xuất bằng tools/export_quests.js).
+## Nhiệm vụ chính + phụ tuyến (data/quests/*.json, xuất bằng tools/export/export_quests.js).
 func _load_quests() -> void:
 	QUESTS = []; SIDE_QUESTS = []; _quest_idx = {}
-	var path := "res://data/quests.json"
-	if not FileAccess.file_exists(path): return
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null: return
-	var parsed: Variant = JSON.parse_string(f.get_as_text())
-	f.close()
-	if typeof(parsed) != TYPE_DICTIONARY: return
-	QUESTS = (parsed as Dictionary).get("QUESTS", [])
-	SIDE_QUESTS = (parsed as Dictionary).get("SIDE", [])
-	AWAKENS = (parsed as Dictionary).get("AWAKENS", [])
-	EVOLUTION_SCHOOLS = (parsed as Dictionary).get("EVOLUTION_SCHOOLS", [])
-	STAMINA = (parsed as Dictionary).get("STAMINA", {})
+	var parsed := _read_dataset(QUEST_DIR)
+	if parsed.is_empty(): return
+	QUESTS = parsed.get("QUESTS", [])
+	SIDE_QUESTS = parsed.get("SIDE", [])
+	AWAKENS = parsed.get("AWAKENS", [])
+	EVOLUTION_SCHOOLS = parsed.get("EVOLUTION_SCHOOLS", [])
+	STAMINA = parsed.get("STAMINA", {})
 	for i in range(QUESTS.size()): _quest_idx[str((QUESTS[i] as Dictionary).get("id", ""))] = i
 
 func quest_by_id(id: String) -> Dictionary:
@@ -540,9 +550,9 @@ func is_village(m: Dictionary) -> bool:
 	var v: Variant = m.get("village", false)
 	return typeof(v) == TYPE_DICTIONARY or (typeof(v) == TYPE_BOOL and v)
 
-## Bảng hình quái của web (MOBS / LOOK / LOOK_TINT / MON_GRADE), xuất bằng tools/export_mobs.js.
+## Bảng hình quái của web (MOBS / LOOK / LOOK_TINT / MON_GRADE), xuất bằng tools/export/export_mobs.js.
 var mob_art: Dictionary = {}
-## Hằng số tính chỉ số (phẩm chất, bộ trang bị, nội tại, Kỳ Nguyên...), tools/export_calc.js.
+## Hằng số tính chỉ số (phẩm chất, bộ trang bị, nội tại, Kỳ Nguyên...), tools/export/export_calc.js.
 var calc: Dictionary = {}
 
 func _load_looks() -> void:
@@ -552,19 +562,16 @@ func _load_looks() -> void:
 	# và app hiển thị máu thấp hơn server rất nhiều (lỗi 3k vs 15k). Báo rõ thay vì bỏ qua im lặng.
 	for req in ["res://data/calc.json", "res://data/mob_art.json"]:
 		if not FileAccess.file_exists(req):
-			push_error("THIEU FILE DU LIEU: %s — chay: node tools/export_calc.js va node tools/export_mobs.js" % req)
+			push_error("THIEU FILE DU LIEU: %s — chay: node tools/export/export_calc.js va node tools/export/export_mobs.js" % req)
 			printerr("THIEU FILE DU LIEU: ", req)
-	for pair in [["res://data/map_looks.json", "looks"], ["res://assets/art/meta.json", "art_meta"], ["res://data/mob_art.json", "mob_art"], ["res://data/calc.json", "calc"]]:
-		if not FileAccess.file_exists(pair[0]): continue
-		var f := FileAccess.open(pair[0], FileAccess.READ)
-		if f == null: continue
-		var parsed: Variant = JSON.parse_string(f.get_as_text())
-		f.close()
-		if typeof(parsed) == TYPE_DICTIONARY:
-			if pair[1] == "looks": looks = parsed
-			elif pair[1] == "mob_art": mob_art = parsed
-			elif pair[1] == "calc": calc = parsed
-			else: art_meta = parsed
+	var looks_v: Variant = _read_json("res://data/map_looks.json")
+	if typeof(looks_v) == TYPE_DICTIONARY: looks = looks_v
+	var mob_v: Variant = _read_json("res://data/mob_art.json")
+	if typeof(mob_v) == TYPE_DICTIONARY: mob_art = mob_v
+	var calc_v: Variant = _read_json("res://data/calc.json")
+	if typeof(calc_v) == TYPE_DICTIONARY: calc = calc_v
+	var meta_v: Variant = _read_json("res://assets/art/meta.json")
+	if typeof(meta_v) == TYPE_DICTIONARY: art_meta = meta_v
 
 ## Diện mạo của một map (nền, sương, ánh sáng, thời tiết, cảnh trí). Trả {} nếu không có.
 func look(map_id: String) -> Dictionary:

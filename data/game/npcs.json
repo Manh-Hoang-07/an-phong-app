@@ -1,0 +1,681 @@
+{
+  "NPCS": {
+    "npc_an": {
+      "name": "Người Gác Màn",
+      "role": "hidden",
+      "color": 11824127,
+      "greet": "Ta chỉ xuất hiện khi cậu gọi đúng mật hiệu."
+    },
+    "he_thong": {
+      "name": "Hệ thống",
+      "role": "quest",
+      "color": 4182271,
+      "greet": "[Hệ thống] Người chơi đã tỉnh lại. Đang chờ lệnh."
+    },
+    "lao_su": {
+      "name": "Hội trưởng Khải",
+      "role": "quest",
+      "color": 2832981,
+      "greet": "Thợ săn mới à? Ở Tân Đô này, cổng mở ra mỗi ngày. Ai cũng cần người đủ gan bước vào."
+    },
+    "vy": {
+      "name": "Vy",
+      "role": "quest",
+      "color": 8006474,
+      "greet": "Đừng nhìn tôi như vậy, hạng C cũng là thợ săn thôi. Theo sát tôi là được.",
+      "appear": {
+        "lang": [["q0", "q4"], ["q10", "c2q1"], ["c3q6", "c3q7"], ["c3q9", "c4q1"]],
+        "ham_ngam": [["q5", "q5"]],
+        "rung": [["q4", "q7"]],
+        "hang": [["q7", "q9"]],
+        "b_en_pha": [["c2q1", "c2q1"]],
+        "d_lay_muc": [["c2q2", "c2q2"]],
+        "lang_chai": [["c2q3", "c2q4"]],
+        "cc_hac_nguyet": [["c2q5", "c2q5"]],
+        "tan_do_2": [["c2q6", "c2q7"], ["c2q12", "c3q1"]],
+        "tp_chim_t": [["c2q8", "c2q8"]],
+        "tp_chim_c": [["c2q9", "c2q11"]],
+        "chan_nui": [["c3q2", "c3q2"]],
+        "hem_nui": [["c3q3", "c3q3"]],
+        "lo_ren_bang": [["c3q4", "c3q4"]],
+        "dinh_nui": [["c3q5", "c3q5"]],
+        "kho_bac": [["c3q7", "c3q8"]],
+        "vac_da": [["c4q1", "c4q1"]],
+        "cong_khai_hoan": [["c4q1", "c4q2"]],
+        "tan_do_4": [["c4q2", "c4q3b"]],
+        "quang_truong": [["c4q3", "c4q3b"]],
+        "cau_dan": [["c5q2", "c5q2c"]],
+        "sanh_cho": [["c5q2c", "c5q3b"]],
+        "dinh_cong_vh": [["c5q4", "c5q4"]],
+        "tam_diem": [["c5q5", "c5q5"]],
+        "tan_do_bt": [["c5q6", "c5q9"]],
+        "tan_do_6": [["c6q1", "c7q9"]],
+        "tan_do_7": [["c8q1", "c10q8"]]
+      }
+    },
+    "lam_suong": {
+      "name": "Lam Sương",
+      "role": "",
+      "color": 4864618,
+      "greet": "Vy, tôi ở lại. Lần này, thật sự ở lại.",
+      "appear": {
+        "tan_do_bt": [["c5q7", "c5q9"]],
+        "tan_do_6": [["c6q1", "c7q9"]],
+        "tan_do_7": [["c8q1", "c10q8"]]
+      }
+    },
+    "tho_san_1": {
+      "name": "Thợ săn bị giam",
+      "role": "quest",
+      "color": 6974074,
+      "greet": "Làm ơn... mở lồng giúp tôi. Bọn chúng đã nhốt chúng tôi ba ngày rồi.",
+      "appear": {"tp_chim_c": [[20, 20]]}
+    },
+    "tho_san_2": {
+      "name": "Thợ săn bị giam",
+      "role": "quest",
+      "color": 6974074,
+      "greet": "Cô gái tóc đỏ đâu? Tôi nghe tiếng cô ấy gọi... Mau mở lồng đi!",
+      "appear": {"tp_chim_c": [[20, 20]]}
+    },
+    "tho_san_3": {
+      "name": "Thợ săn bị giam",
+      "role": "quest",
+      "color": 6974074,
+      "greet": "Nước đang dâng! Làm ơn, tôi chưa muốn chết ở đây.",
+      "appear": {"tp_chim_c": [[20, 20]]}
+    },
+    "tho_san_4": {
+      "name": "Thợ săn bị giam",
+      "role": "quest",
+      "color": 6974074,
+      "greet": "Tôi tưởng sẽ không ai tới. Cảm ơn trời.",
+      "appear": {"tp_chim_c": [[20, 20]]}
+    },
+    "tho_san_5": {
+      "name": "Thợ săn bị giam",
+      "role": "quest",
+      "color": 6974074,
+      "greet": "Bọn chúng lấy lõi đỏ từ chúng tôi mỗi đêm. Đi đi, mở lồng!",
+      "appear": {"tp_chim_c": [[20, 20]]}
+    },
+    "hat_mach_1": {
+      "name": "Điểm dẫn mạch",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Hạt Mạch đi qua đây, nối vào dòng chảy này là mạch sẽ liền lại.",
+      "appear": {"long_mach_3": [["c7q5", "c7q5"]]}
+    },
+    "hat_mach_2": {
+      "name": "Điểm dẫn mạch",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Hạt Mạch đi qua đây, nối vào dòng chảy này là mạch sẽ liền lại.",
+      "appear": {"long_mach_3": [["c7q5", "c7q5"]]}
+    },
+    "hat_mach_3": {
+      "name": "Điểm dẫn mạch",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Hạt Mạch đi qua đây, nối vào dòng chảy này là mạch sẽ liền lại.",
+      "appear": {"long_mach_3": [["c7q5", "c7q5"]]}
+    },
+    "tro_ly_1": {
+      "name": "Trợ lý Viện Tinh Hà",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Viện trưởng sai chúng tôi đo sao ở đây rồi trạm sập. Cảm ơn trời, cậu tới rồi!",
+      "appear": {"tinh_van_3": [["c8q5", "c8q5"]]}
+    },
+    "tro_ly_2": {
+      "name": "Trợ lý Viện Tinh Hà",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Viện trưởng sai chúng tôi đo sao ở đây rồi trạm sập. Cảm ơn trời, cậu tới rồi!",
+      "appear": {"tinh_van_3": [["c8q5", "c8q5"]]}
+    },
+    "tro_ly_3": {
+      "name": "Trợ lý Viện Tinh Hà",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Viện trưởng sai chúng tôi đo sao ở đây rồi trạm sập. Cảm ơn trời, cậu tới rồi!",
+      "appear": {"tinh_van_3": [["c8q5", "c8q5"]]}
+    },
+    "tro_ly_4": {
+      "name": "Trợ lý Viện Tinh Hà",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Viện trưởng sai chúng tôi đo sao ở đây rồi trạm sập. Cảm ơn trời, cậu tới rồi!",
+      "appear": {"tinh_van_3": [["c8q5", "c8q5"]]}
+    },
+    "cua_sang_1": {
+      "name": "Cánh cửa Sáng Thế",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Cánh cửa phát sáng, đợi người đủ can đảm bước qua.",
+      "appear": {"sang_the_2": [["c10q4", "c10q4"]]}
+    },
+    "cua_sang_2": {
+      "name": "Cánh cửa Sáng Thế",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Cánh cửa phát sáng, đợi người đủ can đảm bước qua.",
+      "appear": {"sang_the_2": [["c10q4", "c10q4"]]}
+    },
+    "cua_sang_3": {
+      "name": "Cánh cửa Sáng Thế",
+      "role": "quest",
+      "color": 6982298,
+      "greet": "Cánh cửa phát sáng, đợi người đủ can đảm bước qua.",
+      "appear": {"sang_the_2": [["c10q4", "c10q4"]]}
+    },
+    "lang_hinh": {
+      "name": "Lăng",
+      "role": "quest",
+      "color": 16771232,
+      "greet": "Ngươi tới rồi. Ta đã đợi ba trăm năm.",
+      "appear": {"sang_the_4": [["c10q6", "c10q8"]]}
+    },
+    "bang_nv": {
+      "name": "Bảng nhiệm vụ",
+      "role": "daily",
+      "color": 3885658,
+      "greet": "Bảng nhiệm vụ của Hiệp Hội. Mỗi ngày có 3 việc mới, làm mới lúc 0 giờ."
+    },
+    "tho_ren": {
+      "name": "Thợ chế tác Thiết",
+      "role": "smith",
+      "color": 6113850,
+      "greet": "Đồ rơi từ cổng thì phải qua tay ta mới thành vũ khí thật sự. Đưa đây xem nào!"
+    },
+    "ba_thuoc": {
+      "name": "Dược sư Lan",
+      "role": "shop",
+      "color": 3112301,
+      "greet": "Vào cổng mà không mang thuốc là tự sát đấy, cậu nhóc.",
+      "shop": [
+        "binh_mau_nho", "binh_nl_nho", "binh_mau_vua", "binh_nl_vua", "binh_mau_lon", "binh_nl_lon",
+        "binh_mau_dac", "binh_nl_dac", "binh_mau_than_thoai", "binh_nl_than_thoai", "thuoc_nhiem_do",
+        "da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao", "da_cuong_hoa_than_thoai"
+      ],
+      "shopKind": "herb"
+    },
+    "tran_bao": {
+      "name": "Lầu Trân Bảo",
+      "role": "shop",
+      "color": 9071151,
+      "ngocShop": true,
+      "greet": "Xu mua được đồ thường. Ngọc thì mua được thứ người ta không bán cho ai.",
+      "shop": [
+        "bua_x2_kinh_nghiem", "sach_ky_nang", "sach_tay_ky_nang", "sach_mo_rong_thuong",
+        "sach_mo_rong_tuyet_ky"
+      ]
+    },
+    "tap_hoa": {
+      "name": "Chủ tiệm Tư",
+      "role": "shop",
+      "color": 7032736,
+      "greet": "Trang bị cho thợ săn mới vào nghề đây! Bán gì cũng mua, giá hữu nghị.",
+      "gearShop": true,
+      "shop": ["da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao"],
+      "shopKind": "gear"
+    },
+    "tram": {
+      "name": "Trạm dịch chuyển",
+      "role": "teleport",
+      "color": 4182271,
+      "greet": "Trạm dịch chuyển của Hiệp Hội. Đưa cậu tới Tân Đô nào cậu đã từng ghé, mỗi lượt 300 xu. Đi bộ thì miễn phí."
+    },
+    "ha_phong": {
+      "name": "Hạ Phong",
+      "role": "quest",
+      "color": 3107722,
+      "greet": "Tôi đứng ở bến này hai mươi năm rồi. Sông nào, cổng nào, tôi đều biết đường. Nhưng mấy tháng nay có những người đi qua mà không trở về."
+    },
+    "minh_triet": {
+      "name": "Viện trưởng Minh Triết",
+      "role": "quest",
+      "color": 5913226,
+      "greet": "À, cậu đến rồi. Xin lỗi, tôi đã quên ăn trưa. Tôi đang đo xem năm Vùng rơi xuống theo quy luật nào. Cậu có muốn nhìn bản vẽ không?"
+    },
+    "thu_kho": {
+      "name": "Quản kho Bảo",
+      "role": "storage",
+      "color": 3885658,
+      "greet": "Kho của Hiệp Hội, khóa ba lớp. Gửi gì cũng giữ nguyên vẹn."
+    },
+    "cho": {
+      "name": "Chợ người chơi",
+      "role": "market",
+      "color": 9071151,
+      "greet": "Chợ của thợ săn. Ai có đồ thừa thì treo lên, ai cần thì mua. Ta giữ tin 48 giờ, thu 5% khi bán được."
+    },
+    "khu_su": {
+      "name": "Người dẫn khu",
+      "role": "zone",
+      "color": 4182271,
+      "look": "tram",
+      "greet": "Mỗi bản đồ chia thành 30 khu, mỗi khu tối đa 20 người. Cậu muốn sang khu nào?"
+    },
+    "lu_khach": {
+      "name": "Lữ khách bí ẩn",
+      "role": "mystic",
+      "color": 3811925,
+      "greet": "Cậu cũng nghe thấy giọng nói của Hệ thống, phải không? Nó không chọn ngẫu nhiên đâu. Nếu cậu biết mật mã, ta sẽ chỉ cho cậu một con đường khác.",
+      "appear": {
+        "lang": [["q0", "c3q10"], ["c5q1", "c10q8"]],
+        "tan_do_3": [["c3q11", "c4q1"]],
+        "vac_da": [["c4q1", "c4q2"]],
+        "cong_khai_hoan": [["c4q1", "c4q2"]],
+        "tan_do_4": [["c4q2", "c4q3b"], ["c4q7", "c4q8"]],
+        "thu_vien": [["c4q4", "c4q4b"]],
+        "phong_luu_tru": [["c4q4b", "c4q5"]],
+        "dinh_thap": [["c4q6", "c4q6"]],
+        "sanh_cho": [["c5q3", "c5q3b"]],
+        "tan_do_7": [["c8q9", "c9q9"]]
+      }
+    },
+    "tho_ren_2": {
+      "name": "Thợ chế tác Phong",
+      "role": "smith",
+      "color": 6113850,
+      "greet": "Đồ rơi từ cổng thì phải qua tay ta mới thành vũ khí thật sự. Đưa đây xem nào!",
+      "look": "tho_ren",
+      "village": 2
+    },
+    "tho_ren_3": {
+      "name": "Thợ chế tác Hàn",
+      "role": "smith",
+      "color": 6113850,
+      "greet": "Đồ rơi từ cổng thì phải qua tay ta mới thành vũ khí thật sự. Đưa đây xem nào!",
+      "look": "tho_ren",
+      "village": 3
+    },
+    "tho_ren_4": {
+      "name": "Thợ chế tác Kiều",
+      "role": "smith",
+      "color": 6113850,
+      "greet": "Đồ rơi từ cổng thì phải qua tay ta mới thành vũ khí thật sự. Đưa đây xem nào!",
+      "look": "tho_ren",
+      "village": 4
+    },
+    "tho_ren_5": {
+      "name": "Thợ chế tác Diệm",
+      "role": "smith",
+      "color": 6113850,
+      "greet": "Đồ rơi từ cổng thì phải qua tay ta mới thành vũ khí thật sự. Đưa đây xem nào!",
+      "look": "tho_ren",
+      "village": 5
+    },
+    "tho_ren_6": {
+      "name": "Thợ chế tác Khôi",
+      "role": "smith",
+      "color": 6113850,
+      "greet": "Đồ rơi từ cổng thì phải qua tay ta mới thành vũ khí thật sự. Đưa đây xem nào!",
+      "look": "tho_ren",
+      "village": 6
+    },
+    "tho_ren_7": {
+      "name": "Thợ chế tác Tinh",
+      "role": "smith",
+      "color": 6113850,
+      "greet": "Đồ rơi từ cổng thì phải qua tay ta mới thành vũ khí thật sự. Đưa đây xem nào!",
+      "look": "tho_ren",
+      "village": 7
+    },
+    "ba_thuoc_2": {
+      "name": "Dược sư Đào",
+      "role": "shop",
+      "color": 3112301,
+      "greet": "Vào cổng mà không mang thuốc là tự sát đấy, cậu nhóc.",
+      "shop": [
+        "binh_mau_nho", "binh_nl_nho", "binh_mau_vua", "binh_nl_vua", "binh_mau_lon", "binh_nl_lon",
+        "binh_mau_dac", "binh_nl_dac", "binh_mau_than_thoai", "binh_nl_than_thoai", "thuoc_nhiem_do",
+        "da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao", "da_cuong_hoa_than_thoai"
+      ],
+      "shopKind": "herb",
+      "look": "ba_thuoc",
+      "village": 2
+    },
+    "ba_thuoc_3": {
+      "name": "Dược sư Băng",
+      "role": "shop",
+      "color": 3112301,
+      "greet": "Vào cổng mà không mang thuốc là tự sát đấy, cậu nhóc.",
+      "shop": [
+        "binh_mau_nho", "binh_nl_nho", "binh_mau_vua", "binh_nl_vua", "binh_mau_lon", "binh_nl_lon",
+        "binh_mau_dac", "binh_nl_dac", "binh_mau_than_thoai", "binh_nl_than_thoai", "thuoc_nhiem_do",
+        "da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao", "da_cuong_hoa_than_thoai"
+      ],
+      "shopKind": "herb",
+      "look": "ba_thuoc",
+      "village": 3
+    },
+    "ba_thuoc_4": {
+      "name": "Dược sư Mây",
+      "role": "shop",
+      "color": 3112301,
+      "greet": "Vào cổng mà không mang thuốc là tự sát đấy, cậu nhóc.",
+      "shop": [
+        "binh_mau_nho", "binh_nl_nho", "binh_mau_vua", "binh_nl_vua", "binh_mau_lon", "binh_nl_lon",
+        "binh_mau_dac", "binh_nl_dac", "binh_mau_than_thoai", "binh_nl_than_thoai", "thuoc_nhiem_do",
+        "da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao", "da_cuong_hoa_than_thoai"
+      ],
+      "shopKind": "herb",
+      "look": "ba_thuoc",
+      "village": 4
+    },
+    "ba_thuoc_5": {
+      "name": "Dược sư Hồng",
+      "role": "shop",
+      "color": 3112301,
+      "greet": "Vào cổng mà không mang thuốc là tự sát đấy, cậu nhóc.",
+      "shop": [
+        "binh_mau_nho", "binh_nl_nho", "binh_mau_vua", "binh_nl_vua", "binh_mau_lon", "binh_nl_lon",
+        "binh_mau_dac", "binh_nl_dac", "binh_mau_than_thoai", "binh_nl_than_thoai", "thuoc_nhiem_do",
+        "da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao", "da_cuong_hoa_than_thoai"
+      ],
+      "shopKind": "herb",
+      "look": "ba_thuoc",
+      "village": 5
+    },
+    "ba_thuoc_6": {
+      "name": "Dược sư Thảo",
+      "role": "shop",
+      "color": 3112301,
+      "greet": "Vào cổng mà không mang thuốc là tự sát đấy, cậu nhóc.",
+      "shop": [
+        "binh_mau_nho", "binh_nl_nho", "binh_mau_vua", "binh_nl_vua", "binh_mau_lon", "binh_nl_lon",
+        "binh_mau_dac", "binh_nl_dac", "binh_mau_than_thoai", "binh_nl_than_thoai", "thuoc_nhiem_do",
+        "da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao", "da_cuong_hoa_than_thoai"
+      ],
+      "shopKind": "herb",
+      "look": "ba_thuoc",
+      "village": 6
+    },
+    "ba_thuoc_7": {
+      "name": "Dược sư Sao",
+      "role": "shop",
+      "color": 3112301,
+      "greet": "Vào cổng mà không mang thuốc là tự sát đấy, cậu nhóc.",
+      "shop": [
+        "binh_mau_nho", "binh_nl_nho", "binh_mau_vua", "binh_nl_vua", "binh_mau_lon", "binh_nl_lon",
+        "binh_mau_dac", "binh_nl_dac", "binh_mau_than_thoai", "binh_nl_than_thoai", "thuoc_nhiem_do",
+        "da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao", "da_cuong_hoa_than_thoai"
+      ],
+      "shopKind": "herb",
+      "look": "ba_thuoc",
+      "village": 7
+    },
+    "tap_hoa_2": {
+      "name": "Chủ tiệm Mận",
+      "role": "shop",
+      "color": 7032736,
+      "greet": "Trang bị cho thợ săn mới vào nghề đây! Bán gì cũng mua, giá hữu nghị.",
+      "gearShop": true,
+      "shop": ["da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao"],
+      "shopKind": "gear",
+      "look": "tap_hoa",
+      "village": 2
+    },
+    "tap_hoa_3": {
+      "name": "Chủ tiệm Lạnh",
+      "role": "shop",
+      "color": 7032736,
+      "greet": "Trang bị cho thợ săn mới vào nghề đây! Bán gì cũng mua, giá hữu nghị.",
+      "gearShop": true,
+      "shop": ["da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao"],
+      "shopKind": "gear",
+      "look": "tap_hoa",
+      "village": 3
+    },
+    "tap_hoa_4": {
+      "name": "Chủ tiệm Đá",
+      "role": "shop",
+      "color": 7032736,
+      "greet": "Trang bị cho thợ săn mới vào nghề đây! Bán gì cũng mua, giá hữu nghị.",
+      "gearShop": true,
+      "shop": ["da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao"],
+      "shopKind": "gear",
+      "look": "tap_hoa",
+      "village": 4
+    },
+    "tap_hoa_5": {
+      "name": "Chủ tiệm Tú",
+      "role": "shop",
+      "color": 7032736,
+      "greet": "Trang bị cho thợ săn mới vào nghề đây! Bán gì cũng mua, giá hữu nghị.",
+      "gearShop": true,
+      "shop": ["da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao"],
+      "shopKind": "gear",
+      "look": "tap_hoa",
+      "village": 5
+    },
+    "tap_hoa_6": {
+      "name": "Chủ tiệm Trụ",
+      "role": "shop",
+      "color": 7032736,
+      "greet": "Trang bị cho thợ săn mới vào nghề đây! Bán gì cũng mua, giá hữu nghị.",
+      "gearShop": true,
+      "shop": ["da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao"],
+      "shopKind": "gear",
+      "look": "tap_hoa",
+      "village": 6
+    },
+    "tap_hoa_7": {
+      "name": "Chủ tiệm Hà",
+      "role": "shop",
+      "color": 7032736,
+      "greet": "Trang bị cho thợ săn mới vào nghề đây! Bán gì cũng mua, giá hữu nghị.",
+      "gearShop": true,
+      "shop": ["da_cuong_hoa", "da_cuong_hoa_trung", "da_cuong_hoa_cao"],
+      "shopKind": "gear",
+      "look": "tap_hoa",
+      "village": 7
+    },
+    "thu_kho_2": {
+      "name": "Quản kho Bến",
+      "role": "storage",
+      "color": 3885658,
+      "greet": "Kho của Hiệp Hội, khóa ba lớp. Gửi gì cũng giữ nguyên vẹn.",
+      "look": "thu_kho",
+      "village": 2
+    },
+    "thu_kho_3": {
+      "name": "Quản kho Sương",
+      "role": "storage",
+      "color": 3885658,
+      "greet": "Kho của Hiệp Hội, khóa ba lớp. Gửi gì cũng giữ nguyên vẹn.",
+      "look": "thu_kho",
+      "village": 3
+    },
+    "thu_kho_4": {
+      "name": "Quản kho Kiên",
+      "role": "storage",
+      "color": 3885658,
+      "greet": "Kho của Hiệp Hội, khóa ba lớp. Gửi gì cũng giữ nguyên vẹn.",
+      "look": "thu_kho",
+      "village": 4
+    },
+    "thu_kho_5": {
+      "name": "Quản kho Nguyệt",
+      "role": "storage",
+      "color": 3885658,
+      "greet": "Kho của Hiệp Hội, khóa ba lớp. Gửi gì cũng giữ nguyên vẹn.",
+      "look": "thu_kho",
+      "village": 5
+    },
+    "thu_kho_6": {
+      "name": "Quản kho Mạch",
+      "role": "storage",
+      "color": 3885658,
+      "greet": "Kho của Hiệp Hội, khóa ba lớp. Gửi gì cũng giữ nguyên vẹn.",
+      "look": "thu_kho",
+      "village": 6
+    },
+    "thu_kho_7": {
+      "name": "Quản kho Ngân",
+      "role": "storage",
+      "color": 3885658,
+      "greet": "Kho của Hiệp Hội, khóa ba lớp. Gửi gì cũng giữ nguyên vẹn.",
+      "look": "thu_kho",
+      "village": 7
+    },
+    "bang_nv_2": {
+      "name": "Bảng nhiệm vụ Hải Cảng",
+      "role": "daily",
+      "color": 3885658,
+      "greet": "Bảng nhiệm vụ của Tân Đô Hải Cảng. Mỗi ngày có 3 việc mới, làm mới lúc 0 giờ.",
+      "look": "bang_nv",
+      "village": 2
+    },
+    "tram_2": {
+      "name": "Trạm dịch chuyển",
+      "role": "teleport",
+      "color": 4182271,
+      "greet": "Trạm dịch chuyển của Hiệp Hội. Đưa cậu tới Tân Đô nào cậu đã từng ghé, mỗi lượt 300 xu. Đi bộ thì miễn phí.",
+      "look": "tram",
+      "village": 2
+    },
+    "cho_2": {
+      "name": "Chợ Hải Cảng",
+      "role": "market",
+      "color": 9071151,
+      "greet": "Chợ của Tân Đô Hải Cảng. Treo đồ thừa lên đây, người cần sẽ tìm thấy.",
+      "look": "cho",
+      "village": 2
+    },
+    "bang_nv_3": {
+      "name": "Bảng nhiệm vụ Lò Rèn Băng",
+      "role": "daily",
+      "color": 3885658,
+      "greet": "Bảng nhiệm vụ của Tân Đô Lò Rèn Băng. Mỗi ngày có 3 việc mới, làm mới lúc 0 giờ.",
+      "look": "bang_nv",
+      "village": 3
+    },
+    "tram_3": {
+      "name": "Trạm dịch chuyển",
+      "role": "teleport",
+      "color": 4182271,
+      "greet": "Trạm dịch chuyển của Hiệp Hội. Đưa cậu tới Tân Đô nào cậu đã từng ghé, mỗi lượt 300 xu. Đi bộ thì miễn phí.",
+      "look": "tram",
+      "village": 3
+    },
+    "cho_3": {
+      "name": "Chợ Lò Rèn Băng",
+      "role": "market",
+      "color": 9071151,
+      "greet": "Chợ của Tân Đô Lò Rèn Băng. Treo đồ thừa lên đây, người cần sẽ tìm thấy.",
+      "look": "cho",
+      "village": 3
+    },
+    "bang_nv_4": {
+      "name": "Bảng nhiệm vụ Phù Đảo",
+      "role": "daily",
+      "color": 3885658,
+      "greet": "Bảng nhiệm vụ của Tân Đô Phù Đảo. Mỗi ngày có 3 việc mới, làm mới lúc 0 giờ.",
+      "look": "bang_nv",
+      "village": 4
+    },
+    "tram_4": {
+      "name": "Trạm dịch chuyển",
+      "role": "teleport",
+      "color": 4182271,
+      "greet": "Trạm dịch chuyển của Hiệp Hội. Đưa cậu tới Tân Đô nào cậu đã từng ghé, mỗi lượt 300 xu. Đi bộ thì miễn phí.",
+      "look": "tram",
+      "village": 4
+    },
+    "cho_4": {
+      "name": "Chợ Phù Đảo",
+      "role": "market",
+      "color": 9071151,
+      "greet": "Chợ của Tân Đô Phù Đảo. Treo đồ thừa lên đây, người cần sẽ tìm thấy.",
+      "look": "cho",
+      "village": 4
+    },
+    "bang_nv_5": {
+      "name": "Bảng nhiệm vụ Bầu Trời Rách",
+      "role": "daily",
+      "color": 3885658,
+      "greet": "Bảng nhiệm vụ của Tân Đô Bầu Trời Rách. Mỗi ngày có 3 việc mới, làm mới lúc 0 giờ.",
+      "look": "bang_nv",
+      "village": 5
+    },
+    "tram_5": {
+      "name": "Trạm dịch chuyển",
+      "role": "teleport",
+      "color": 4182271,
+      "greet": "Trạm dịch chuyển của Hiệp Hội. Đưa cậu tới Tân Đô nào cậu đã từng ghé, mỗi lượt 300 xu. Đi bộ thì miễn phí.",
+      "look": "tram",
+      "village": 5
+    },
+    "cho_5": {
+      "name": "Chợ Bầu Trời Rách",
+      "role": "market",
+      "color": 9071151,
+      "greet": "Chợ của Tân Đô Bầu Trời Rách. Treo đồ thừa lên đây, người cần sẽ tìm thấy.",
+      "look": "cho",
+      "village": 5
+    },
+    "bang_nv_6": {
+      "name": "Bảng nhiệm vụ Thiên Đô",
+      "role": "daily",
+      "color": 3885658,
+      "greet": "Bảng nhiệm vụ của Tân Đô Thiên Đô. Mỗi ngày có 3 việc mới, làm mới lúc 0 giờ.",
+      "look": "bang_nv",
+      "village": 6
+    },
+    "tram_6": {
+      "name": "Trạm dịch chuyển",
+      "role": "teleport",
+      "color": 4182271,
+      "greet": "Trạm dịch chuyển của Hiệp Hội. Đưa cậu tới Tân Đô nào cậu đã từng ghé, mỗi lượt 300 xu. Đi bộ thì miễn phí.",
+      "look": "tram",
+      "village": 6
+    },
+    "cho_6": {
+      "name": "Chợ Thiên Đô",
+      "role": "market",
+      "color": 9071151,
+      "greet": "Chợ của Tân Đô Thiên Đô. Treo đồ thừa lên đây, người cần sẽ tìm thấy.",
+      "look": "cho",
+      "village": 6
+    },
+    "bang_nv_7": {
+      "name": "Bảng nhiệm vụ Tinh Hà",
+      "role": "daily",
+      "color": 3885658,
+      "greet": "Bảng nhiệm vụ của Tân Đô Tinh Hà. Mỗi ngày có 3 việc mới, làm mới lúc 0 giờ.",
+      "look": "bang_nv",
+      "village": 7
+    },
+    "tram_7": {
+      "name": "Trạm dịch chuyển",
+      "role": "teleport",
+      "color": 4182271,
+      "greet": "Trạm dịch chuyển của Hiệp Hội. Đưa cậu tới Tân Đô nào cậu đã từng ghé, mỗi lượt 300 xu. Đi bộ thì miễn phí.",
+      "look": "tram",
+      "village": 7
+    },
+    "cho_7": {
+      "name": "Chợ Tinh Hà",
+      "role": "market",
+      "color": 9071151,
+      "greet": "Chợ của Tân Đô Tinh Hà. Treo đồ thừa lên đây, người cần sẽ tìm thấy.",
+      "look": "cho",
+      "village": 7
+    },
+    "truong_lang_5": {
+      "name": "Trưởng làng Vực",
+      "role": "quest",
+      "color": 6957882,
+      "greet": "Cổng ở đây rách ra từ chính bầu trời. Hội trưởng Khải nhắn qua đường truyền: cậu là người cần gặp."
+    },
+    "truong_lang_6": {
+      "name": "Trưởng Thịnh",
+      "role": "quest",
+      "color": 2837098,
+      "greet": "Thiên Đô giữ được tới giờ là nhờ những người như cậu. Hội trưởng Khải vẫn nhắn qua đường truyền mỗi ngày."
+    }
+  }
+}

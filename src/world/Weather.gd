@@ -48,7 +48,7 @@ func _emitter(count: int, tex: Texture2D, color: Color, life: float, vel: Vector
 	var p := CPUParticles2D.new()
 	p.amount = maxi(2, int(float(count) * (0.5 if Settings.quality_low else 1.0)))
 	p.lifetime = life
-	p.preprocess = life
+	p.preprocess = minf(life, 1.0)   # mô phỏng trước cả vòng đời (tới 7s) gây khựng lúc vào map
 	p.texture = tex
 	p.color = color
 	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
@@ -69,7 +69,9 @@ func _emitter(count: int, tex: Texture2D, color: Color, life: float, vel: Vector
 func apply(look: Dictionary) -> void:
 	for c in _holder.get_children(): c.queue_free()
 	_view = get_viewport().get_visible_rect().size
-	_grade.color = _col(int(look.get("grade", 0xffffff)))
+	var grade_v := int(look.get("grade", 0xffffff))
+	_grade.color = _col(grade_v)
+	_grade.visible = (grade_v & 0xffffff) != 0xffffff   # nhân trắng = không đổi gì: bỏ hẳn lớp phủ toàn màn hình
 	var weather := str(look.get("weather", "none"))
 	if Settings.quality_low and weather in ["rain", "snow"]: weather = "none"
 	var mote_n := int(look.get("moteN", 14))

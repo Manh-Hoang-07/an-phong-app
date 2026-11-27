@@ -1,20 +1,19 @@
 extends RefCounted
-## Sổ đăng ký các bộ hiệu ứng kỹ năng riêng theo nhóm class (mỗi file FxExt_*.gd do một người sửa).
+## Sổ đăng ký các bộ hiệu ứng kỹ năng riêng theo nhóm class — file FxSkill_<Class>.gd là bản vẽ hiện hành theo class; FxSkillOld_*.gd là bản cũ, chỉ làm dự phòng. THỨ TỰ trong ALL = ưu tiên (đứng trước đè đứng sau).
 ## Mỗi bộ có: IDS {id_kỹ_năng: tên_sig}, CFG {sig: {place, dur, nopop, rumble}}, static draw(s, sig, t, lowq).
 const ALL := [
-	preload("res://src/world/fx/FxExt_h.gd"),
-	preload("res://src/world/fx/FxExt_i.gd"),
-	preload("res://src/world/fx/FxExt_j.gd"),
-	preload("res://src/world/fx/FxExt_k.gd"),
-	preload("res://src/world/fx/FxExt_l.gd"),
-	preload("res://src/world/fx/FxExt_m.gd"),
-	preload("res://src/world/fx/FxExt_g.gd"),
-	preload("res://src/world/fx/FxExt_f.gd"),
-	preload("res://src/world/fx/FxExt_e.gd"),
-	preload("res://src/world/fx/FxExt_a.gd"),
-	preload("res://src/world/fx/FxExt_b.gd"),
-	preload("res://src/world/fx/FxExt_c.gd"),
-	preload("res://src/world/fx/FxExt_d.gd"),
+	preload("res://src/world/fx/FxSkill_Tank.gd"),
+	preload("res://src/world/fx/FxSkill_Mage.gd"),
+	preload("res://src/world/fx/FxSkill_Healer.gd"),
+	preload("res://src/world/fx/FxSkill_Necromancer.gd"),
+	preload("res://src/world/fx/FxSkill_Summoner.gd"),
+	preload("res://src/world/fx/FxSkill_CommonOmni.gd"),
+	preload("res://src/world/fx/FxSkill_Assassin.gd"),
+	preload("res://src/world/fx/FxSkill_Archer.gd"),
+	preload("res://src/world/fx/FxSkill_Swordsman.gd"),
+	preload("res://src/world/fx/FxSkillOld_AssassinArcher.gd"),
+	preload("res://src/world/fx/FxSkillOld_MageNecro.gd"),
+	preload("res://src/world/fx/FxSkillOld_HealSummonCommon.gd"),
 ]
 
 static func sig_for(id: String) -> String:

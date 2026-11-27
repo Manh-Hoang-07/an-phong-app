@@ -48,7 +48,8 @@ func _ready() -> void:
 		fps_cap = int(_cfg.get_value("game", "fps_cap", 60))
 		ui_scale = clampf(float(_cfg.get_value("game", "ui_scale", DEFAULT_UI_SCALE)), 0.6, 1.5)
 		world_zoom = clampf(float(_cfg.get_value("game", "world_zoom", DEFAULT_WORLD_ZOOM)), 0.6, 2.0)
-		quality_low = bool(_cfg.get_value("game", "quality_low", false))
+		# Lần đầu (chưa có khoá): mobile ít nhân CPU thì mặc định chất lượng thấp
+		quality_low = bool(_cfg.get_value("game", "quality_low", _weak_device()))
 		debug_stats = bool(_cfg.get_value("game", "debug_stats", false))
 		last_user = str(_cfg.get_value("net", "last_user", ""))
 		haptics = bool(_cfg.get_value("game", "haptics", true))
@@ -64,6 +65,9 @@ func _ready() -> void:
 	_apply_fps()
 	_apply_display()
 
+func _weak_device() -> bool:
+	return (OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios")) and OS.get_processor_count() <= 4
+
 ## Cỡ HUD. Thay đổi content_scale_factor; KHÔNG đụng vào camera (thế giới có world_zoom riêng).
 func _apply_display() -> void:
 	var w := get_window()
@@ -77,6 +81,25 @@ func set_ui_scale(value: float) -> void:
 func set_world_zoom(value: float) -> void:
 	world_zoom = clampf(value, 0.6, 2.0)
 	_save(); changed.emit("world_zoom", world_zoom)
+
+## Tự hạ chất lượng khi máy yếu: FPS < 40 liên tục ~6s (chỉ khi đang ở chế độ 60 và chưa bật low) thì bật quality_low.
+## Người chơi vẫn tắt lại được trong cài đặt; chỉ tự hạ một lần mỗi phiên để không giằng co.
+var _perf_low_s := 0
+var _perf_acc := 0.0
+var _perf_done := false
+
+func _process(delta: float) -> void:
+	if quality_low or _perf_done or fps_cap == 30: return
+	_perf_acc += delta
+	if _perf_acc < 1.0: return
+	_perf_acc = 0.0
+	if not get_window().has_focus(): _perf_low_s = 0; return
+	var fps := Engine.get_frames_per_second()
+	if fps > 0 and fps < 40: _perf_low_s += 1
+	else: _perf_low_s = maxi(0, _perf_low_s - 1)
+	if _perf_low_s >= 6:
+		_perf_done = true
+		set_quality_low(true)
 
 func _apply_fps() -> void:
 	# 30 FPS: cố định 30. Còn lại: để màn hình quyết định nhịp (vsync) — đặt trần 60 trên màn 90/120Hz làm

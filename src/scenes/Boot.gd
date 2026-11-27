@@ -54,7 +54,7 @@ func _start() -> void:
 	_set_status("Đang nạp dữ liệu…", "", 0.25)
 
 	if not Data.load_local():
-		_set_status("Thiếu dữ liệu game", "Chạy: node server/tools/export-gamedata.js", 0.0)
+		_set_status("Thiếu dữ liệu game", "Chạy: export-gamedata.js rồi tools/export/split_gamedata.js", 0.0)
 		_retry.visible = true
 		return
 
